@@ -8,6 +8,17 @@
   </head>
   <body class="bg-zinc-50">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      import { StrictMode } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import App from './src/App.tsx';
+      import './src/index.css';
+
+      createRoot(document.getElementById('root')).render(
+        <StrictMode>
+          <App />
+        </StrictMode>
+      );
+    </script>
   </body>
 </html>

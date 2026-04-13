@@ -32,8 +32,10 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   updateProfile,
-  db
+  db,
+  storage
 } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, setDoc } from "firebase/firestore";
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
 
@@ -108,6 +110,33 @@ export default function App() {
       toast.success("Profile updated successfully");
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setProfileLoading(true);
+    try {
+      const storageRef = ref(storage, `profiles/${user.uid}/${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      setProfilePhotoUrl(downloadURL);
+      
+      // Update profile immediately with the new URL
+      await updateProfile(user, { photoURL: downloadURL });
+      
+      // Sync with Firestore
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, { photoURL: downloadURL }, { merge: true });
+      
+      toast.success("Photo uploaded successfully");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to upload photo");
     } finally {
       setProfileLoading(false);
     }
@@ -505,12 +534,18 @@ export default function App() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-medium">Profile Image URL</label>
-                      <Input 
-                        value={profilePhotoUrl} 
-                        onChange={(e) => setProfilePhotoUrl(e.target.value)} 
-                        placeholder="https://example.com/photo.jpg"
-                      />
+                      <label className="text-xs font-medium">Profile Image</label>
+                      <div className="flex items-center gap-3">
+                        <Input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handlePhotoUpload}
+                          className="cursor-pointer"
+                          disabled={profileLoading}
+                        />
+                        {profileLoading && <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 italic">Upload a new profile picture.</p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-medium">Email Address</label>
