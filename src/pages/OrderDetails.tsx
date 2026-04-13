@@ -567,7 +567,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           })}
                         >
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder="Select country" />
                           </SelectTrigger>
                           <SelectContent>
                             {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
@@ -844,7 +844,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       <Label>Bill Shipping Charges To</Label>
                       <Select value={billShippingTo} onValueChange={setBillShippingTo}>
                         <SelectTrigger className="text-xs h-8">
-                          <SelectValue />
+                          <SelectValue placeholder="Select billing" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
@@ -858,7 +858,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         <Label>Bill Duties/Taxes To</Label>
                         <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
                           <SelectTrigger className="text-xs h-8">
-                            <SelectValue />
+                            <SelectValue placeholder="Select billing" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="shipper">Shipper (DDP)</SelectItem>

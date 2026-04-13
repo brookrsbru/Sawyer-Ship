@@ -118,7 +118,7 @@ export default function Settings({
                       onValueChange={(v: 'PDF' | 'ZPL') => setFormData({ ...formData, general: { ...formData.general, labelFormat: v } })}
                     >
                       <SelectTrigger id="format">
-                        <SelectValue />
+                        <SelectValue placeholder="Select format" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="PDF">PDF (Standard)</SelectItem>
@@ -133,7 +133,7 @@ export default function Settings({
                       onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, currency: v } })}
                     >
                       <SelectTrigger id="currency">
-                        <SelectValue />
+                        <SelectValue placeholder="Select currency" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="GBP">GBP (£)</SelectItem>
@@ -149,7 +149,7 @@ export default function Settings({
                       onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, autoLockMinutes: parseInt(v) } })}
                     >
                       <SelectTrigger id="autolock">
-                        <SelectValue />
+                        <SelectValue placeholder="Select time" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="0">Never Lock</SelectItem>
@@ -173,7 +173,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, originCountry: v } })}
                       >
                         <SelectTrigger id="origin-country">
-                          <SelectValue />
+                          <SelectValue placeholder="Select country" />
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
@@ -194,7 +194,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, alwaysShowDuties: v === "yes" } })}
                       >
                         <SelectTrigger className="w-[100px]">
-                          <SelectValue />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="yes">Yes</SelectItem>
@@ -213,7 +213,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, markAsShipped: v === "yes" } })}
                       >
                         <SelectTrigger className="w-[100px]">
-                          <SelectValue />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="yes">Yes</SelectItem>
@@ -231,7 +231,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, upsPickupType: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select pickup type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="01">Daily Pickup</SelectItem>
@@ -251,7 +251,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, fedexPickupType: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select pickup type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="CONTACT_FEDEX_TO_SCHEDULE">Contact FedEx to Schedule</SelectItem>
@@ -330,7 +330,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billShippingTo: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select billing" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
@@ -346,7 +346,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billDutiesTo: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select billing" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="shipper">Shipper (DDP)</SelectItem>
@@ -366,7 +366,7 @@ export default function Settings({
                       onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, overwriteExisting: v === "yes" } })}
                     >
                       <SelectTrigger id="overwrite" className="w-[100px]">
-                        <SelectValue />
+                        <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="yes">Yes</SelectItem>
@@ -454,7 +454,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, isSandbox: v === "sandbox" } })}
                       >
                         <SelectTrigger id="ups-env">
-                          <SelectValue />
+                          <SelectValue placeholder="Select environment" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
@@ -511,7 +511,7 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, fedex: { ...formData.fedex, isSandbox: v === "sandbox" } })}
                       >
                         <SelectTrigger id="fedex-env">
-                          <SelectValue />
+                          <SelectValue placeholder="Select environment" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>

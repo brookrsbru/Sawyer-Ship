@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { useSawyerStorage } from '@/src/hooks/use-sawyer-storage';
 import React, { useState } from 'react';
@@ -140,7 +140,7 @@ export default function App() {
   }
 
   return (
-    <Router basename="/Sawyer-Ship">
+    <Router>
       <Layout onLogout={logout}>
         <Routes>
           <Route path="/" element={<Dashboard credentials={credentials} />} />
