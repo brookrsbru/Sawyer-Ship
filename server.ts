@@ -100,40 +100,10 @@ async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "custom", // Changed to custom to handle HTML manually
+      appType: "spa",
     });
     
     app.use(vite.middlewares);
-
-    app.use("*", async (req, res, next) => {
-      const url = req.originalUrl;
-
-      // Skip for API routes or files with extensions (assets)
-      if (url.startsWith("/api") || url.includes(".")) {
-        return next();
-      }
-
-      try {
-        // 1. Read index.html
-        let template = fs.readFileSync(
-          path.resolve(__dirname, "index.html"),
-          "utf-8"
-        );
-
-        // 2. Apply Vite HTML transforms. This injects the Vite HMR client, and
-        //    also applies HTML transforms from Vite plugins, e.g. global preambles
-        //    from @vitejs/plugin-react
-        template = await vite.transformIndexHtml(url, template);
-
-        // 3. Send the rendered HTML back.
-        res.status(200).set({ "Content-Type": "text/html" }).end(template);
-      } catch (e: any) {
-        // If an error is caught, let Vite fix the stack trace so it maps back
-        // to your actual source code.
-        vite.ssrFixStacktrace(e);
-        next(e);
-      }
-    });
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
