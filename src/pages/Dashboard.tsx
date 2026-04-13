@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Package, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Package, ArrowRight, Loader2, AlertCircle, X } from 'lucide-react';
 import { MagentoClient, MagentoOrder } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
 export default function Dashboard({ credentials }: { credentials: SawyerCredentials }) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('sawyer_last_search') || '');
   const [orders, setOrders] = useState<MagentoOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    localStorage.setItem('sawyer_last_search', searchQuery);
+  }, [searchQuery]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +68,17 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
                 placeholder="Order #"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 pr-10"
               />
+              {searchQuery && (
+                <button 
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <Button type="submit" disabled={isLoading} className="bg-zinc-900 hover:bg-zinc-800">
               {isLoading ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Search className="w-4 h-4 mr-2" />}

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Globe } from 'lucide-react';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2 } from 'lucide-react';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { toast } from 'sonner';
@@ -20,7 +20,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [productDetails, setProductDetails] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingProducts, setIsFetchingProducts] = useState(false);
-  
+  const [error, setError] = useState<string | null>(null);
+
   // Package details
   const [weight, setWeight] = useState('1.0');
   const [length, setLength] = useState('10');
@@ -33,6 +34,32 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [isShipping, setIsShipping] = useState(false);
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchOrder = async () => {
+      if (order || !id || !credentials.magento.url || !credentials.magento.token) return;
+      
+      setIsLoading(true);
+      setError(null);
+      try {
+        const client = new MagentoClient(
+          credentials.magento.url,
+          credentials.magento.token,
+          credentials.general.proxyUrl
+        );
+        const fetchedOrder = await client.getOrder(id);
+        setOrder(fetchedOrder);
+      } catch (e: any) {
+        console.error(e);
+        setError(e.message || "Failed to load order details.");
+        toast.error("Failed to load order from Magento.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrder();
+  }, [id, order, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl]);
 
   useEffect(() => {
     const fetchProductInfo = async () => {
@@ -127,7 +154,27 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     }
   };
 
-  if (!order) return <div>Loading order...</div>;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="w-8 h-8 animate-spin text-zinc-900" />
+        <p className="text-zinc-500">Loading order details...</p>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="p-3 bg-red-50 rounded-full">
+          <Package className="w-8 h-8 text-red-600" />
+        </div>
+        <h2 className="text-xl font-bold text-zinc-900">Order Not Found</h2>
+        <p className="text-zinc-500 max-w-md text-center">{error || "We couldn't find the order you're looking for."}</p>
+        <Button onClick={() => navigate('/')} variant="outline">Back to Dashboard</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

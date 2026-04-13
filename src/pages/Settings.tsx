@@ -66,13 +66,64 @@ export default function Settings({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <Tabs defaultValue="magento" className="w-full">
+          <Tabs defaultValue="general" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="magento">Magento</TabsTrigger>
               <TabsTrigger value="ups">UPS</TabsTrigger>
               <TabsTrigger value="fedex">FedEx</TabsTrigger>
-              <TabsTrigger value="general">General</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="general" className="space-y-4 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Application Preferences</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="proxy">CORS Proxy URL</Label>
+                    <Input 
+                      id="proxy" 
+                      placeholder="https://cors-anywhere.herokuapp.com/" 
+                      value={formData.general.proxyUrl}
+                      onChange={(e) => setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } })}
+                    />
+                    <p className="text-xs text-zinc-500">Required for browser-based API calls if the server doesn't support CORS.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="format">Default Label Format</Label>
+                    <Select 
+                      value={formData.general.labelFormat}
+                      onValueChange={(v: 'PDF' | 'ZPL') => setFormData({ ...formData, general: { ...formData.general, labelFormat: v } })}
+                    >
+                      <SelectTrigger id="format">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PDF">PDF (Standard)</SelectItem>
+                        <SelectItem value="ZPL">ZPL (Thermal)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Display Currency</Label>
+                    <Select 
+                      value={formData.general.currency}
+                      onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, currency: v } })}
+                    >
+                      <SelectTrigger id="currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="magento" className="space-y-4 mt-6">
               <Card>
@@ -216,57 +267,6 @@ export default function Settings({
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="general" className="space-y-4 mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Application Preferences</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="proxy">CORS Proxy URL</Label>
-                    <Input 
-                      id="proxy" 
-                      placeholder="https://cors-anywhere.herokuapp.com/" 
-                      value={formData.general.proxyUrl}
-                      onChange={(e) => setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } })}
-                    />
-                    <p className="text-xs text-zinc-500">Required for browser-based API calls if the server doesn't support CORS.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="format">Default Label Format</Label>
-                    <Select 
-                      value={formData.general.labelFormat}
-                      onValueChange={(v: 'PDF' | 'ZPL') => setFormData({ ...formData, general: { ...formData.general, labelFormat: v } })}
-                    >
-                      <SelectTrigger id="format">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PDF">PDF (Standard)</SelectItem>
-                        <SelectItem value="ZPL">ZPL (Thermal)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Display Currency</Label>
-                    <Select 
-                      value={formData.general.currency}
-                      onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, currency: v } })}
-                    >
-                      <SelectTrigger id="currency">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                        <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </CardContent>
               </Card>
