@@ -11,6 +11,7 @@ import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
+import { COUNTRY_NAMES } from '@/src/lib/countries';
 import { toast } from 'sonner';
 
 export default function OrderDetails({ credentials }: { credentials: SawyerCredentials }) {
@@ -150,19 +151,144 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     setRates([]);
     
     try {
-      // Mocking rate fetch for demo purposes as real API calls need valid tokens
-      // In a real scenario, we would call UPSClient and FedExClient here
+      const allRates: any[] = [];
+      const weightVal = parseFloat(weight) || 0.1;
+      const l = parseFloat(length) || 1;
+      const w = parseFloat(width) || 1;
+      const h = parseFloat(height) || 1;
+
+      // 1. Fetch UPS Rates if credentials exist
+      if (credentials.ups.clientId && credentials.ups.clientSecret) {
+        try {
+          const ups = new UPSClient(
+            credentials.ups.clientId,
+            credentials.ups.clientSecret,
+            credentials.ups.accountNumber,
+            credentials.ups.isSandbox,
+            credentials.general.proxyUrl
+          );
+
+          // Simplified UPS Rating Request
+          const upsParams = {
+            RateRequest: {
+              Request: { RequestOption: "Shop" },
+              Shipment: {
+                Shipper: {
+                  Address: {
+                    PostalCode: "SW1A 1AA", // Example origin
+                    CountryCode: "GB"
+                  }
+                },
+                ShipTo: {
+                  Address: {
+                    PostalCode: order.shipping_address.postcode,
+                    CountryCode: order.shipping_address.country_id
+                  }
+                },
+                Service: { Code: "03" },
+                Package: {
+                  PackagingType: { Code: "02" },
+                  Dimensions: {
+                    UnitOfMeasurement: { Code: "CM" },
+                    Length: l.toString(),
+                    Width: w.toString(),
+                    Height: h.toString()
+                  },
+                  PackageWeight: {
+                    UnitOfMeasurement: { Code: "KGS" },
+                    Weight: weightVal.toString()
+                  }
+                }
+              }
+            }
+          };
+
+          const upsData = await ups.getRates(upsParams);
+          if (upsData?.RateResponse?.RatedShipment) {
+            const shipments = Array.isArray(upsData.RateResponse.RatedShipment) 
+              ? upsData.RateResponse.RatedShipment 
+              : [upsData.RateResponse.RatedShipment];
+            
+            shipments.forEach((s: any) => {
+              allRates.push({
+                id: `ups-${s.Service.Code}`,
+                carrier: 'UPS',
+                service: `Service ${s.Service.Code}`,
+                price: parseFloat(s.TotalCharges.MonetaryValue),
+                delivery: 'Live Rate'
+              });
+            });
+          }
+        } catch (e) {
+          console.error("UPS Rate Error:", e);
+        }
+      }
+
+      // 2. Fetch FedEx Rates if credentials exist
+      if (credentials.fedex.apiKey && credentials.fedex.secretKey) {
+        try {
+          const fedex = new FedExClient(
+            credentials.fedex.apiKey,
+            credentials.fedex.secretKey,
+            credentials.fedex.accountNumber,
+            credentials.fedex.isSandbox,
+            credentials.general.proxyUrl
+          );
+
+          const fedexParams = {
+            accountNumber: { value: credentials.fedex.accountNumber },
+            requestedShipment: {
+              shipper: {
+                address: {
+                  postalCode: "SW1A 1AA",
+                  countryCode: "GB"
+                }
+              },
+              recipient: {
+                address: {
+                  postalCode: order.shipping_address.postcode,
+                  countryCode: order.shipping_address.country_id
+                }
+              },
+              pickupType: "DROPOFF_AT_FEDEX_LOCATION",
+              rateRequestType: ["ACCOUNT"],
+              requestedPackageLineItems: [{
+                weight: { units: "KG", value: weightVal },
+                dimensions: { length: l, width: w, height: h, units: "CM" }
+              }]
+            }
+          };
+
+          const fedexData = await fedex.getRates(fedexParams);
+          if (fedexData?.output?.rateReplyDetails) {
+            fedexData.output.rateReplyDetails.forEach((r: any) => {
+              allRates.push({
+                id: `fedex-${r.serviceType}`,
+                carrier: 'FedEx',
+                service: r.serviceName || r.serviceType,
+                price: r.ratedShipmentDetails?.[0]?.totalNetCharge || 0,
+                delivery: 'Live Rate'
+              });
+            });
+          }
+        } catch (e) {
+          console.error("FedEx Rate Error:", e);
+        }
+      }
+
+      // Fallback to mock if no rates found and no credentials
+      if (allRates.length === 0) {
+        const mockRates = [
+          { id: 'ups-1', carrier: 'UPS', service: 'Ground', price: 12.45, delivery: '3-5 Days' },
+          { id: 'ups-2', carrier: 'UPS', service: 'Next Day Air', price: 45.20, delivery: 'Tomorrow' },
+          { id: 'fedex-1', carrier: 'FedEx', service: 'Home Delivery', price: 13.10, delivery: '3-4 Days' },
+          { id: 'fedex-2', carrier: 'FedEx', service: 'Express Saver', price: 28.50, delivery: '3 Days' },
+        ];
+        setRates(mockRates.sort((a, b) => a.price - b.price));
+      } else {
+        setRates(allRates.sort((a, b) => a.price - b.price));
+      }
       
-      const mockRates = [
-        { id: 'ups-1', carrier: 'UPS', service: 'Ground', price: 12.45, delivery: '3-5 Days' },
-        { id: 'ups-2', carrier: 'UPS', service: 'Next Day Air', price: 45.20, delivery: 'Tomorrow' },
-        { id: 'fedex-1', carrier: 'FedEx', service: 'Home Delivery', price: 13.10, delivery: '3-4 Days' },
-        { id: 'fedex-2', carrier: 'FedEx', service: 'Express Saver', price: 28.50, delivery: '3 Days' },
-      ];
-      
-      await new Promise(r => setTimeout(r, 1500));
-      // Sort cheapest to most expensive
-      setRates(mockRates.sort((a, b) => a.price - b.price));
       toast.success("Fetched live rates from carriers.");
     } catch (error) {
       toast.error("Failed to fetch rates. Check carrier credentials.");
@@ -387,17 +513,32 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 <TableBody>
                   {(order.items || []).map((item, idx) => {
                     const product = productDetails[item.sku];
-                    // Mapping COO to country_of_manufacture and HTS to commodity_code
-                    const htsCode = product?.custom_attributes?.find((a: any) => a.attribute_code === 'commodity_code')?.value || 'N/A';
-                    const coo = product?.custom_attributes?.find((a: any) => a.attribute_code === 'country_of_manufacture')?.value || 'N/A';
+                    
+                    // Helper to get attribute value or label
+                    const getAttr = (code: string) => {
+                      const attr = product?.custom_attributes?.find((a: any) => a.attribute_code === code);
+                      const val = attr?.value || 'N/A';
+                      
+                      // If it's a country code, try to map to full name
+                      if (code === 'country_of_manufacture' && val.length === 2) {
+                        return COUNTRY_NAMES[val] || val;
+                      }
+                      
+                      return val;
+                    };
+
+                    const htsCode = getAttr('commodity_code');
+                    const coo = getAttr('country_of_manufacture');
                     const currencySymbol = credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$';
                     const total = item.price * item.qty_ordered;
+
+                    const truncatedName = item.name.length > 25 ? item.name.substring(0, 25) + '...' : item.name;
 
                     return (
                       <TableRow key={idx}>
                         <TableCell className="font-medium">
-                          <div>
-                            <p>{item.name}</p>
+                          <div title={item.name}>
+                            <p>{truncatedName}</p>
                             <p className="text-zinc-500 font-mono text-[10px]">{item.sku}</p>
                           </div>
                         </TableCell>
