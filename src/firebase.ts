@@ -8,7 +8,8 @@ import {
   User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updateProfile
 } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc, onSnapshot, query, orderBy, getDocFromServer } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
@@ -19,7 +20,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 
-export { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail };
+export { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile };
 
 // Validation function for connection
 async function testConnection() {

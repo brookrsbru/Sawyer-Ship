@@ -30,8 +30,11 @@ import {
   auth, 
   googleProvider, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
+  createUserWithEmailAndPassword,
+  updateProfile,
+  db
 } from "./firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
 
 // --- Types ---
@@ -64,14 +67,45 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  
+  // Profile State
+  const [profileName, setProfileName] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        setProfileName(currentUser.displayName || "");
+      }
       setIsAuthReady(true);
     });
     return () => unsubscribe();
   }, []);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setProfileLoading(true);
+    try {
+      await updateProfile(user, { displayName: profileName });
+      
+      // Also update Firestore document
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, {
+        displayName: profileName,
+        email: user.email,
+        uid: user.uid,
+        role: user.email === "brookrsbru@gmail.com" ? "admin" : "user"
+      }, { merge: true });
+
+      toast.success("Profile updated successfully");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update profile");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const fetchOrders = async () => {
     if (!user) return;
@@ -158,7 +192,7 @@ export default function App() {
             <div className="mx-auto w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-2">
               <Truck className="w-6 h-6 text-blue-600" />
             </div>
-            <CardTitle className="text-2xl font-bold">Sawyer-ship Manager</CardTitle>
+            <CardTitle className="text-2xl font-bold">Sawyer-Ship Manager</CardTitle>
             <CardDescription>
               {isRegistering ? "Create your account." : "Secure access to your Magento shipping interface."}
             </CardDescription>
@@ -246,7 +280,7 @@ export default function App() {
         <div className="p-6 border-b border-zinc-200">
           <div className="flex items-center gap-2 font-bold text-xl text-zinc-900">
             <Truck className="w-6 h-6 text-blue-600" />
-            <span>Sawyer-ship</span>
+            <span>Sawyer-Ship</span>
           </div>
           <p className="text-xs text-zinc-500 mt-1 font-medium uppercase tracking-wider">Shipping Interface</p>
         </div>
@@ -430,7 +464,34 @@ export default function App() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="settings" className="mt-0">
+            <TabsContent value="settings" className="mt-0 space-y-6">
+              <Card className="bg-white shadow-sm border-zinc-200">
+                <CardHeader>
+                  <CardTitle>Profile Settings</CardTitle>
+                  <CardDescription>Update your personal information.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-md">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium">Display Name</label>
+                      <Input 
+                        value={profileName} 
+                        onChange={(e) => setProfileName(e.target.value)} 
+                        placeholder="Your Name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium">Email Address</label>
+                      <Input value={user.email || ""} disabled className="bg-zinc-50" />
+                      <p className="text-[10px] text-zinc-500 italic">Email cannot be changed.</p>
+                    </div>
+                    <Button type="submit" disabled={profileLoading} className="bg-blue-600 hover:bg-blue-700">
+                      {profileLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Update Profile"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
               <Card className="bg-white shadow-sm border-zinc-200">
                 <CardHeader>
                   <CardTitle>Integration Settings</CardTitle>
