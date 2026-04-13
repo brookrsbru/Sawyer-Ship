@@ -474,7 +474,7 @@ export default function App() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="settings" className="mt-0 space-y-6">
+            <TabsContent value="settings" className="mt-0 space-y-6 overflow-y-auto max-h-[calc(100vh-160px)] pr-2 scrollbar-thin scrollbar-thumb-zinc-200">
               <Card className="bg-white shadow-sm border-zinc-200">
                 <CardHeader>
                   <CardTitle>Profile Settings</CardTitle>
