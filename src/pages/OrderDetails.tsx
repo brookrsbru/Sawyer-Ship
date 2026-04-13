@@ -272,8 +272,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             requestedShipment: {
               shipper: {
                 address: {
-                  postalCode: "SW1A 1AA",
-                  countryCode: "GB"
+                  postalCode: credentials.general.originCountry === 'GB' ? "SW1A 1AA" : "SW1A 1AA", // Use origin postal code if possible
+                  countryCode: credentials.general.originCountry || "GB"
                 }
               },
               recipient: {
@@ -283,7 +283,6 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 }
               },
               pickupType: credentials.general.fedexPickupType || "DROPOFF_AT_FEDEX_LOCATION",
-              serviceType: "INTERNATIONAL_PRIORITY", // Default to a common service
               packagingType: "YOUR_PACKAGING",
               rateRequestType: ["ACCOUNT"],
               requestedPackageLineItems: [{
@@ -293,7 +292,17 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             }
           };
 
+          console.log("[FedExClient] Fetching rates", fedexParams);
           const fedexData = await fedex.getRates(fedexParams);
+          
+          if (fedexData?.errors && fedexData.errors.length > 0) {
+            const err = fedexData.errors[0];
+            toast.error(`FedEx Error: ${err.code}`, {
+              description: err.message || "Service type not allowed or invalid package combination.",
+              className: "bg-red-50 border-red-200 text-red-900",
+            });
+          }
+
           if (fedexData?.output?.rateReplyDetails) {
             fedexData.output.rateReplyDetails.forEach((r: any) => {
               allRates.push({
@@ -567,7 +576,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           })}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select country" />
+                            <SelectValue placeholder="Select country">
+                              {COUNTRY_NAMES[order.shipping_address?.country_id || ''] || order.shipping_address?.country_id}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
@@ -844,7 +855,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       <Label>Bill Shipping Charges To</Label>
                       <Select value={billShippingTo} onValueChange={setBillShippingTo}>
                         <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Select billing" />
+                          <SelectValue placeholder="Select billing">
+                            {billShippingTo === 'shipper' ? 'Shipper (Prepaid)' : billShippingTo === 'recipient' ? 'Recipient (Collect)' : 'Third Party'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
@@ -858,7 +871,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         <Label>Bill Duties/Taxes To</Label>
                         <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
                           <SelectTrigger className="text-xs h-8">
-                            <SelectValue placeholder="Select billing" />
+                            <SelectValue placeholder="Select billing">
+                              {billDutiesTo === 'shipper' ? 'Shipper (DDP)' : billDutiesTo === 'recipient' ? 'Recipient (DDU/DAP)' : 'Third Party'}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="shipper">Shipper (DDP)</SelectItem>

@@ -11,6 +11,21 @@ import { COUNTRY_NAMES } from '@/src/lib/countries';
 import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 
+const UPS_PICKUP_LABELS: Record<string, string> = {
+  "01": "Daily Pickup",
+  "03": "Customer Counter",
+  "06": "One Time Pickup",
+  "07": "On Call Air",
+  "19": "Letter Center",
+  "20": "Air Service Center"
+};
+
+const FEDEX_PICKUP_LABELS: Record<string, string> = {
+  "CONTACT_FEDEX_TO_SCHEDULE": "Contact FedEx to Schedule",
+  "DROPOFF_AT_FEDEX_LOCATION": "Dropoff at FedEx Location",
+  "USE_SCHEDULED_PICKUP": "Use Scheduled Pickup"
+};
+
 export default function Settings({ 
   credentials, 
   onSave, 
@@ -118,7 +133,9 @@ export default function Settings({
                       onValueChange={(v: 'PDF' | 'ZPL') => setFormData({ ...formData, general: { ...formData.general, labelFormat: v } })}
                     >
                       <SelectTrigger id="format">
-                        <SelectValue placeholder="Select format" />
+                        <SelectValue placeholder="Select format">
+                          {formData.general.labelFormat === 'PDF' ? 'PDF (Standard)' : 'ZPL (Thermal)'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="PDF">PDF (Standard)</SelectItem>
@@ -133,7 +150,9 @@ export default function Settings({
                       onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, currency: v } })}
                     >
                       <SelectTrigger id="currency">
-                        <SelectValue placeholder="Select currency" />
+                        <SelectValue placeholder="Select currency">
+                          {formData.general.currency === 'GBP' ? 'GBP (£)' : formData.general.currency === 'USD' ? 'USD ($)' : 'EUR (€)'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="GBP">GBP (£)</SelectItem>
@@ -149,7 +168,13 @@ export default function Settings({
                       onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, autoLockMinutes: parseInt(v) } })}
                     >
                       <SelectTrigger id="autolock">
-                        <SelectValue placeholder="Select time" />
+                        <SelectValue placeholder="Select time">
+                          {formData.general.autoLockMinutes === 0 ? 'Never Lock' : 
+                           formData.general.autoLockMinutes === 1 ? '1 Minute' :
+                           formData.general.autoLockMinutes === 5 ? '5 Minutes' :
+                           formData.general.autoLockMinutes === 15 ? '15 Minutes' :
+                           formData.general.autoLockMinutes === 30 ? '30 Minutes' : '1 Hour'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="0">Never Lock</SelectItem>
@@ -173,7 +198,9 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, originCountry: v } })}
                       >
                         <SelectTrigger id="origin-country">
-                          <SelectValue placeholder="Select country" />
+                          <SelectValue placeholder="Select country">
+                            {COUNTRY_NAMES[formData.general.originCountry] || formData.general.originCountry}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
@@ -194,7 +221,9 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, alwaysShowDuties: v === "yes" } })}
                       >
                         <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder="Select">
+                            {formData.general.alwaysShowDuties ? "Yes" : "No"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="yes">Yes</SelectItem>
@@ -213,7 +242,9 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, markAsShipped: v === "yes" } })}
                       >
                         <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder="Select">
+                            {formData.general.markAsShipped ? "Yes" : "No"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="yes">Yes</SelectItem>
@@ -231,15 +262,14 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, upsPickupType: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select pickup type" />
+                          <SelectValue placeholder="Select pickup type">
+                            {UPS_PICKUP_LABELS[formData.general.upsPickupType] || formData.general.upsPickupType}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="01">Daily Pickup</SelectItem>
-                          <SelectItem value="03">Customer Counter</SelectItem>
-                          <SelectItem value="06">One Time Pickup</SelectItem>
-                          <SelectItem value="07">On Call Air</SelectItem>
-                          <SelectItem value="19">Letter Center</SelectItem>
-                          <SelectItem value="20">Air Service Center</SelectItem>
+                          {Object.entries(UPS_PICKUP_LABELS).map(([val, label]) => (
+                            <SelectItem key={val} value={val}>{label}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -251,12 +281,14 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, fedexPickupType: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select pickup type" />
+                          <SelectValue placeholder="Select pickup type">
+                            {FEDEX_PICKUP_LABELS[formData.general.fedexPickupType] || formData.general.fedexPickupType}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="CONTACT_FEDEX_TO_SCHEDULE">Contact FedEx to Schedule</SelectItem>
-                          <SelectItem value="DROPOFF_AT_FEDEX_LOCATION">Dropoff at FedEx Location</SelectItem>
-                          <SelectItem value="USE_SCHEDULED_PICKUP">Use Scheduled Pickup</SelectItem>
+                          {Object.entries(FEDEX_PICKUP_LABELS).map(([val, label]) => (
+                            <SelectItem key={val} value={val}>{label}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -330,7 +362,9 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billShippingTo: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select billing" />
+                          <SelectValue placeholder="Select billing">
+                            {formData.shippingDefaults.billShippingTo === 'shipper' ? 'Shipper (Prepaid)' : formData.shippingDefaults.billShippingTo === 'recipient' ? 'Recipient (Collect)' : 'Third Party'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
@@ -346,7 +380,9 @@ export default function Settings({
                         onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billDutiesTo: v } })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select billing" />
+                          <SelectValue placeholder="Select billing">
+                            {formData.shippingDefaults.billDutiesTo === 'shipper' ? 'Shipper (DDP)' : formData.shippingDefaults.billDutiesTo === 'recipient' ? 'Recipient (DDU/DAP)' : 'Third Party'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="shipper">Shipper (DDP)</SelectItem>
@@ -366,7 +402,9 @@ export default function Settings({
                       onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, overwriteExisting: v === "yes" } })}
                     >
                       <SelectTrigger id="overwrite" className="w-[100px]">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Select">
+                          {formData.shippingDefaults.overwriteExisting ? "Yes" : "No"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="yes">Yes</SelectItem>
