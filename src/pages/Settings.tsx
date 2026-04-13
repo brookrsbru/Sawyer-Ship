@@ -252,6 +252,22 @@ export default function Settings({
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Display Currency</Label>
+                    <Select 
+                      value={formData.general.currency}
+                      onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, currency: v } })}
+                    >
+                      <SelectTrigger id="currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

@@ -36,7 +36,11 @@ export class MagentoClient {
   constructor(private baseUrl: string, private token: string, private proxyUrl: string = '') {}
 
   private async fetch(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.proxyUrl}${this.baseUrl}/rest/V1/${endpoint}`;
+    // Sanitize URLs to prevent double slashes
+    const cleanBaseUrl = this.baseUrl.replace(/\/+$/, '');
+    const cleanProxyUrl = this.proxyUrl ? (this.proxyUrl.endsWith('/') ? this.proxyUrl : `${this.proxyUrl}/`) : '';
+    
+    const url = `${cleanProxyUrl}${cleanBaseUrl}/rest/V1/${endpoint}`;
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -45,7 +49,10 @@ export class MagentoClient {
         ...options.headers,
       },
     });
-    if (!response.ok) throw new Error(`Magento API Error: ${response.statusText}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(`Magento API Error (${response.status}): ${errorData.message || response.statusText}`);
+    }
     return response.json();
   }
 

@@ -35,9 +35,10 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
       if (results.length === 0) {
         toast.info("No orders found matching your search.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Failed to fetch orders. Check your Magento settings and CORS proxy.");
+      const message = error.message || "Unknown error";
+      toast.error(`Failed to fetch orders: ${message}`);
     } finally {
       setIsLoading(false);
     }
@@ -53,14 +54,14 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
       <Card>
         <CardHeader>
           <CardTitle>Import Orders</CardTitle>
-          <CardDescription>Search by Order ID, Customer Name, or Email.</CardDescription>
+          <CardDescription>Search by Order ID.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
               <Input
-                placeholder="Order # (e.g. 000000001)"
+                placeholder="Order #"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -102,7 +103,10 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
                       </div>
                     </TableCell>
                     <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>${order.grand_total.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$'}
+                      {order.grand_total.toFixed(2)}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">{order.status}</Badge>
                     </TableCell>

@@ -21,6 +21,7 @@ export interface SawyerCredentials {
   general: {
     proxyUrl: string;
     labelFormat: 'PDF' | 'ZPL';
+    currency: string;
   };
 }
 
@@ -28,7 +29,7 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
   ups: { clientId: '', clientSecret: '', accountNumber: '', isSandbox: true },
   fedex: { apiKey: '', secretKey: '', accountNumber: '', isSandbox: true },
-  general: { proxyUrl: 'https://cors-anywhere.herokuapp.com/', labelFormat: 'PDF' }
+  general: { proxyUrl: 'https://cors-anywhere.herokuapp.com/', labelFormat: 'PDF', currency: 'GBP' }
 };
 
 export function useSawyerStorage() {

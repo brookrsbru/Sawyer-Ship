@@ -206,7 +206,10 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                             <p><span className="text-zinc-400">COO:</span> {coo}</p>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">
+                          {credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$'}
+                          {item.price.toFixed(2)}
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -280,7 +283,10 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                             <p className="font-bold text-sm">{rate.carrier} {rate.service}</p>
                             <p className="text-xs text-zinc-500">{rate.delivery}</p>
                           </div>
-                          <p className="font-bold text-zinc-900">${rate.price.toFixed(2)}</p>
+                          <p className="font-bold text-zinc-900">
+                            {credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$'}
+                            {rate.price.toFixed(2)}
+                          </p>
                         </div>
                       </div>
                     ))}
