@@ -1,0 +1,5 @@
+{
+  "name": "Sawyer-ship Manager",
+  "description": "A professional shipping interface integrating Magento orders with UPS and FedEx APIs.",
+  "requestFramePermissions": []
+}

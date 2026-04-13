@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Application user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["uid", "email"]
+    },
+    "ShippingLog": {
+      "title": "Shipping Log",
+      "description": "Record of a generated shipping label",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "carrier": { "type": "string", "enum": ["ups", "fedex"] },
+        "trackingNumber": { "type": "string" },
+        "labelUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["orderId", "carrier", "trackingNumber", "createdAt", "createdBy"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/shipping_logs/{logId}": {
+      "schema": "ShippingLog",
+      "description": "History of all labels generated"
+    }
+  }
+}
