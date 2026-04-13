@@ -107,6 +107,12 @@ async function startServer() {
 
     app.use("*", async (req, res, next) => {
       const url = req.originalUrl;
+
+      // Skip for API routes or files with extensions (assets)
+      if (url.startsWith("/api") || url.includes(".")) {
+        return next();
+      }
+
       try {
         // 1. Read index.html
         let template = fs.readFileSync(

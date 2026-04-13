@@ -70,6 +70,7 @@ export default function App() {
   
   // Profile State
   const [profileName, setProfileName] = useState("");
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function App() {
       setUser(currentUser);
       if (currentUser) {
         setProfileName(currentUser.displayName || "");
+        setProfilePhotoUrl(currentUser.photoURL || "");
       }
       setIsAuthReady(true);
     });
@@ -88,12 +90,16 @@ export default function App() {
     if (!user) return;
     setProfileLoading(true);
     try {
-      await updateProfile(user, { displayName: profileName });
+      await updateProfile(user, { 
+        displayName: profileName,
+        photoURL: profilePhotoUrl
+      });
       
       // Also update Firestore document
       const userRef = doc(db, "users", user.uid);
       await setDoc(userRef, {
         displayName: profileName,
+        photoURL: profilePhotoUrl,
         email: user.email,
         uid: user.uid,
         role: user.email === "brookrsbru@gmail.com" ? "admin" : "user"
@@ -314,8 +320,12 @@ export default function App() {
         
         <div className="p-4 border-t border-zinc-200 space-y-2">
           <div className="px-3 py-2 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs">
-              {user.displayName?.charAt(0) || user.email?.charAt(0)}
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs overflow-hidden">
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                user.displayName?.charAt(0) || user.email?.charAt(0)
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-zinc-900 truncate">{user.displayName || "Admin"}</p>
@@ -471,6 +481,20 @@ export default function App() {
                   <CardDescription>Update your personal information.</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-16 h-16 rounded-full bg-zinc-100 border border-zinc-200 overflow-hidden flex items-center justify-center">
+                      {profilePhotoUrl ? (
+                        <img src={profilePhotoUrl} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <Truck className="w-8 h-8 text-zinc-400" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold">{profileName || "No Name Set"}</h4>
+                      <p className="text-xs text-zinc-500">{user.email}</p>
+                    </div>
+                  </div>
+
                   <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-md">
                     <div className="space-y-2">
                       <label className="text-xs font-medium">Display Name</label>
@@ -478,6 +502,14 @@ export default function App() {
                         value={profileName} 
                         onChange={(e) => setProfileName(e.target.value)} 
                         placeholder="Your Name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium">Profile Image URL</label>
+                      <Input 
+                        value={profilePhotoUrl} 
+                        onChange={(e) => setProfilePhotoUrl(e.target.value)} 
+                        placeholder="https://example.com/photo.jpg"
                       />
                     </div>
                     <div className="space-y-2">
