@@ -26,6 +26,8 @@ export interface SawyerCredentials {
     originCountry: string;
     alwaysShowDuties: boolean;
     markAsShipped: boolean;
+    upsPickupType: string;
+    fedexPickupType: string;
   };
   shippingDefaults: {
     weightKg: string;
@@ -50,7 +52,9 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     autoLockMinutes: 0,
     originCountry: 'GB',
     alwaysShowDuties: false,
-    markAsShipped: true
+    markAsShipped: true,
+    upsPickupType: '01',
+    fedexPickupType: 'DROPOFF_AT_FEDEX_LOCATION'
   },
   shippingDefaults: {
     weightKg: '',

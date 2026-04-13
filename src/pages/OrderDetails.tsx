@@ -216,6 +216,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     CountryCode: order.shipping_address.country_id
                   }
                 },
+                PickupType: { Code: credentials.general.upsPickupType || "01" },
                 Service: { Code: "03" },
                 Package: {
                   PackagingType: { Code: "02" },
@@ -281,7 +282,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   countryCode: order.shipping_address.country_id
                 }
               },
-              pickupType: "DROPOFF_AT_FEDEX_LOCATION",
+              pickupType: credentials.general.fedexPickupType || "DROPOFF_AT_FEDEX_LOCATION",
+              serviceType: "INTERNATIONAL_PRIORITY", // Default to a common service
+              packagingType: "YOUR_PACKAGING",
               rateRequestType: ["ACCOUNT"],
               requestedPackageLineItems: [{
                 weight: { units: "KG", value: weightVal },

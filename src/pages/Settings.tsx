@@ -221,6 +221,45 @@ export default function Settings({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label>UPS Pickup Type</Label>
+                      <Select 
+                        value={formData.general.upsPickupType}
+                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, upsPickupType: v } })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="01">Daily Pickup</SelectItem>
+                          <SelectItem value="03">Customer Counter</SelectItem>
+                          <SelectItem value="06">One Time Pickup</SelectItem>
+                          <SelectItem value="07">On Call Air</SelectItem>
+                          <SelectItem value="19">Letter Center</SelectItem>
+                          <SelectItem value="20">Air Service Center</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>FedEx Pickup Type</Label>
+                      <Select 
+                        value={formData.general.fedexPickupType}
+                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, fedexPickupType: v } })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CONTACT_FEDEX_TO_SCHEDULE">Contact FedEx to Schedule</SelectItem>
+                          <SelectItem value="DROPOFF_AT_FEDEX_LOCATION">Dropoff at FedEx Location</SelectItem>
+                          <SelectItem value="USE_SCHEDULED_PICKUP">Use Scheduled Pickup</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
