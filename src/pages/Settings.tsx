@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
+import { COUNTRY_NAMES } from '@/src/lib/countries';
 import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -160,6 +161,66 @@ export default function Settings({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-zinc-500">Automatically lock the app after a period of inactivity.</p>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="origin-country">Origin Country</Label>
+                      <Select 
+                        value={formData.general.originCountry}
+                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, originCountry: v } })}
+                      >
+                        <SelectTrigger id="origin-country">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
+                            <SelectItem key={code} value={code}>{name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-zinc-500">Your shipping origin country. Used to determine if duties/taxes options are shown.</p>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Always show Duties/Taxes</Label>
+                        <p className="text-[10px] text-zinc-500">Show duties billing even for domestic shipments.</p>
+                      </div>
+                      <Select 
+                        value={formData.general.alwaysShowDuties ? "yes" : "no"}
+                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, alwaysShowDuties: v === "yes" } })}
+                      >
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Mark as Shipped in Magento</Label>
+                        <p className="text-[10px] text-zinc-500">Automatically create shipment in Magento after creating label.</p>
+                      </div>
+                      <Select 
+                        value={formData.general.markAsShipped ? "yes" : "no"}
+                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, markAsShipped: v === "yes" } })}
+                      >
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

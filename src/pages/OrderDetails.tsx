@@ -111,21 +111,24 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   };
 
   useEffect(() => {
+    console.log(`[OrderDetails] Loading order ID: ${id}`);
     const fetchOrder = async () => {
       if (order || !id || !credentials.magento.url || !credentials.magento.token) return;
       
       setIsLoading(true);
       setError(null);
       try {
+        console.log(`[OrderDetails] Fetching order from Magento: ${credentials.magento.url}`);
         const client = new MagentoClient(
           credentials.magento.url,
           credentials.magento.token,
           credentials.general.proxyUrl
         );
         const fetchedOrder = await client.getOrder(id);
+        console.log(`[OrderDetails] Order fetched successfully:`, fetchedOrder);
         setOrder(fetchedOrder);
       } catch (e: any) {
-        console.error(e);
+        console.error(`[OrderDetails] Error fetching order:`, e);
         setError(e.message || "Failed to load order details.");
         toast.error("Failed to load order from Magento.");
       } finally {
@@ -140,6 +143,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     const fetchProductInfo = async () => {
       if (!order || !credentials.magento.url || !credentials.magento.token) return;
       
+      console.log(`[OrderDetails] Fetching product details for ${order.items.length} items`);
       setIsFetchingProducts(true);
       const client = new MagentoClient(
         credentials.magento.url,
@@ -151,13 +155,15 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       try {
         await Promise.all(order.items.map(async (item) => {
           try {
+            console.log(`[OrderDetails] Fetching product: ${item.sku}`);
             const product = await client.getProduct(item.sku);
             details[item.sku] = product;
           } catch (e) {
-            console.error(`Failed to fetch product ${item.sku}`, e);
+            console.error(`[OrderDetails] Failed to fetch product ${item.sku}`, e);
           }
         }));
         setProductDetails(details);
+        console.log(`[OrderDetails] All product details loaded`);
       } finally {
         setIsFetchingProducts(false);
       }
@@ -168,6 +174,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
   const fetchRates = async () => {
     if (!order) return;
+    console.log(`[OrderDetails] Fetching live rates...`);
     setIsRating(true);
     setRates([]);
     
@@ -178,9 +185,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       const w = parseFloat(width) || 1;
       const h = parseFloat(height) || 1;
 
+      console.log(`[OrderDetails] Package: ${weightVal}kg, ${l}x${w}x${h}cm`);
+
       // 1. Fetch UPS Rates if credentials exist
       if (credentials.ups.clientId && credentials.ups.clientSecret) {
         try {
+          console.log(`[OrderDetails] Calling UPS API...`);
           const ups = new UPSClient(
             credentials.ups.clientId,
             credentials.ups.clientSecret,
@@ -320,35 +330,52 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
   const handleCreateLabel = async () => {
     if (!selectedRate || !order) return;
+
+    // Check address line lengths
+    const street = order.shipping_address?.street || [];
+    const tooLong = street.some(line => line.length > 35);
+    if (tooLong) {
+      const confirm = window.confirm("Warning: One or more address lines exceed 35 characters. This may cause issues with the carrier. Do you want to continue?");
+      if (!confirm) return;
+    }
+
+    console.log(`[OrderDetails] Creating label for ${selectedRate.carrier} ${selectedRate.service}`);
     setIsShipping(true);
     
     try {
       // 1. Mock Carrier API Call (Label Generation)
       await new Promise(r => setTimeout(r, 2000));
       const mockTracking = `1Z${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
+      console.log(`[OrderDetails] Label created. Tracking: ${mockTracking}`);
       setTrackingNumber(mockTracking);
       setLabelUrl("https://www.ups.com/assets/resources/media/en_US/shipping_label_samples.pdf");
 
-      // 2. Update Magento Shipment Status
-      const client = new MagentoClient(
-        credentials.magento.url,
-        credentials.magento.token,
-        credentials.general.proxyUrl
-      );
+      // 2. Update Magento Shipment Status (if enabled)
+      if (credentials.general.markAsShipped) {
+        console.log(`[OrderDetails] Updating Magento shipment status...`);
+        const client = new MagentoClient(
+          credentials.magento.url,
+          credentials.magento.token,
+          credentials.general.proxyUrl
+        );
 
-      // Map carrier name as requested
-      const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
-      const carrierCode = selectedRate.carrier.toLowerCase();
+        // Map carrier name as requested
+        const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
+        const carrierCode = selectedRate.carrier.toLowerCase();
 
-      await client.createShipment(order.entity_id, [{
-        track_number: mockTracking,
-        title: carrierTitle,
-        carrier_code: carrierCode
-      }]);
+        await client.createShipment(order.entity_id, [{
+          track_number: mockTracking,
+          title: carrierTitle,
+          carrier_code: carrierCode
+        }]);
+        console.log(`[OrderDetails] Magento updated successfully`);
+      } else {
+        console.log(`[OrderDetails] Skipping Magento update (disabled in settings)`);
+      }
 
-      toast.success(`Label created and Magento updated with ${carrierTitle}!`);
+      toast.success(`Label created! ${credentials.general.markAsShipped ? 'Magento updated.' : ''}`);
     } catch (error) {
-      console.error(error);
+      console.error(`[OrderDetails] Error in handleCreateLabel:`, error);
       toast.error("Label created, but failed to update Magento shipment status.");
     } finally {
       setIsShipping(false);
@@ -447,16 +474,54 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Street Address</Label>
+                      <Label className="flex justify-between">
+                        Address Line 1
+                        {(order.shipping_address?.street?.[0]?.length || 0) > 35 && (
+                          <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                        )}
+                      </Label>
                       <Input 
-                        value={order.shipping_address?.street?.join(', ') || ''} 
-                        onChange={(e) => setOrder({
-                          ...order, 
-                          shipping_address: { ...order.shipping_address!, street: [e.target.value] }
-                        })}
+                        value={order.shipping_address?.street?.[0] || ''} 
+                        onChange={(e) => {
+                          const street = [...(order.shipping_address?.street || [])];
+                          street[0] = e.target.value;
+                          setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                        }}
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="flex justify-between">
+                        Address Line 2
+                        {(order.shipping_address?.street?.[1]?.length || 0) > 35 && (
+                          <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                        )}
+                      </Label>
+                      <Input 
+                        value={order.shipping_address?.street?.[1] || ''} 
+                        onChange={(e) => {
+                          const street = [...(order.shipping_address?.street || [])];
+                          street[1] = e.target.value;
+                          setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="flex justify-between">
+                        Address Line 3
+                        {(order.shipping_address?.street?.[2]?.length || 0) > 35 && (
+                          <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                        )}
+                      </Label>
+                      <Input 
+                        value={order.shipping_address?.street?.[2] || ''} 
+                        onChange={(e) => {
+                          const street = [...(order.shipping_address?.street || [])];
+                          street[2] = e.target.value;
+                          setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                        }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>City</Label>
                         <Input 
@@ -477,6 +542,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           })}
                         />
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Postcode</Label>
                         <Input 
@@ -486,6 +553,25 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                             shipping_address: { ...order.shipping_address!, postcode: e.target.value }
                           })}
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Country</Label>
+                        <Select 
+                          value={order.shipping_address?.country_id}
+                          onValueChange={(v) => setOrder({
+                            ...order,
+                            shipping_address: { ...order.shipping_address!, country_id: v }
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
+                              <SelectItem key={code} value={code}>{name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </div>
@@ -764,19 +850,21 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Bill Duties/Taxes To</Label>
-                      <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="shipper">Shipper (DDP)</SelectItem>
-                          <SelectItem value="recipient">Recipient (DDU/DAP)</SelectItem>
-                          <SelectItem value="third_party">Third Party</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {(credentials.general.alwaysShowDuties || credentials.general.originCountry !== order.shipping_address?.country_id) && (
+                      <div className="space-y-2">
+                        <Label>Bill Duties/Taxes To</Label>
+                        <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="shipper">Shipper (DDP)</SelectItem>
+                            <SelectItem value="recipient">Recipient (DDU/DAP)</SelectItem>
+                            <SelectItem value="third_party">Third Party</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

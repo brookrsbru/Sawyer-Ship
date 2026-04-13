@@ -23,6 +23,9 @@ export interface SawyerCredentials {
     labelFormat: 'PDF' | 'ZPL';
     currency: string;
     autoLockMinutes: number;
+    originCountry: string;
+    alwaysShowDuties: boolean;
+    markAsShipped: boolean;
   };
   shippingDefaults: {
     weightKg: string;
@@ -40,7 +43,15 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
   ups: { clientId: '', clientSecret: '', accountNumber: '', isSandbox: true },
   fedex: { apiKey: '', secretKey: '', accountNumber: '', isSandbox: true },
-  general: { proxyUrl: 'https://cors-anywhere.herokuapp.com/', labelFormat: 'PDF', currency: 'GBP', autoLockMinutes: 0 },
+  general: { 
+    proxyUrl: 'https://cors-anywhere.herokuapp.com/', 
+    labelFormat: 'PDF', 
+    currency: 'GBP', 
+    autoLockMinutes: 0,
+    originCountry: 'GB',
+    alwaysShowDuties: false,
+    markAsShipped: true
+  },
   shippingDefaults: {
     weightKg: '',
     weightG: '',

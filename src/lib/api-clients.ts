@@ -65,7 +65,9 @@ export class MagentoClient {
   }
 
   async getOrder(id: string): Promise<MagentoOrder> {
+    console.log(`[MagentoClient] Fetching order: ${id}`);
     const order = await this.fetch(`orders/${id}`);
+    console.log(`[MagentoClient] Order data received:`, order);
     return this.normalizeOrder(order);
   }
 
@@ -98,11 +100,15 @@ export class MagentoClient {
   }
 
   async getProduct(sku: string): Promise<any> {
-    return this.fetch(`products/${encodeURIComponent(sku)}`);
+    console.log(`[MagentoClient] Fetching product: ${sku}`);
+    const product = await this.fetch(`products/${encodeURIComponent(sku)}`);
+    console.log(`[MagentoClient] Product data received for ${sku}`);
+    return product;
   }
 
   async createShipment(orderId: number, tracks: Array<{ track_number: string, title: string, carrier_code: string }>): Promise<any> {
-    return this.fetch(`order/${orderId}/ship`, {
+    console.log(`[MagentoClient] Creating shipment for order ${orderId}`, tracks);
+    const result = await this.fetch(`order/${orderId}/ship`, {
       method: 'POST',
       body: JSON.stringify({
         items: [], // Empty array ships all items
@@ -120,6 +126,8 @@ export class MagentoClient {
         }))
       })
     });
+    console.log(`[MagentoClient] Shipment created successfully:`, result);
+    return result;
   }
 }
 
@@ -147,7 +155,9 @@ export class UPSClient {
   }
 
   async getRates(params: any): Promise<any> {
+    console.log(`[UPSClient] Fetching rates`, params);
     const token = await this.getAccessToken();
+    console.log(`[UPSClient] OAuth token obtained`);
     const url = `${this.proxyUrl}${this.baseUrl}/api/rating/v1/shop`;
     const response = await fetch(url, {
       method: 'POST',
@@ -157,7 +167,9 @@ export class UPSClient {
       },
       body: JSON.stringify(params),
     });
-    return response.json();
+    const data = await response.json();
+    console.log(`[UPSClient] Rates response:`, data);
+    return data;
   }
 }
 
@@ -186,7 +198,9 @@ export class FedExClient {
   }
 
   async getRates(params: any): Promise<any> {
+    console.log(`[FedExClient] Fetching rates`, params);
     const token = await this.getAccessToken();
+    console.log(`[FedExClient] OAuth token obtained`);
     const url = `${this.proxyUrl}${this.baseUrl}/rate/v1/rates/quotes`;
     const response = await fetch(url, {
       method: 'POST',
@@ -196,6 +210,8 @@ export class FedExClient {
       },
       body: JSON.stringify(params),
     });
-    return response.json();
+    const data = await response.json();
+    console.log(`[FedExClient] Rates response:`, data);
+    return data;
   }
 }
