@@ -112,7 +112,7 @@ export default function App() {
   }
 
   return (
-    <Router>
+    <Router basename="/Sawyer-Ship">
       <Layout onLogout={logout}>
         <Routes>
           <Route path="/" element={<Dashboard credentials={credentials} />} />
