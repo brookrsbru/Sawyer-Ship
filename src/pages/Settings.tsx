@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
-import { Save, Download, Upload, Shield, Globe, Truck, Info } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Settings({ 
@@ -41,20 +41,39 @@ export default function Settings({
   const handleExport = () => {
     const data = onExport();
     if (data) {
-      navigator.clipboard.writeText(data);
-      toast.success("Encrypted data copied to clipboard!");
+      const blob = new Blob([JSON.stringify({ encryptedData: data }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sawyer-ship-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Settings exported as JSON file.");
     }
   };
 
-  const handleImport = () => {
-    if (!importText) return;
-    try {
-      onImport(importText);
-      toast.success("Data imported. Please refresh and unlock with the original master password.");
-      setTimeout(() => window.location.reload(), 2000);
-    } catch (e) {
-      toast.error("Invalid import data.");
-    }
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json.encryptedData) {
+          onImport(json.encryptedData);
+          toast.success("Data imported. Please refresh and unlock with the original master password.");
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          toast.error("Invalid backup file format.");
+        }
+      } catch (err) {
+        toast.error("Failed to parse JSON file.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -67,8 +86,9 @@ export default function Settings({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="shipping">Shipping Defaults</TabsTrigger>
               <TabsTrigger value="magento">Magento</TabsTrigger>
               <TabsTrigger value="ups">UPS</TabsTrigger>
               <TabsTrigger value="fedex">FedEx</TabsTrigger>
@@ -145,6 +165,118 @@ export default function Settings({
               </Card>
             </TabsContent>
 
+            <TabsContent value="shipping" className="space-y-4 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Truck size={20} /> Shipping Defaults
+                  </CardTitle>
+                  <CardDescription>Set default values for new shipments.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Default Weight (KG)</Label>
+                      <Input 
+                        type="number" 
+                        step="0.1"
+                        value={formData.shippingDefaults.weightKg}
+                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, weightKg: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Default Weight (Grams)</Label>
+                      <Input 
+                        type="number"
+                        value={formData.shippingDefaults.weightG}
+                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, weightG: e.target.value } })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Length (cm)</Label>
+                      <Input 
+                        type="number"
+                        value={formData.shippingDefaults.length}
+                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, length: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Width (cm)</Label>
+                      <Input 
+                        type="number"
+                        value={formData.shippingDefaults.width}
+                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, width: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Height (cm)</Label>
+                      <Input 
+                        type="number"
+                        value={formData.shippingDefaults.height}
+                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, height: e.target.value } })}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Bill Shipping To</Label>
+                      <Select 
+                        value={formData.shippingDefaults.billShippingTo}
+                        onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billShippingTo: v } })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
+                          <SelectItem value="recipient">Recipient (Collect)</SelectItem>
+                          <SelectItem value="third_party">Third Party</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Bill Duties/Taxes To</Label>
+                      <Select 
+                        value={formData.shippingDefaults.billDutiesTo}
+                        onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billDutiesTo: v } })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="shipper">Shipper (DDP)</SelectItem>
+                          <SelectItem value="recipient">Recipient (DDU/DAP)</SelectItem>
+                          <SelectItem value="third_party">Third Party</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <Label htmlFor="overwrite" className="text-sm font-medium">
+                      Overwrite existing order information with these defaults
+                    </Label>
+                    <Select 
+                      value={formData.shippingDefaults.overwriteExisting ? "yes" : "no"}
+                      onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, overwriteExisting: v === "yes" } })}
+                    >
+                      <SelectTrigger id="overwrite" className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
             <TabsContent value="magento" className="space-y-4 mt-6">
               <Card>
                 <CardHeader>
@@ -310,25 +442,47 @@ export default function Settings({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Export Encrypted Data</Label>
+                <Label>Export Settings & Tokens</Label>
                 <Button variant="outline" className="w-full gap-2" onClick={handleExport}>
-                  <Download size={18} /> Copy to Clipboard
+                  <FileJson size={18} /> Download JSON Backup
                 </Button>
+                <p className="text-[10px] text-zinc-500">This file contains your encrypted credentials. Keep it safe.</p>
               </div>
               
               <Separator />
               
               <div className="space-y-2">
-                <Label htmlFor="import">Import Encrypted Data</Label>
+                <Label htmlFor="import-file">Import from JSON Backup</Label>
+                <div className="flex flex-col gap-2">
+                  <Input 
+                    id="import-file"
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileImport}
+                    className="text-xs"
+                  />
+                  <p className="text-[10px] text-zinc-500">Importing will overwrite your current settings.</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="import">Manual Import (Encrypted String)</Label>
                 <textarea 
                   id="import"
-                  className="w-full h-24 p-2 text-xs border rounded-md bg-zinc-50 font-mono"
+                  className="w-full h-20 p-2 text-[10px] border rounded-md bg-zinc-50 font-mono"
                   placeholder="Paste encrypted string here..."
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
                 />
-                <Button variant="outline" className="w-full gap-2" onClick={handleImport}>
-                  <Upload size={18} /> Import & Reload
+                <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => {
+                  if (!importText) return;
+                  onImport(importText);
+                  toast.success("Data imported. Reloading...");
+                  setTimeout(() => window.location.reload(), 2000);
+                }}>
+                  <Upload size={14} /> Import String
                 </Button>
               </div>
             </CardContent>

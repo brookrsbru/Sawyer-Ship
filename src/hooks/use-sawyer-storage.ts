@@ -24,13 +24,33 @@ export interface SawyerCredentials {
     currency: string;
     autoLockMinutes: number;
   };
+  shippingDefaults: {
+    weightKg: string;
+    weightG: string;
+    length: string;
+    width: string;
+    height: string;
+    overwriteExisting: boolean;
+    billShippingTo: string;
+    billDutiesTo: string;
+  };
 }
 
 const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
   ups: { clientId: '', clientSecret: '', accountNumber: '', isSandbox: true },
   fedex: { apiKey: '', secretKey: '', accountNumber: '', isSandbox: true },
-  general: { proxyUrl: 'https://cors-anywhere.herokuapp.com/', labelFormat: 'PDF', currency: 'GBP', autoLockMinutes: 0 }
+  general: { proxyUrl: 'https://cors-anywhere.herokuapp.com/', labelFormat: 'PDF', currency: 'GBP', autoLockMinutes: 0 },
+  shippingDefaults: {
+    weightKg: '',
+    weightG: '',
+    length: '',
+    width: '',
+    height: '',
+    overwriteExisting: false,
+    billShippingTo: 'shipper',
+    billDutiesTo: 'shipper'
+  }
 };
 
 export function useSawyerStorage() {
@@ -57,7 +77,8 @@ export function useSawyerStorage() {
         magento: { ...DEFAULT_CREDENTIALS.magento, ...(parsed.magento || {}) },
         ups: { ...DEFAULT_CREDENTIALS.ups, ...(parsed.ups || {}) },
         fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
-        general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) }
+        general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) },
+        shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) }
       };
       
       setCredentials(merged);

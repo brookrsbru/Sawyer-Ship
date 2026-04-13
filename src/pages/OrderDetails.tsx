@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
@@ -40,6 +41,26 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   // Weight fields
   const [weightKg, setWeightKg] = useState('');
   const [weightG, setWeightG] = useState('');
+  const [billShippingTo, setBillShippingTo] = useState('shipper');
+  const [billDutiesTo, setBillDutiesTo] = useState('shipper');
+
+  // Apply defaults
+  useEffect(() => {
+    if (order && credentials.shippingDefaults) {
+      const defaults = credentials.shippingDefaults;
+      const shouldApply = defaults.overwriteExisting || (!weightKg && !weightG && !length && !width && !height);
+      
+      if (shouldApply) {
+        if (defaults.weightKg) setWeightKg(defaults.weightKg);
+        if (defaults.weightG) setWeightG(defaults.weightG);
+        if (defaults.length) setLength(defaults.length);
+        if (defaults.width) setWidth(defaults.width);
+        if (defaults.height) setHeight(defaults.height);
+        if (defaults.billShippingTo) setBillShippingTo(defaults.billShippingTo);
+        if (defaults.billDutiesTo) setBillDutiesTo(defaults.billDutiesTo);
+      }
+    }
+  }, [order, credentials.shippingDefaults]);
 
   // Editing state
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -487,7 +508,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 <p className="text-zinc-600">
                   {order.shipping_address?.city}, {order.shipping_address?.region} {order.shipping_address?.postcode}
                 </p>
-                <p className="text-zinc-600">{order.shipping_address?.country_id}</p>
+                <p className="text-zinc-600">
+                  {COUNTRY_NAMES[order.shipping_address?.country_id || ''] || order.shipping_address?.country_id}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -720,6 +743,40 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       value={height} 
                       onChange={(e) => setHeight(e.target.value)}
                     />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <Label className="text-xs font-bold uppercase text-zinc-500">Billing Options</Label>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label>Bill Shipping Charges To</Label>
+                      <Select value={billShippingTo} onValueChange={setBillShippingTo}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
+                          <SelectItem value="recipient">Recipient (Collect)</SelectItem>
+                          <SelectItem value="third_party">Third Party</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Bill Duties/Taxes To</Label>
+                      <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="shipper">Shipper (DDP)</SelectItem>
+                          <SelectItem value="recipient">Recipient (DDU/DAP)</SelectItem>
+                          <SelectItem value="third_party">Third Party</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
