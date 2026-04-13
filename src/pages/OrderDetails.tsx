@@ -25,9 +25,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
   // Package details
   const [weight, setWeight] = useState('1.0');
-  const [length, setLength] = useState('10');
-  const [width, setWidth] = useState('10');
-  const [height, setHeight] = useState('10');
+  const [length, setLength] = useState('');
+  const [width, setWidth] = useState('');
+  const [height, setHeight] = useState('');
   
   const [rates, setRates] = useState<any[]>([]);
   const [isRating, setIsRating] = useState(false);
@@ -37,8 +37,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
 
   // Weight fields
-  const [weightKg, setWeightKg] = useState('1');
-  const [weightG, setWeightG] = useState('0');
+  const [weightKg, setWeightKg] = useState('');
+  const [weightG, setWeightG] = useState('');
 
   // Editing state
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -81,11 +81,11 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   };
 
   const clearPackageDetails = () => {
-    setWeightKg('0');
-    setWeightG('0');
-    setLength('0');
-    setWidth('0');
-    setHeight('0');
+    setWeightKg('');
+    setWeightG('');
+    setLength('');
+    setWidth('');
+    setHeight('');
   };
 
   useEffect(() => {
@@ -387,9 +387,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 <TableBody>
                   {(order.items || []).map((item, idx) => {
                     const product = productDetails[item.sku];
-                    // Example of finding a custom attribute like 'ts_hts_code' or 'country_of_origin'
-                    const htsCode = product?.custom_attributes?.find((a: any) => a.attribute_code === 'ts_hts_code')?.value || 'N/A';
-                    const coo = product?.custom_attributes?.find((a: any) => a.attribute_code === 'country_of_origin')?.value || 'N/A';
+                    // Mapping COO to country_of_manufacture and HTS to commodity_code
+                    const htsCode = product?.custom_attributes?.find((a: any) => a.attribute_code === 'commodity_code')?.value || 'N/A';
+                    const coo = product?.custom_attributes?.find((a: any) => a.attribute_code === 'country_of_manufacture')?.value || 'N/A';
                     const currencySymbol = credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$';
                     const total = item.price * item.qty_ordered;
 
@@ -463,9 +463,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                         const newProductDetails = { ...productDetails };
                                         const product = { ...newProductDetails[item.sku] };
                                         const attrs = [...(product.custom_attributes || [])];
-                                        const htsIdx = attrs.findIndex(a => a.attribute_code === 'ts_hts_code');
+                                        const htsIdx = attrs.findIndex(a => a.attribute_code === 'commodity_code');
                                         if (htsIdx > -1) attrs[htsIdx] = { ...attrs[htsIdx], value: e.target.value };
-                                        else attrs.push({ attribute_code: 'ts_hts_code', value: e.target.value });
+                                        else attrs.push({ attribute_code: 'commodity_code', value: e.target.value });
                                         product.custom_attributes = attrs;
                                         newProductDetails[item.sku] = product;
                                         setProductDetails(newProductDetails);
@@ -480,9 +480,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                         const newProductDetails = { ...productDetails };
                                         const product = { ...newProductDetails[item.sku] };
                                         const attrs = [...(product.custom_attributes || [])];
-                                        const cooIdx = attrs.findIndex(a => a.attribute_code === 'country_of_origin');
+                                        const cooIdx = attrs.findIndex(a => a.attribute_code === 'country_of_manufacture');
                                         if (cooIdx > -1) attrs[cooIdx] = { ...attrs[cooIdx], value: e.target.value };
-                                        else attrs.push({ attribute_code: 'country_of_origin', value: e.target.value });
+                                        else attrs.push({ attribute_code: 'country_of_manufacture', value: e.target.value });
                                         product.custom_attributes = attrs;
                                         newProductDetails[item.sku] = product;
                                         setProductDetails(newProductDetails);

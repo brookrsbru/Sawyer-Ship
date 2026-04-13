@@ -22,6 +22,7 @@ export interface SawyerCredentials {
     proxyUrl: string;
     labelFormat: 'PDF' | 'ZPL';
     currency: string;
+    autoLockMinutes: number;
   };
 }
 
@@ -29,7 +30,7 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
   ups: { clientId: '', clientSecret: '', accountNumber: '', isSandbox: true },
   fedex: { apiKey: '', secretKey: '', accountNumber: '', isSandbox: true },
-  general: { proxyUrl: 'https://cors-anywhere.herokuapp.com/', labelFormat: 'PDF', currency: 'GBP' }
+  general: { proxyUrl: 'https://cors-anywhere.herokuapp.com/', labelFormat: 'PDF', currency: 'GBP', autoLockMinutes: 0 }
 };
 
 export function useSawyerStorage() {
@@ -47,7 +48,19 @@ export function useSawyerStorage() {
 
     try {
       const decrypted = await decrypt(stored, password);
-      setCredentials(JSON.parse(decrypted));
+      const parsed = JSON.parse(decrypted);
+      
+      // Merge with defaults to handle missing fields from older versions
+      const merged: SawyerCredentials = {
+        ...DEFAULT_CREDENTIALS,
+        ...parsed,
+        magento: { ...DEFAULT_CREDENTIALS.magento, ...(parsed.magento || {}) },
+        ups: { ...DEFAULT_CREDENTIALS.ups, ...(parsed.ups || {}) },
+        fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
+        general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) }
+      };
+      
+      setCredentials(merged);
       setMasterPassword(password);
       setIsLocked(false);
       return true;

@@ -102,6 +102,34 @@ function Layout({ children, onLogout }: { children: React.ReactNode, onLogout: (
 export default function App() {
   const { isLocked, credentials, unlock, logout, hasStoredData, save, exportData, importData } = useSawyerStorage();
 
+  // Auto-lock logic
+  React.useEffect(() => {
+    if (isLocked || !credentials.general.autoLockMinutes || credentials.general.autoLockMinutes <= 0) {
+      return;
+    }
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        logout();
+      }, credentials.general.autoLockMinutes * 60 * 1000);
+    };
+
+    // Events to track activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => document.addEventListener(event, resetTimer));
+
+    // Initial timer start
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => document.removeEventListener(event, resetTimer));
+    };
+  }, [isLocked, credentials.general.autoLockMinutes, logout]);
+
   if (isLocked) {
     return (
       <>

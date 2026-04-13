@@ -121,6 +121,26 @@ export default function Settings({
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="autolock">Auto-Lock Timer</Label>
+                    <Select 
+                      value={(formData.general.autoLockMinutes ?? 0).toString()}
+                      onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, autoLockMinutes: parseInt(v) } })}
+                    >
+                      <SelectTrigger id="autolock">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Never Lock</SelectItem>
+                        <SelectItem value="1">1 Minute</SelectItem>
+                        <SelectItem value="5">5 Minutes</SelectItem>
+                        <SelectItem value="15">15 Minutes</SelectItem>
+                        <SelectItem value="30">30 Minutes</SelectItem>
+                        <SelectItem value="60">1 Hour</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-zinc-500">Automatically lock the app after a period of inactivity.</p>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
