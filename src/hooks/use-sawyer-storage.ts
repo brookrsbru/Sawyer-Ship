@@ -36,14 +36,6 @@ export function useSawyerStorage() {
   const [credentials, setCredentials] = useState<SawyerCredentials>(DEFAULT_CREDENTIALS);
   const [masterPassword, setMasterPassword] = useState<string | null>(null);
 
-  // Check if we have any stored data
-  useEffect(() => {
-    const stored = localStorage.getItem('sawyer_ship_data');
-    if (!stored) {
-      setIsLocked(false); // No data, so not locked (first time setup)
-    }
-  }, []);
-
   const unlock = async (password: string) => {
     const stored = localStorage.getItem('sawyer_ship_data');
     if (!stored) {

@@ -7,8 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2 } from 'lucide-react';
-import { MagentoOrder, UPSClient, FedExClient } from '@/src/lib/api-clients';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Globe } from 'lucide-react';
+import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { toast } from 'sonner';
 
@@ -17,7 +17,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const location = useLocation();
   const navigate = useNavigate();
   const [order, setOrder] = useState<MagentoOrder | null>(location.state?.order || null);
+  const [productDetails, setProductDetails] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingProducts, setIsFetchingProducts] = useState(false);
   
   // Package details
   const [weight, setWeight] = useState('1.0');
@@ -30,6 +32,37 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [selectedRate, setSelectedRate] = useState<any>(null);
   const [isShipping, setIsShipping] = useState(false);
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
+  const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProductInfo = async () => {
+      if (!order || !credentials.magento.url || !credentials.magento.token) return;
+      
+      setIsFetchingProducts(true);
+      const client = new MagentoClient(
+        credentials.magento.url,
+        credentials.magento.token,
+        credentials.general.proxyUrl
+      );
+
+      const details: Record<string, any> = {};
+      try {
+        await Promise.all(order.items.map(async (item) => {
+          try {
+            const product = await client.getProduct(item.sku);
+            details[item.sku] = product;
+          } catch (e) {
+            console.error(`Failed to fetch product ${item.sku}`, e);
+          }
+        }));
+        setProductDetails(details);
+      } finally {
+        setIsFetchingProducts(false);
+      }
+    };
+
+    fetchProductInfo();
+  }, [order, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl]);
 
   const fetchRates = async () => {
     if (!order) return;
@@ -58,15 +91,37 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   };
 
   const handleCreateLabel = async () => {
-    if (!selectedRate) return;
+    if (!selectedRate || !order) return;
     setIsShipping(true);
     
     try {
+      // 1. Mock Carrier API Call (Label Generation)
       await new Promise(r => setTimeout(r, 2000));
+      const mockTracking = `1Z${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
+      setTrackingNumber(mockTracking);
       setLabelUrl("https://www.ups.com/assets/resources/media/en_US/shipping_label_samples.pdf");
-      toast.success(`Label created successfully with ${selectedRate.carrier}!`);
+
+      // 2. Update Magento Shipment Status
+      const client = new MagentoClient(
+        credentials.magento.url,
+        credentials.magento.token,
+        credentials.general.proxyUrl
+      );
+
+      // Map carrier name as requested
+      const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
+      const carrierCode = selectedRate.carrier.toLowerCase();
+
+      await client.createShipment(order.entity_id, [{
+        track_number: mockTracking,
+        title: carrierTitle,
+        carrier_code: carrierCode
+      }]);
+
+      toast.success(`Label created and Magento updated with ${carrierTitle}!`);
     } catch (error) {
-      toast.error("Failed to create label.");
+      console.error(error);
+      toast.error("Label created, but failed to update Magento shipment status.");
     } finally {
       setIsShipping(false);
     }
@@ -129,22 +184,40 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     <TableHead>Item</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead className="text-center">Qty</TableHead>
-                    <TableHead className="text-right">Weight</TableHead>
+                    <TableHead className="text-right">Customs/HTS</TableHead>
                     <TableHead className="text-right">Price</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.items.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-zinc-500 font-mono text-xs">{item.sku}</TableCell>
-                      <TableCell className="text-center">{item.qty_ordered}</TableCell>
-                      <TableCell className="text-right">{item.weight} lbs</TableCell>
-                      <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {order.items.map((item, idx) => {
+                    const product = productDetails[item.sku];
+                    // Example of finding a custom attribute like 'ts_hts_code' or 'country_of_origin'
+                    const htsCode = product?.custom_attributes?.find((a: any) => a.attribute_code === 'ts_hts_code')?.value || 'N/A';
+                    const coo = product?.custom_attributes?.find((a: any) => a.attribute_code === 'country_of_origin')?.value || 'N/A';
+                    
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="text-zinc-500 font-mono text-xs">{item.sku}</TableCell>
+                        <TableCell className="text-center">{item.qty_ordered}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="text-xs">
+                            <p><span className="text-zinc-400">HTS:</span> {htsCode}</p>
+                            <p><span className="text-zinc-400">COO:</span> {coo}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
+              {isFetchingProducts && (
+                <div className="flex items-center justify-center py-4 text-zinc-500 text-sm gap-2">
+                  <Loader2 className="animate-spin w-4 h-4" />
+                  Fetching product customs data...
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -226,9 +299,16 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
               {labelUrl && (
                 <div className="space-y-4 pt-4">
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span>Label generated successfully!</span>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm space-y-2">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <span className="font-bold">Label generated & Magento Updated!</span>
+                    </div>
+                    {trackingNumber && (
+                      <div className="pl-8 font-mono text-xs">
+                        Tracking: {trackingNumber}
+                      </div>
+                    )}
                   </div>
                   <Button variant="outline" className="w-full gap-2" onClick={() => window.open(labelUrl, '_blank')}>
                     <Printer size={18} /> Print Shipping Label

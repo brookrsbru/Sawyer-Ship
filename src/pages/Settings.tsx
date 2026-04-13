@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,11 @@ export default function Settings({
 }) {
   const [formData, setFormData] = useState<SawyerCredentials>(credentials);
   const [importText, setImportText] = useState('');
+
+  // Sync state if credentials change (e.g. after a save or import)
+  useEffect(() => {
+    setFormData(credentials);
+  }, [credentials]);
 
   const handleSave = async () => {
     try {

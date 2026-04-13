@@ -59,6 +59,31 @@ export class MagentoClient {
   async getOrder(id: string): Promise<MagentoOrder> {
     return this.fetch(`orders/${id}`);
   }
+
+  async getProduct(sku: string): Promise<any> {
+    return this.fetch(`products/${encodeURIComponent(sku)}`);
+  }
+
+  async createShipment(orderId: number, tracks: Array<{ track_number: string, title: string, carrier_code: string }>): Promise<any> {
+    return this.fetch(`order/${orderId}/ship`, {
+      method: 'POST',
+      body: JSON.stringify({
+        items: [], // Empty array ships all items
+        notify: true,
+        appendComment: true,
+        comment: {
+          extension_attributes: {},
+          comment: "Shipment created via Sawyer-Ship",
+          is_visible_on_front: 1
+        },
+        tracks: tracks.map(t => ({
+          track_number: t.track_number,
+          title: t.title,
+          carrier_code: t.carrier_code
+        }))
+      })
+    });
+  }
 }
 
 export class UPSClient {
