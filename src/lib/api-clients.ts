@@ -60,11 +60,41 @@ export class MagentoClient {
     // Search by increment_id or customer email
     const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
     const data = await this.fetch(`orders?${searchCriteria}`);
-    return data.items || [];
+    const items = data.items || [];
+    return items.map((item: any) => this.normalizeOrder(item));
   }
 
   async getOrder(id: string): Promise<MagentoOrder> {
-    return this.fetch(`orders/${id}`);
+    const order = await this.fetch(`orders/${id}`);
+    return this.normalizeOrder(order);
+  }
+
+  private normalizeOrder(order: any): MagentoOrder {
+    // Magento 2 orders often have shipping address in extension_attributes
+    const shippingAddress = order.extension_attributes?.shipping_assignments?.[0]?.shipping?.address 
+      || order.shipping_address 
+      || order.billing_address 
+      || {};
+
+    // Ensure street is an array (sometimes it comes as a string or is missing)
+    let street = shippingAddress.street || [];
+    if (typeof street === 'string') {
+      street = [street];
+    }
+
+    return {
+      ...order,
+      shipping_address: {
+        firstname: shippingAddress.firstname || order.customer_firstname || '',
+        lastname: shippingAddress.lastname || order.customer_lastname || '',
+        street: street,
+        city: shippingAddress.city || '',
+        region: shippingAddress.region || '',
+        postcode: shippingAddress.postcode || '',
+        country_id: shippingAddress.country_id || '',
+        telephone: shippingAddress.telephone || '',
+      }
+    };
   }
 
   async getProduct(sku: string): Promise<any> {

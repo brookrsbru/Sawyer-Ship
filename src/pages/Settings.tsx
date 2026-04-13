@@ -147,7 +147,7 @@ export default function Settings({
                     <Label htmlFor="magento-token">Integration Access Token</Label>
                     <Input 
                       id="magento-token" 
-                      type="password"
+                      autoComplete="off"
                       placeholder="Bearer Token" 
                       value={formData.magento.token}
                       onChange={(e) => setFormData({ ...formData, magento: { ...formData.magento, token: e.target.value } })}
@@ -180,7 +180,7 @@ export default function Settings({
                       <Label htmlFor="ups-client-secret">Client Secret</Label>
                       <Input 
                         id="ups-client-secret" 
-                        type="password"
+                        autoComplete="off"
                         value={formData.ups.clientSecret}
                         onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, clientSecret: e.target.value } })}
                       />
@@ -237,7 +237,7 @@ export default function Settings({
                       <Label htmlFor="fedex-secret">Secret Key</Label>
                       <Input 
                         id="fedex-secret" 
-                        type="password"
+                        autoComplete="off"
                         value={formData.fedex.secretKey}
                         onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, secretKey: e.target.value } })}
                       />
