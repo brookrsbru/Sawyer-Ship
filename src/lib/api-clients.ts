@@ -31,6 +31,7 @@ export interface MagentoOrder {
     price: number;
     weight: number;
   }>;
+  product_details?: Record<string, any>;
 }
 
 export class MagentoClient {
@@ -62,14 +63,52 @@ export class MagentoClient {
     const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
     const data = await this.fetch(`orders?${searchCriteria}`);
     const items = data.items || [];
-    return items.map((item: any) => this.normalizeOrder(item));
+    const orders = items.map((item: any) => this.normalizeOrder(item));
+
+    // Bulk fetch products for all orders to limit API requests
+    const allSkus = Array.from(new Set(orders.flatMap(o => o.items.map(i => i.sku)))) as string[];
+    if (allSkus.length > 0) {
+      try {
+        const products = await this.getProducts(allSkus);
+        const productMap: Record<string, any> = {};
+        products.forEach(p => productMap[p.sku] = p);
+        
+        orders.forEach(o => {
+          o.product_details = {};
+          o.items.forEach(i => {
+            if (productMap[i.sku]) {
+              o.product_details![i.sku] = productMap[i.sku];
+            }
+          });
+        });
+      } catch (e) {
+        console.error(`[MagentoClient] Failed to enrich orders with product details:`, e);
+      }
+    }
+
+    return orders;
   }
 
   async getOrder(id: string): Promise<MagentoOrder> {
     console.log(`[MagentoClient] Fetching order: ${id}`);
-    const order = await this.fetch(`orders/${id}`);
-    console.log(`[MagentoClient] Order data received:`, order);
-    return this.normalizeOrder(order);
+    const orderData = await this.fetch(`orders/${id}`);
+    const order = this.normalizeOrder(orderData);
+
+    // Bulk fetch products for this order to limit API requests
+    const skus = order.items.map(i => i.sku) as string[];
+    if (skus.length > 0) {
+      try {
+        const products = await this.getProducts(skus);
+        order.product_details = {};
+        products.forEach(p => {
+          order.product_details![p.sku] = p;
+        });
+      } catch (e) {
+        console.error(`[MagentoClient] Failed to enrich order with product details:`, e);
+      }
+    }
+
+    return order;
   }
 
   private normalizeOrder(order: any): MagentoOrder {
@@ -143,6 +182,22 @@ export class MagentoClient {
       }
       
       throw error;
+    }
+  }
+
+  async getProducts(skus: string[]): Promise<any[]> {
+    if (skus.length === 0) return [];
+    const uniqueSkus = Array.from(new Set(skus.map(s => s.trim())));
+    console.log(`[MagentoClient] Fetching multiple products (${uniqueSkus.length}): ${uniqueSkus.join(', ')}`);
+    
+    try {
+      // Use searchCriteria with 'in' condition for bulk fetch
+      const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=sku&searchCriteria[filter_groups][0][filters][0][value]=${uniqueSkus.map(s => encodeURIComponent(s)).join(',')}&searchCriteria[filter_groups][0][filters][0][condition_type]=in`;
+      const data = await this.fetch(`products?${searchCriteria}`);
+      return data.items || [];
+    } catch (error) {
+      console.error(`[MagentoClient] Bulk product fetch failed:`, error);
+      return [];
     }
   }
 

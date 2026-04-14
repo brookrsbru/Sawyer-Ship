@@ -180,7 +180,16 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
   useEffect(() => {
     const fetchProductInfo = async () => {
-      if (!order || id === 'manual' || !credentials.magento.url || !credentials.magento.token) return;
+      if (!order || id === 'manual') return;
+      
+      // If order already has product details (from search or getOrder), use them
+      if (order.product_details && Object.keys(order.product_details).length > 0) {
+        console.log(`[OrderDetails] Using pre-loaded product details`);
+        setProductDetails(order.product_details);
+        return;
+      }
+
+      if (!credentials.magento.url || !credentials.magento.token) return;
       
       console.log(`[OrderDetails] Fetching product details for ${order.items.length} items`);
       setIsFetchingProducts(true);
@@ -192,24 +201,22 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
       const details: Record<string, any> = {};
       try {
-        await Promise.all(order.items.map(async (item) => {
-          try {
-            console.log(`[OrderDetails] Fetching product: ${item.sku}`);
-            const product = await client.getProduct(item.sku);
-            details[item.sku] = product;
-          } catch (e) {
-            console.error(`[OrderDetails] Failed to fetch product ${item.sku}`, e);
-          }
-        }));
+        const skus = order.items.map(item => item.sku);
+        const products = await client.getProducts(skus);
+        
+        products.forEach(product => {
+          details[product.sku] = product;
+        });
+
+        console.log(`[OrderDetails] Loaded details for ${products.length} products`);
         setProductDetails(details);
-        console.log(`[OrderDetails] All product details loaded`);
       } finally {
         setIsFetchingProducts(false);
       }
     };
 
     fetchProductInfo();
-  }, [order, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl]);
+  }, [order, id, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl]);
 
   const fetchRates = async () => {
     if (!order) return;
