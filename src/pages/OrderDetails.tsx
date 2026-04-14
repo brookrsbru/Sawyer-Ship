@@ -100,6 +100,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   // Editing state
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [isManualReady, setIsManualReady] = useState(false);
 
   // Sync weight when Kg or G changes
   useEffect(() => {
@@ -296,6 +297,10 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   PackageWeight: {
                     UnitOfMeasurement: { Code: "KGS" },
                     Weight: weightVal.toString()
+                  },
+                  ReferenceNumber: {
+                    Code: "01",
+                    Value: order.increment_id
                   }
                 }
               }
@@ -384,7 +389,13 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               rateRequestType: ["ACCOUNT", "LIST"],
               requestedPackageLineItems: [{
                 weight: { units: "KG", value: weightVal },
-                dimensions: { length: Math.max(1, l), width: Math.max(1, w), height: Math.max(1, h), units: "CM" }
+                dimensions: { length: Math.max(1, l), width: Math.max(1, w), height: Math.max(1, h), units: "CM" },
+                customerReferences: [
+                  {
+                    customerReferenceType: "CUSTOMER_REFERENCE",
+                    value: order.increment_id
+                  }
+                ]
               }]
             }
           };
@@ -591,6 +602,166 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         <h2 className="text-xl font-bold text-zinc-900">Order Not Found</h2>
         <p className="text-zinc-500 max-w-md text-center">{error || "We couldn't find the order you're looking for."}</p>
         <Button onClick={() => navigate('/')} variant="outline">Back to Dashboard</Button>
+      </div>
+    );
+  }
+
+  const isManual = id === 'manual';
+  if (isManual && !isManualReady) {
+    const isComplete = !!(
+      order.customer_firstname && 
+      order.customer_lastname && 
+      order.shipping_address?.street?.[0] && 
+      order.shipping_address?.city && 
+      order.shipping_address?.postcode
+    );
+
+    return (
+      <div className="max-w-2xl mx-auto space-y-8">
+        <header className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-zinc-900">Manual Shipment</h1>
+            <p className="text-zinc-500">Please provide the recipient's information to continue.</p>
+          </div>
+        </header>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer & Shipping Information</CardTitle>
+            <CardDescription>All fields marked with * are required.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>First Name <span className="text-red-500">*</span></Label>
+                <Input 
+                  value={order.customer_firstname} 
+                  onChange={(e) => setOrder({
+                    ...order, 
+                    customer_firstname: e.target.value,
+                    shipping_address: { ...order.shipping_address!, firstname: e.target.value }
+                  })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Last Name <span className="text-red-500">*</span></Label>
+                <Input 
+                  value={order.customer_lastname} 
+                  onChange={(e) => setOrder({
+                    ...order, 
+                    customer_lastname: e.target.value,
+                    shipping_address: { ...order.shipping_address!, lastname: e.target.value }
+                  })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input 
+                  value={order.customer_email} 
+                  onChange={(e) => setOrder({...order, customer_email: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telephone</Label>
+                <Input 
+                  value={order.shipping_address?.telephone || ''} 
+                  onChange={(e) => setOrder({
+                    ...order, 
+                    shipping_address: { ...order.shipping_address!, telephone: e.target.value }
+                  })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Company</Label>
+              <Input 
+                value={order.shipping_address?.company || ''} 
+                onChange={(e) => setOrder({
+                  ...order, 
+                  shipping_address: { ...order.shipping_address!, company: e.target.value }
+                })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Address Line 1 <span className="text-red-500">*</span></Label>
+              <Input 
+                value={order.shipping_address?.street?.[0] || ''} 
+                onChange={(e) => {
+                  const street = [...(order.shipping_address?.street || [])];
+                  street[0] = e.target.value;
+                  setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>City <span className="text-red-500">*</span></Label>
+                <Input 
+                  value={order.shipping_address?.city || ''} 
+                  onChange={(e) => setOrder({
+                    ...order, 
+                    shipping_address: { ...order.shipping_address!, city: e.target.value }
+                  })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Region</Label>
+                <Input 
+                  value={order.shipping_address?.region || ''} 
+                  onChange={(e) => setOrder({
+                    ...order, 
+                    shipping_address: { ...order.shipping_address!, region: e.target.value }
+                  })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Postcode <span className="text-red-500">*</span></Label>
+                <Input 
+                  value={order.shipping_address?.postcode || ''} 
+                  onChange={(e) => setOrder({
+                    ...order, 
+                    shipping_address: { ...order.shipping_address!, postcode: e.target.value }
+                  })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Country <span className="text-red-500">*</span></Label>
+                <Select 
+                  value={order.shipping_address?.country_id}
+                  onValueChange={(v) => setOrder({
+                    ...order,
+                    shipping_address: { ...order.shipping_address!, country_id: v }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country">
+                      {COUNTRY_NAMES[order.shipping_address?.country_id || ''] || order.shipping_address?.country_id}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
+                      <SelectItem key={code} value={code}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button 
+              className="w-full bg-zinc-900 hover:bg-zinc-800" 
+              disabled={!isComplete}
+              onClick={() => setIsManualReady(true)}
+            >
+              Continue to Shipping
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

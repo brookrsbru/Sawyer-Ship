@@ -100,7 +100,7 @@ function Layout({ children, onLogout }: { children: React.ReactNode, onLogout: (
   return (
     <div className="min-h-screen bg-zinc-50 flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-zinc-200 flex flex-col">
+      <aside className="w-64 bg-white border-r border-zinc-200 flex flex-col h-screen sticky top-0 shrink-0">
         <div className="p-6">
           <div className="flex items-center gap-2 font-bold text-xl">
             <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center">

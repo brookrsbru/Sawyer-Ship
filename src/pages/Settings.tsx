@@ -8,7 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, Settings as SettingsIcon } from 'lucide-react';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
 
 const UPS_PICKUP_LABELS: Record<string, string> = {
@@ -38,7 +48,7 @@ export default function Settings({
   onImport: (data: string) => void
 }) {
   const [formData, setFormData] = useState<SawyerCredentials>(credentials);
-  const [importText, setImportText] = useState('');
+  const [pendingImportData, setPendingImportData] = useState<string | null>(null);
 
   // Sync state if credentials change (e.g. after a save or import)
   useEffect(() => {
@@ -79,9 +89,7 @@ export default function Settings({
       try {
         const json = JSON.parse(event.target?.result as string);
         if (json.encryptedData) {
-          onImport(json.encryptedData);
-          toast.success("Data imported. Please refresh and unlock with the original master password.");
-          setTimeout(() => window.location.reload(), 2000);
+          setPendingImportData(json.encryptedData);
         } else {
           toast.error("Invalid backup file format.");
         }
@@ -92,30 +100,76 @@ export default function Settings({
     reader.readAsText(file);
   };
 
+  const confirmImport = () => {
+    if (pendingImportData) {
+      onImport(pendingImportData);
+      toast.success("Data imported. Please refresh and unlock with the original master password.");
+      setTimeout(() => window.location.reload(), 2000);
+    }
+  };
+
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold text-zinc-900">Settings</h1>
-        <p className="text-zinc-500">Manage your API credentials and application preferences.</p>
+    <div className="space-y-8 pb-20">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 bg-zinc-50/80 backdrop-blur-md z-10 py-4 -mt-4 border-b border-zinc-200 mb-4">
+        <div>
+          <h1 className="text-3xl font-bold text-zinc-900">Settings</h1>
+          <p className="text-zinc-500">Manage your API credentials and application preferences.</p>
+        </div>
+        <Button onClick={handleSave} className="bg-zinc-900 hover:bg-zinc-800 gap-2 shadow-lg">
+          <Save size={18} /> Save All Settings
+        </Button>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="shipping">Shipping Defaults</TabsTrigger>
-              <TabsTrigger value="magento">Magento</TabsTrigger>
-              <TabsTrigger value="ups">UPS</TabsTrigger>
-              <TabsTrigger value="fedex">FedEx</TabsTrigger>
-            </TabsList>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Navigation Sidebar */}
+        <div className="hidden lg:block">
+          <div className="sticky top-24 space-y-4">
+            <Card className="border-none shadow-none bg-transparent">
+              <CardHeader className="px-0 pt-0">
+                <CardTitle className="text-xs font-bold uppercase text-zinc-400 tracking-widest">Navigation</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <nav className="space-y-1">
+                  {[
+                    { id: 'general', label: 'General Preferences', icon: SettingsIcon },
+                    { id: 'shipping', label: 'Shipping Defaults', icon: Truck },
+                    { id: 'magento', label: 'Magento Integration', icon: Globe },
+                    { id: 'ups', label: 'UPS Integration', icon: Truck },
+                    { id: 'fedex', label: 'FedEx Integration', icon: Truck },
+                    { id: 'security', label: 'Security & Backup', icon: Shield },
+                  ].map((item) => (
+                    <a
+                      key={item.id}
+                      href={`#${item.id}`}
+                      className="flex items-center justify-between group px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon size={16} className="text-zinc-400 group-hover:text-zinc-900" />
+                        {item.label}
+                      </div>
+                      <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  ))}
+                </nav>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-            <TabsContent value="general" className="space-y-4 mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Application Preferences</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+        <div className="lg:col-span-3 space-y-12">
+          {/* General Section */}
+          <section id="general" className="scroll-mt-24 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="h-px flex-1 bg-zinc-200" />
+              <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">General Preferences</h2>
+              <div className="h-px flex-1 bg-zinc-200" />
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Preferences</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="proxy">CORS Proxy URL</Label>
                     <div className="flex gap-2">
@@ -368,52 +422,18 @@ export default function Settings({
                         </SelectContent>
                       </Select>
                     </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <Label>UPS Pickup Type</Label>
-                      <Select 
-                        value={formData.general.upsPickupType}
-                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, upsPickupType: v } })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select pickup type">
-                            {UPS_PICKUP_LABELS[formData.general.upsPickupType] || formData.general.upsPickupType}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(UPS_PICKUP_LABELS).map(([val, label]) => (
-                            <SelectItem key={val} value={val}>{label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>FedEx Pickup Type</Label>
-                      <Select 
-                        value={formData.general.fedexPickupType}
-                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, fedexPickupType: v } })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select pickup type">
-                            {FEDEX_PICKUP_LABELS[formData.general.fedexPickupType] || formData.general.fedexPickupType}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(FEDEX_PICKUP_LABELS).map(([val, label]) => (
-                            <SelectItem key={val} value={val}>{label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </section>
 
-            <TabsContent value="shipping" className="space-y-4 mt-6">
+            {/* Shipping Defaults Section */}
+            <section id="shipping" className="scroll-mt-24 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Shipping Defaults</h2>
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -582,116 +602,126 @@ export default function Settings({
                       <p className="text-xs text-zinc-500 italic">No country-specific defaults set.</p>
                     ) : (
                       <div className="space-y-4">
-                        {Object.entries(formData.countryDefaults).map(([code, defaults]) => (
-                          <Card key={code} className="border-zinc-200">
-                            <CardHeader className="py-3 flex flex-row items-center justify-between">
-                              <CardTitle className="text-sm">{COUNTRY_NAMES[code] || code} Defaults</CardTitle>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-red-500"
-                                onClick={() => {
-                                  const newDefaults = { ...formData.countryDefaults };
-                                  delete newDefaults[code];
-                                  setFormData({ ...formData, countryDefaults: newDefaults });
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            </CardHeader>
-                            <CardContent className="py-3 space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-[10px]">Weight (kg/g)</Label>
-                                  <div className="flex gap-1">
-                                    <Input 
-                                      className="h-7 text-xs" 
-                                      placeholder="kg"
-                                      value={defaults.weightKg}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          countryDefaults: {
-                                            ...formData.countryDefaults,
-                                            [code]: { ...defaults, weightKg: e.target.value }
-                                          }
-                                        });
-                                      }}
-                                    />
-                                    <Input 
-                                      className="h-7 text-xs" 
-                                      placeholder="g"
-                                      value={defaults.weightG}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          countryDefaults: {
-                                            ...formData.countryDefaults,
-                                            [code]: { ...defaults, weightG: e.target.value }
-                                          }
-                                        });
-                                      }}
-                                    />
+                        {Object.entries(formData.countryDefaults || {}).map(([code, defaults]) => {
+                          const d = defaults as any;
+                          return (
+                            <Card key={code} className="border-zinc-200">
+                              <CardHeader className="py-3 flex flex-row items-center justify-between">
+                                <CardTitle className="text-sm">{COUNTRY_NAMES[code] || code} Defaults</CardTitle>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-red-500"
+                                  onClick={() => {
+                                    const newDefaults = { ...formData.countryDefaults };
+                                    delete newDefaults[code];
+                                    setFormData({ ...formData, countryDefaults: newDefaults });
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </CardHeader>
+                              <CardContent className="py-3 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Weight (kg/g)</Label>
+                                    <div className="flex gap-1">
+                                      <Input 
+                                        className="h-7 text-xs" 
+                                        placeholder="kg"
+                                        value={d.weightKg}
+                                        onChange={(e) => {
+                                          setFormData({
+                                            ...formData,
+                                            countryDefaults: {
+                                              ...formData.countryDefaults,
+                                              [code]: { ...d, weightKg: e.target.value }
+                                            }
+                                          });
+                                        }}
+                                      />
+                                      <Input 
+                                        className="h-7 text-xs" 
+                                        placeholder="g"
+                                        value={d.weightG}
+                                        onChange={(e) => {
+                                          setFormData({
+                                            ...formData,
+                                            countryDefaults: {
+                                              ...formData.countryDefaults,
+                                              [code]: { ...d, weightG: e.target.value }
+                                            }
+                                          });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Dimensions (L/W/H)</Label>
+                                    <div className="flex gap-1">
+                                      <Input 
+                                        className="h-7 text-xs" 
+                                        placeholder="L"
+                                        value={d.length}
+                                        onChange={(e) => {
+                                          setFormData({
+                                            ...formData,
+                                            countryDefaults: {
+                                              ...formData.countryDefaults,
+                                              [code]: { ...d, length: e.target.value }
+                                            }
+                                          });
+                                        }}
+                                      />
+                                      <Input 
+                                        className="h-7 text-xs" 
+                                        placeholder="W"
+                                        value={d.width}
+                                        onChange={(e) => {
+                                          setFormData({
+                                            ...formData,
+                                            countryDefaults: {
+                                              ...formData.countryDefaults,
+                                              [code]: { ...d, width: e.target.value }
+                                            }
+                                          });
+                                        }}
+                                      />
+                                      <Input 
+                                        className="h-7 text-xs" 
+                                        placeholder="H"
+                                        value={d.height}
+                                        onChange={(e) => {
+                                          setFormData({
+                                            ...formData,
+                                            countryDefaults: {
+                                              ...formData.countryDefaults,
+                                              [code]: { ...d, height: e.target.value }
+                                            }
+                                          });
+                                        }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <Label className="text-[10px]">Dimensions (L/W/H)</Label>
-                                  <div className="flex gap-1">
-                                    <Input 
-                                      className="h-7 text-xs" 
-                                      placeholder="L"
-                                      value={defaults.length}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          countryDefaults: {
-                                            ...formData.countryDefaults,
-                                            [code]: { ...defaults, length: e.target.value }
-                                          }
-                                        });
-                                      }}
-                                    />
-                                    <Input 
-                                      className="h-7 text-xs" 
-                                      placeholder="W"
-                                      value={defaults.width}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          countryDefaults: {
-                                            ...formData.countryDefaults,
-                                            [code]: { ...defaults, width: e.target.value }
-                                          }
-                                        });
-                                      }}
-                                    />
-                                    <Input 
-                                      className="h-7 text-xs" 
-                                      placeholder="H"
-                                      value={defaults.height}
-                                      onChange={(e) => {
-                                        setFormData({
-                                          ...formData,
-                                          countryDefaults: {
-                                            ...formData.countryDefaults,
-                                            [code]: { ...defaults, height: e.target.value }
-                                          }
-                                        });
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-            <TabsContent value="magento" className="space-y-4 mt-6">
+            </section>
+
+            {/* Magento Section */}
+            <section id="magento" className="scroll-mt-24 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Magento Integration</h2>
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -722,9 +752,15 @@ export default function Settings({
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </section>
 
-            <TabsContent value="ups" className="space-y-4 mt-6">
+            {/* UPS Section */}
+            <section id="ups" className="scroll-mt-24 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">UPS Integration</h2>
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
@@ -787,26 +823,52 @@ export default function Settings({
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ups-env">Environment</Label>
-                    <Select 
-                      value={formData.ups.isSandbox ? "sandbox" : "production"}
-                      onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, isSandbox: v === "sandbox" } })}
-                    >
-                      <SelectTrigger id="ups-env">
-                        <SelectValue placeholder="Select environment" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
-                        <SelectItem value="production">Production (Live)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ups-pickup">Pickup Type</Label>
+                      <Select 
+                        value={formData.general.upsPickupType}
+                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, upsPickupType: v } })}
+                      >
+                        <SelectTrigger id="ups-pickup">
+                          <SelectValue placeholder="Select pickup type">
+                            {UPS_PICKUP_LABELS[formData.general.upsPickupType] || formData.general.upsPickupType}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(UPS_PICKUP_LABELS).map(([val, label]) => (
+                            <SelectItem key={val} value={val}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ups-env">Environment</Label>
+                      <Select 
+                        value={formData.ups.isSandbox ? "sandbox" : "production"}
+                        onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, isSandbox: v === "sandbox" } })}
+                      >
+                        <SelectTrigger id="ups-env">
+                          <SelectValue placeholder="Select environment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
+                          <SelectItem value="production">Production (Live)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </section>
 
-            <TabsContent value="fedex" className="space-y-4 mt-6">
+            {/* FedEx Section */}
+            <section id="fedex" className="scroll-mt-24 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">FedEx Integration</h2>
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
@@ -869,109 +931,131 @@ export default function Settings({
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fedex-env">Environment</Label>
-                    <Select 
-                      value={formData.fedex.isSandbox ? "sandbox" : "production"}
-                      onValueChange={(v) => setFormData({ ...formData, fedex: { ...formData.fedex, isSandbox: v === "sandbox" } })}
-                    >
-                      <SelectTrigger id="fedex-env">
-                        <SelectValue placeholder="Select environment" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
-                        <SelectItem value="production">Production (Live)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fedex-pickup">Pickup Type</Label>
+                      <Select 
+                        value={formData.general.fedexPickupType}
+                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, fedexPickupType: v } })}
+                      >
+                        <SelectTrigger id="fedex-pickup">
+                          <SelectValue placeholder="Select pickup type">
+                            {FEDEX_PICKUP_LABELS[formData.general.fedexPickupType] || formData.general.fedexPickupType}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(FEDEX_PICKUP_LABELS).map(([val, label]) => (
+                            <SelectItem key={val} value={val}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fedex-env">Environment</Label>
+                      <Select 
+                        value={formData.fedex.isSandbox ? "sandbox" : "production"}
+                        onValueChange={(v) => setFormData({ ...formData, fedex: { ...formData.fedex, isSandbox: v === "sandbox" } })}
+                      >
+                        <SelectTrigger id="fedex-env">
+                          <SelectValue placeholder="Select environment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
+                          <SelectItem value="production">Production (Live)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
+            </section>
 
-          <div className="flex justify-end">
-            <Button onClick={handleSave} className="bg-zinc-900 hover:bg-zinc-800 gap-2">
-              <Save size={18} /> Save All Settings
-            </Button>
+            {/* Security Section */}
+            <section id="security" className="scroll-mt-24 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Security & Backup</h2>
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield size={20} /> Security & Backup
+                  </CardTitle>
+                  <CardDescription>Export or import your encrypted credentials.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Export Settings & Tokens</Label>
+                    <Button variant="outline" className="w-full gap-2" onClick={handleExport}>
+                      <FileJson size={18} /> Download JSON Backup
+                    </Button>
+                    <p className="text-[10px] text-zinc-500">This file contains your encrypted credentials. Keep it safe.</p>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="import-file">Import from JSON Backup</Label>
+                    <div className="flex flex-col gap-2">
+                      <Input 
+                        id="import-file"
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileImport}
+                        className="text-xs"
+                      />
+                      <p className="text-[10px] text-zinc-500">Importing will overwrite your current settings.</p>
+                    </div>
+                  </div>
+
+                  <AlertDialog open={!!pendingImportData} onOpenChange={(open) => !open && setPendingImportData(null)}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+                          <Shield size={20} /> Confirm Import
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to import this backup? This will overwrite all your current settings and API tokens.
+                          <br /><br />
+                          You will need to use the master password that was active when this backup was created.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel variant="outline" size="default">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmImport} className="bg-amber-600 hover:bg-amber-700">
+                          Yes, Import Data
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Help Section */}
+            <section id="help" className="scroll-mt-24">
+              <Card className="bg-zinc-900 text-white border-none">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <Info size={20} /> Help Desk
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-4 opacity-90">
+                  <p>
+                    <strong>UPS Credentials:</strong> Get them at the <a href="https://developer.ups.com/" target="_blank" className="underline">UPS Developer Portal</a>. Create an "App" to get your Client ID and Secret.
+                  </p>
+                  <p>
+                    <strong>FedEx Credentials:</strong> Get them at the <a href="https://developer.fedex.com/" target="_blank" className="underline">FedEx Developer Portal</a>.
+                  </p>
+                  <p>
+                    <strong>CORS Proxy:</strong> Since this app runs in your browser, some APIs might block requests. Using a proxy helps bypass these restrictions.
+                  </p>
+                </CardContent>
+              </Card>
+            </section>
           </div>
         </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield size={20} /> Security & Backup
-              </CardTitle>
-              <CardDescription>Export or import your encrypted credentials.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Export Settings & Tokens</Label>
-                <Button variant="outline" className="w-full gap-2" onClick={handleExport}>
-                  <FileJson size={18} /> Download JSON Backup
-                </Button>
-                <p className="text-[10px] text-zinc-500">This file contains your encrypted credentials. Keep it safe.</p>
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-2">
-                <Label htmlFor="import-file">Import from JSON Backup</Label>
-                <div className="flex flex-col gap-2">
-                  <Input 
-                    id="import-file"
-                    type="file"
-                    accept=".json"
-                    onChange={handleFileImport}
-                    className="text-xs"
-                  />
-                  <p className="text-[10px] text-zinc-500">Importing will overwrite your current settings.</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label htmlFor="import">Manual Import (Encrypted String)</Label>
-                <textarea 
-                  id="import"
-                  className="w-full h-20 p-2 text-[10px] border rounded-md bg-zinc-50 font-mono"
-                  placeholder="Paste encrypted string here..."
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                />
-                <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => {
-                  if (!importText) return;
-                  onImport(importText);
-                  toast.success("Data imported. Reloading...");
-                  setTimeout(() => window.location.reload(), 2000);
-                }}>
-                  <Upload size={14} /> Import String
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-zinc-900 text-white border-none">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <Info size={20} /> Help Desk
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-4 opacity-90">
-              <p>
-                <strong>UPS Credentials:</strong> Get them at the <a href="https://developer.ups.com/" target="_blank" className="underline">UPS Developer Portal</a>. Create an "App" to get your Client ID and Secret.
-              </p>
-              <p>
-                <strong>FedEx Credentials:</strong> Get them at the <a href="https://developer.fedex.com/" target="_blank" className="underline">FedEx Developer Portal</a>.
-              </p>
-              <p>
-                <strong>CORS Proxy:</strong> Since this app runs in your browser, some APIs might block requests. Using a proxy helps bypass these restrictions.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
