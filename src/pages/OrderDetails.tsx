@@ -808,29 +808,22 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             <CardDescription>All fields marked with * are required.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>First Name <span className="text-red-500">*</span></Label>
-                <Input 
-                  value={order.customer_firstname} 
-                  onChange={(e) => setOrder({
+            <div className="space-y-2">
+              <Label>Full Name <span className="text-red-500">*</span></Label>
+              <Input 
+                value={`${order.customer_firstname} ${order.customer_lastname}`.trim()} 
+                onChange={(e) => {
+                  const parts = e.target.value.split(' ');
+                  const first = parts[0] || '';
+                  const last = parts.slice(1).join(' ') || '';
+                  setOrder({
                     ...order, 
-                    customer_firstname: e.target.value,
-                    shipping_address: { ...order.shipping_address!, firstname: e.target.value }
-                  })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Last Name <span className="text-red-500">*</span></Label>
-                <Input 
-                  value={order.customer_lastname} 
-                  onChange={(e) => setOrder({
-                    ...order, 
-                    customer_lastname: e.target.value,
-                    shipping_address: { ...order.shipping_address!, lastname: e.target.value }
-                  })}
-                />
-              </div>
+                    customer_firstname: first,
+                    customer_lastname: last,
+                    shipping_address: { ...order.shipping_address!, firstname: first, lastname: last }
+                  });
+                }}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

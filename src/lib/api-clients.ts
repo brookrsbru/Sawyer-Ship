@@ -87,6 +87,8 @@ export class MagentoClient {
 
     return {
       ...order,
+      customer_firstname: shippingAddress.firstname || order.customer_firstname || '',
+      customer_lastname: shippingAddress.lastname || order.customer_lastname || '',
       shipping_address: {
         firstname: shippingAddress.firstname || order.customer_firstname || '',
         lastname: shippingAddress.lastname || order.customer_lastname || '',
