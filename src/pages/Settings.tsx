@@ -138,17 +138,22 @@ export default function Settings({
                     { id: 'fedex', label: 'FedEx Integration', icon: Truck },
                     { id: 'security', label: 'Security & Backup', icon: Shield },
                   ].map((item) => (
-                    <a
+                    <button
                       key={item.id}
-                      href={`#${item.id}`}
-                      className="flex items-center justify-between group px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all"
+                      onClick={() => {
+                        const element = document.getElementById(item.id);
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }}
+                      className="w-full flex items-center justify-between group px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all text-left"
                     >
                       <div className="flex items-center gap-3">
                         <item.icon size={16} className="text-zinc-400 group-hover:text-zinc-900" />
                         {item.label}
                       </div>
                       <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
+                    </button>
                   ))}
                 </nav>
               </CardContent>
