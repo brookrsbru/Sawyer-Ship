@@ -117,7 +117,20 @@ export class MagentoClient {
           const singleEncoded = encodeURIComponent(trimmedSku);
           return await this.fetch(`products/${singleEncoded}`);
         } catch (innerError) {
-          console.warn(`[MagentoClient] Product not found with single encoding either: ${trimmedSku}`);
+          console.log(`[MagentoClient] Single encoding failed for ${trimmedSku}, trying searchCriteria fallback...`);
+          try {
+            // Final fallback: Use searchCriteria which is more robust for special characters
+            const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=sku&searchCriteria[filter_groups][0][filters][0][value]=${encodeURIComponent(trimmedSku)}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+            const data = await this.fetch(`products?${searchCriteria}`);
+            if (data.items && data.items.length > 0) {
+              console.log(`[MagentoClient] Product found via searchCriteria: ${trimmedSku}`);
+              return data.items[0];
+            }
+          } catch (searchError) {
+            console.warn(`[MagentoClient] searchCriteria fallback failed for: ${trimmedSku}`);
+          }
+          
+          console.warn(`[MagentoClient] Product not found with any method: ${trimmedSku}`);
           return null;
         }
       }

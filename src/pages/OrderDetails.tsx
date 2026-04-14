@@ -1463,12 +1463,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       <Select value={billShippingTo} onValueChange={setBillShippingTo}>
                         <SelectTrigger className="text-xs h-8">
                           <SelectValue placeholder="Select billing">
-                            {billShippingTo === 'shipper' ? 'Shipper (Prepaid)' : billShippingTo === 'recipient' ? 'Recipient (Collect)' : 'Third Party'}
+                            {billShippingTo === 'shipper' ? 'Shipper' : billShippingTo === 'recipient' ? 'Recipient' : 'Third Party'}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
-                          <SelectItem value="recipient">Recipient (Collect)</SelectItem>
+                          <SelectItem value="shipper">Shipper</SelectItem>
+                          <SelectItem value="recipient">Recipient</SelectItem>
                           <SelectItem value="third_party">Third Party</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1479,12 +1479,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
                           <SelectTrigger className="text-xs h-8">
                             <SelectValue placeholder="Select billing">
-                              {billDutiesTo === 'shipper' ? 'Shipper (DDP)' : billDutiesTo === 'recipient' ? 'Recipient (DDU/DAP)' : 'Third Party'}
+                              {billDutiesTo === 'shipper' ? 'Shipper (DDP)' : billDutiesTo === 'recipient' ? 'Recipient (DAP)' : 'Third Party'}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="shipper">Shipper (DDP)</SelectItem>
-                            <SelectItem value="recipient">Recipient (DDU/DAP)</SelectItem>
+                            <SelectItem value="recipient">Recipient (DAP)</SelectItem>
                             <SelectItem value="third_party">Third Party</SelectItem>
                           </SelectContent>
                         </Select>
