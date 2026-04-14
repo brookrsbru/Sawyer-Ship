@@ -122,8 +122,8 @@ export default function Settings({
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Navigation Sidebar */}
-        <div className="hidden lg:block">
-          <div className="sticky top-28 space-y-4">
+        <div className="hidden lg:block relative">
+          <div className="sticky top-24 space-y-4 z-10">
             <Card className="border-none shadow-none bg-transparent">
               <CardHeader className="px-0 pt-0">
                 <CardTitle className="text-xs font-bold uppercase text-zinc-400 tracking-widest text-center w-full">Navigation</CardTitle>

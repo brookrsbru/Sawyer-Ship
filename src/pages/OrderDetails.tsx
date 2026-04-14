@@ -545,40 +545,214 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     setIsShipping(true);
     
     try {
-      // 1. Mock Carrier API Call (Label Generation)
-      await new Promise(r => setTimeout(r, 2000));
-      const mockTracking = `1Z${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
-      console.log(`[OrderDetails] Label created. Tracking: ${mockTracking}`);
-      setTrackingNumber(mockTracking);
-      setLabelUrl("https://www.ups.com/assets/resources/media/en_US/shipping_label_samples.pdf");
+      let tracking = "";
+      let labelBase64 = "";
+      let labelType = "application/pdf";
 
-      // 2. Update Magento Shipment Status (if enabled)
-      if (credentials.general.markAsShipped && id !== 'manual') {
-        console.log(`[OrderDetails] Updating Magento shipment status...`);
-        const client = new MagentoClient(
-          credentials.magento.url,
-          credentials.magento.token,
+      const weightVal = parseFloat(weightKg || "0") + (parseFloat(weightG || "0") / 1000);
+      const isDomestic = order.shipping_address?.country_id === credentials.general.originCountry;
+
+      if (selectedRate.carrier === 'UPS') {
+        const ups = new UPSClient(
+          credentials.ups.clientId,
+          credentials.ups.clientSecret,
+          isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber,
+          credentials.ups.isSandbox,
           credentials.general.proxyUrl
         );
 
-        // Map carrier name as requested
-        const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
-        const carrierCode = selectedRate.carrier.toLowerCase();
+        // Map service name to code (simplified mapping)
+        const serviceMap: Record<string, string> = {
+          'Ground': '03',
+          'Next Day Air': '01',
+          '2nd Day Air': '02',
+          'Standard': '11',
+          'Worldwide Express': '07',
+          'Worldwide Expedited': '08',
+          'Worldwide Saver': '65',
+        };
+        const serviceCode = serviceMap[selectedRate.service] || '03';
 
-        await client.createShipment(order.entity_id, [{
-          track_number: mockTracking,
-          title: carrierTitle,
-          carrier_code: carrierCode
-        }]);
-        console.log(`[OrderDetails] Magento updated successfully`);
-      } else {
-        console.log(`[OrderDetails] Skipping Magento update (disabled in settings)`);
+        const upsParams = {
+          ShipmentRequest: {
+            Shipment: {
+              Description: `Order #${order.increment_id}`,
+              Shipper: {
+                Name: credentials.general.originContactName,
+                AttentionName: credentials.general.originContactName,
+                TaxIdentificationNumber: "",
+                Phone: { Number: credentials.general.originPhone },
+                ShipperNumber: isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber,
+                Address: {
+                  AddressLine: [credentials.general.originStreet1, credentials.general.originStreet2].filter(Boolean),
+                  City: credentials.general.originCity,
+                  StateProvinceCode: credentials.general.originState,
+                  PostalCode: credentials.general.originPostalCode,
+                  CountryCode: credentials.general.originCountry
+                }
+              },
+              ShipTo: {
+                Name: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
+                AttentionName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
+                Phone: { Number: order.shipping_address?.telephone },
+                Address: {
+                  AddressLine: order.shipping_address?.street,
+                  City: order.shipping_address?.city,
+                  StateProvinceCode: order.shipping_address?.region,
+                  PostalCode: order.shipping_address?.postcode,
+                  CountryCode: order.shipping_address?.country_id
+                }
+              },
+              PaymentInformation: {
+                ShipmentCharge: {
+                  Type: "01",
+                  BillShipper: { AccountNumber: isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber }
+                }
+              },
+              Service: { Code: serviceCode },
+              Package: [{
+                Description: "Package",
+                Packaging: { Code: "02" },
+                Dimensions: {
+                  UnitOfMeasurement: { Code: "CM" },
+                  Length: length || "10",
+                  Width: width || "10",
+                  Height: height || "10"
+                },
+                PackageWeight: {
+                  UnitOfMeasurement: { Code: "KGS" },
+                  Weight: weightVal.toFixed(2)
+                }
+              }]
+            },
+            LabelSpecification: {
+              LabelImageFormat: { Code: credentials.general.labelFormat || "PDF" },
+              HTTPUserAgent: "Mozilla/4.5"
+            }
+          }
+        };
+
+        const upsData = await ups.createShipment(upsParams);
+        if (upsData.ShipmentResponse?.Response?.ResponseStatus?.Code === "1") {
+          tracking = upsData.ShipmentResponse.ShipmentResults.ShipmentIdentificationNumber;
+          labelBase64 = upsData.ShipmentResponse.ShipmentResults.PackageResults[0].ShippingLabel.GraphicImage;
+          labelType = credentials.general.labelFormat === 'ZPL' ? 'text/plain' : 'application/pdf';
+        } else {
+          const error = upsData.response?.errors?.[0] || upsData.ShipmentResponse?.Response?.Error || { Description: "Unknown UPS Error" };
+          throw new Error(error.Description || error.message || "UPS Shipment Failed");
+        }
+      } else if (selectedRate.carrier === 'FedEx') {
+        const fedex = new FedExClient(
+          credentials.fedex.apiKey,
+          credentials.fedex.secretKey,
+          isDomestic ? credentials.fedex.domesticAccountNumber : credentials.fedex.globalAccountNumber,
+          credentials.fedex.isSandbox,
+          credentials.general.proxyUrl
+        );
+
+        const fedexParams = {
+          labelResponseOptions: "URL_ONLY",
+          requestedShipment: {
+            shipper: {
+              contact: {
+                personName: credentials.general.originContactName,
+                phoneNumber: credentials.general.originPhone,
+                companyName: credentials.general.originCompanyName
+              },
+              address: {
+                streetLines: [credentials.general.originStreet1, credentials.general.originStreet2].filter(Boolean),
+                city: credentials.general.originCity,
+                stateOrProvinceCode: credentials.general.originState,
+                postalCode: credentials.general.originPostalCode,
+                countryCode: credentials.general.originCountry
+              }
+            },
+            recipients: [{
+              contact: {
+                personName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
+                phoneNumber: order.shipping_address?.telephone,
+                companyName: order.shipping_address?.company
+              },
+              address: {
+                streetLines: order.shipping_address?.street,
+                city: order.shipping_address?.city,
+                stateOrProvinceCode: order.shipping_address?.region,
+                postalCode: order.shipping_address?.postcode,
+                countryCode: order.shipping_address?.country_id
+              }
+            }],
+            shipDatestamp: new Date().toISOString().split('T')[0],
+            serviceType: selectedRate.id.replace('fedex-', ''),
+            packagingType: "YOUR_PACKAGING",
+            pickupType: credentials.general.fedexPickupType || "USE_SCHEDULED_PICKUP",
+            shippingChargesPayment: {
+              paymentType: "SENDER",
+              payor: {
+                responsibleParty: {
+                  accountNumber: { value: isDomestic ? credentials.fedex.domesticAccountNumber : credentials.fedex.globalAccountNumber }
+                }
+              }
+            },
+            labelSpecification: {
+              labelFormatType: "COMMON2D",
+              imageType: credentials.general.labelFormat || "PDF",
+              labelStockType: "PAPER_4X6"
+            },
+            requestedPackageLineItems: [{
+              weight: { units: "KG", value: weightVal },
+              dimensions: { length: length || 10, width: width || 10, height: height || 10, units: "CM" }
+            }]
+          }
+        };
+
+        const fedexData = await fedex.createShipment(fedexParams);
+        if (fedexData.output?.transactionShipments?.[0]) {
+          const ship = fedexData.output.transactionShipments[0];
+          tracking = ship.masterTrackingNumber;
+          // FedEx often returns a URL or base64 depending on labelResponseOptions
+          if (ship.pieceResponses?.[0]?.packageDocuments?.[0]?.encodedLabel) {
+            labelBase64 = ship.pieceResponses[0].packageDocuments[0].encodedLabel;
+          } else if (ship.pieceResponses?.[0]?.packageDocuments?.[0]?.url) {
+            setLabelUrl(ship.pieceResponses[0].packageDocuments[0].url);
+          }
+        } else {
+          const error = fedexData.errors?.[0] || { message: "FedEx Shipment Failed" };
+          throw new Error(error.message);
+        }
       }
 
-      toast.success(`Label created! ${credentials.general.markAsShipped ? 'Magento updated.' : ''}`);
-    } catch (error) {
+      if (tracking) {
+        setTrackingNumber(tracking);
+        if (labelBase64) {
+          const blob = await (await fetch(`data:${labelType};base64,${labelBase64}`)).blob();
+          setLabelUrl(URL.createObjectURL(blob));
+        }
+
+        // 2. Update Magento Shipment Status (if enabled)
+        if (credentials.general.markAsShipped && id !== 'manual') {
+          console.log(`[OrderDetails] Updating Magento shipment status...`);
+          const client = new MagentoClient(
+            credentials.magento.url,
+            credentials.magento.token,
+            credentials.general.proxyUrl
+          );
+
+          const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
+          const carrierCode = selectedRate.carrier.toLowerCase();
+
+          await client.createShipment(order.entity_id, [{
+            track_number: tracking,
+            title: carrierTitle,
+            carrier_code: carrierCode
+          }]);
+          console.log(`[OrderDetails] Magento updated successfully`);
+        }
+        
+        toast.success(`Label created! Tracking: ${tracking}`);
+      }
+    } catch (error: any) {
       console.error(`[OrderDetails] Error in handleCreateLabel:`, error);
-      toast.error("Label created, but failed to update Magento shipment status.");
+      toast.error(error.message || "Failed to create label. Check carrier logs.");
     } finally {
       setIsShipping(false);
     }

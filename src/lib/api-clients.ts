@@ -196,6 +196,24 @@ export class UPSClient {
     console.log(`[UPSClient] Rates response:`, data);
     return data;
   }
+
+  async createShipment(params: any): Promise<any> {
+    console.log(`[UPSClient] Creating shipment`, params);
+    const token = await this.getAccessToken();
+    const url = `${this.proxyUrl}${this.baseUrl}/api/shipments/v1/ship`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'x-merchant-id': this.clientId
+      },
+      body: JSON.stringify(params),
+    });
+    const data = await response.json();
+    console.log(`[UPSClient] Shipment response:`, data);
+    return data;
+  }
 }
 
 export class FedExClient {
@@ -237,6 +255,23 @@ export class FedExClient {
     });
     const data = await response.json();
     console.log(`[FedExClient] Rates response:`, data);
+    return data;
+  }
+
+  async createShipment(params: any): Promise<any> {
+    console.log(`[FedExClient] Creating shipment`, params);
+    const token = await this.getAccessToken();
+    const url = `${this.proxyUrl}${this.baseUrl}/ship/v1/shipments`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    const data = await response.json();
+    console.log(`[FedExClient] Shipment response:`, data);
     return data;
   }
 }
