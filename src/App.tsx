@@ -5,12 +5,23 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Package, Settings as SettingsIcon, LayoutDashboard, LogOut } from 'lucide-react';
+import { Lock, Package, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink } from 'lucide-react';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import Dashboard from '@/src/pages/Dashboard';
 import Settings from '@/src/pages/Settings';
 import OrderDetails from '@/src/pages/OrderDetails';
 
-function LockScreen({ onUnlock, hasStoredData }: { onUnlock: (pw: string) => Promise<boolean>, hasStoredData: boolean }) {
+function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: string) => Promise<boolean>, onReset: () => void, hasStoredData: boolean }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
 
@@ -50,6 +61,35 @@ function LockScreen({ onUnlock, hasStoredData }: { onUnlock: (pw: string) => Pro
               {hasStoredData ? "Unlock" : "Setup Sawyer-Ship"}
             </Button>
           </form>
+
+          {hasStoredData && (
+            <div className="mt-6 pt-6 border-t border-zinc-100 text-center">
+              <AlertDialog>
+                <AlertDialogTrigger className="text-xs text-zinc-500 hover:text-red-600 underline bg-transparent border-none p-0 h-auto font-normal cursor-pointer">
+                  Forgotten password? Reset application
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                      <AlertTriangle size={20} />
+                      Warning: Data Loss
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Resetting the application will permanently delete all your stored API tokens and settings from this browser's local storage. This action cannot be undone.
+                      <br /><br />
+                      Are you sure you want to proceed?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel variant="outline" size="default">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={onReset} className="bg-red-600 hover:bg-red-700">
+                      Yes, Reset Data
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -100,7 +140,7 @@ function Layout({ children, onLogout }: { children: React.ReactNode, onLogout: (
 }
 
 export default function App() {
-  const { isLocked, credentials, unlock, logout, hasStoredData, save, exportData, importData } = useSawyerStorage();
+  const { isLocked, credentials, unlock, logout, hasStoredData, save, exportData, importData, resetData } = useSawyerStorage();
 
   // Auto-lock logic
   React.useEffect(() => {
@@ -133,8 +173,8 @@ export default function App() {
   if (isLocked) {
     return (
       <>
-        <LockScreen onUnlock={unlock} hasStoredData={hasStoredData} />
-        <Toaster />
+        <LockScreen onUnlock={unlock} onReset={resetData} hasStoredData={hasStoredData} />
+        <Toaster position="top-right" richColors expand={true} />
       </>
     );
   }
@@ -159,7 +199,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
-      <Toaster />
+      <Toaster position="top-right" richColors expand={true} />
     </Router>
   );
 }

@@ -16,6 +16,7 @@ export interface MagentoOrder {
   shipping_address: {
     firstname: string;
     lastname: string;
+    company?: string;
     street: string[];
     city: string;
     region: string;
@@ -89,6 +90,7 @@ export class MagentoClient {
       shipping_address: {
         firstname: shippingAddress.firstname || order.customer_firstname || '',
         lastname: shippingAddress.lastname || order.customer_lastname || '',
+        company: shippingAddress.company || '',
         street: street,
         city: shippingAddress.city || '',
         region: shippingAddress.region || '',
@@ -100,10 +102,33 @@ export class MagentoClient {
   }
 
   async getProduct(sku: string): Promise<any> {
-    console.log(`[MagentoClient] Fetching product: ${sku}`);
-    const product = await this.fetch(`products/${encodeURIComponent(sku)}`);
-    console.log(`[MagentoClient] Product data received for ${sku}`);
-    return product;
+    const trimmedSku = sku.trim();
+    console.log(`[MagentoClient] Fetching product: ${trimmedSku}`);
+    
+    try {
+      // Try double encoding first (Magento 2 standard for slashes)
+      const doubleEncoded = encodeURIComponent(encodeURIComponent(trimmedSku));
+      return await this.fetch(`products/${doubleEncoded}`);
+    } catch (error: any) {
+      // If 404 and contains slashes, try single encoding as fallback
+      if (error.message?.includes('404') && trimmedSku.includes('/')) {
+        try {
+          console.log(`[MagentoClient] Double encoding failed for ${trimmedSku}, trying single encoding...`);
+          const singleEncoded = encodeURIComponent(trimmedSku);
+          return await this.fetch(`products/${singleEncoded}`);
+        } catch (innerError) {
+          console.warn(`[MagentoClient] Product not found with single encoding either: ${trimmedSku}`);
+          return null;
+        }
+      }
+      
+      if (error.message?.includes('404')) {
+        console.warn(`[MagentoClient] Product not found: ${trimmedSku}`);
+        return null;
+      }
+      
+      throw error;
+    }
   }
 
   async createShipment(orderId: number, tracks: Array<{ track_number: string, title: string, carrier_code: string }>): Promise<any> {

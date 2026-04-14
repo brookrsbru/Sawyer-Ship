@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const UPS_PICKUP_LABELS: Record<string, string> = {
@@ -118,13 +118,25 @@ export default function Settings({
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="proxy">CORS Proxy URL</Label>
-                    <Input 
-                      id="proxy" 
-                      placeholder="https://cors-anywhere.herokuapp.com/" 
-                      value={formData.general.proxyUrl}
-                      onChange={(e) => setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } })}
-                    />
-                    <p className="text-xs text-zinc-500">Required for browser-based API calls if the server doesn't support CORS.</p>
+                    <div className="flex gap-2">
+                      <Input 
+                        id="proxy" 
+                        placeholder="https://cors-anywhere.herokuapp.com/" 
+                        value={formData.general.proxyUrl}
+                        onChange={(e) => setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } })}
+                        className="flex-1"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        type="button"
+                        title="Request Access to Proxy"
+                        onClick={() => window.open(formData.general.proxyUrl, '_blank')}
+                      >
+                        <ExternalLink size={18} />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-zinc-500">Required for browser-based API calls. Click the button to request temporary access if using Heroku CORS Anywhere.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="format">Default Label Format</Label>
@@ -143,6 +155,27 @@ export default function Settings({
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="weight-display">Weight Display Mode</Label>
+                    <Select 
+                      value={formData.general.weightDisplayMode}
+                      onValueChange={(v: 'both' | 'grams' | 'kg') => setFormData({ ...formData, general: { ...formData.general, weightDisplayMode: v } })}
+                    >
+                      <SelectTrigger id="weight-display">
+                        <SelectValue placeholder="Select mode">
+                          {formData.general.weightDisplayMode === 'both' ? 'Both (kg & g)' : 
+                           formData.general.weightDisplayMode === 'grams' ? 'Only Grams' : 'Only Kilograms'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="both">Both (kg & g)</SelectItem>
+                        <SelectItem value="grams">Only Grams</SelectItem>
+                        <SelectItem value="kg">Only Kilograms</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-zinc-500">Choose how weight is displayed and entered. "Both" enables auto-shifting (e.g. 3.2kg to 3kg 200g).</p>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="currency">Display Currency</Label>
                     <Select 
@@ -209,6 +242,89 @@ export default function Settings({
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-zinc-500">Your shipping origin country. Used to determine if duties/taxes options are shown.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-contact">Contact Name</Label>
+                        <Input 
+                          id="origin-contact"
+                          value={formData.general.originContactName}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originContactName: e.target.value } })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-company">Company Name</Label>
+                        <Input 
+                          id="origin-company"
+                          value={formData.general.originCompanyName}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originCompanyName: e.target.value } })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-email">Email</Label>
+                        <Input 
+                          id="origin-email"
+                          type="email"
+                          value={formData.general.originEmail}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originEmail: e.target.value } })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-phone">Phone</Label>
+                        <Input 
+                          id="origin-phone"
+                          value={formData.general.originPhone}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originPhone: e.target.value } })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="origin-street1">Street Address</Label>
+                      <Input 
+                        id="origin-street1"
+                        placeholder="Line 1"
+                        value={formData.general.originStreet1}
+                        onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originStreet1: e.target.value } })}
+                      />
+                      <Input 
+                        id="origin-street2"
+                        placeholder="Line 2 (Optional)"
+                        value={formData.general.originStreet2}
+                        onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originStreet2: e.target.value } })}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-city">City</Label>
+                        <Input 
+                          id="origin-city"
+                          value={formData.general.originCity}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originCity: e.target.value } })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-state">State/Province</Label>
+                        <Input 
+                          id="origin-state"
+                          placeholder="e.g. CA or NY"
+                          value={formData.general.originState}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originState: e.target.value } })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-postcode">Postal Code</Label>
+                        <Input 
+                          id="origin-postcode"
+                          value={formData.general.originPostalCode}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originPostalCode: e.target.value } })}
+                        />
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -303,114 +419,274 @@ export default function Settings({
                   <CardTitle className="flex items-center gap-2">
                     <Truck size={20} /> Shipping Defaults
                   </CardTitle>
-                  <CardDescription>Set default values for new shipments.</CardDescription>
+                  <CardDescription>Set default values for new shipments and choose which fields should overwrite order data.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Default Weight (KG)</Label>
-                      <Input 
-                        type="number" 
-                        step="0.1"
-                        value={formData.shippingDefaults.weightKg}
-                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, weightKg: e.target.value } })}
-                      />
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-12 gap-4 items-end">
+                      <div className="col-span-5 space-y-2">
+                        <Label>Default Weight (KG)</Label>
+                        <Input 
+                          type="number" 
+                          step="0.1"
+                          value={formData.shippingDefaults.weightKg}
+                          onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, weightKg: e.target.value } })}
+                        />
+                      </div>
+                      <div className="col-span-5 space-y-2">
+                        <Label>Default Weight (Grams)</Label>
+                        <Input 
+                          type="number"
+                          value={formData.shippingDefaults.weightG}
+                          onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, weightG: e.target.value } })}
+                        />
+                      </div>
+                      <div className="col-span-2 flex flex-col items-center gap-2">
+                        <Label className="text-[10px]">Overwrite</Label>
+                        <Select 
+                          value={formData.shippingDefaults.overwriteWeightKg ? "yes" : "no"}
+                          onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, overwriteWeightKg: v === "yes", overwriteWeightG: v === "yes" } })}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="yes">Yes</SelectItem>
+                            <SelectItem value="no">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Default Weight (Grams)</Label>
-                      <Input 
-                        type="number"
-                        value={formData.shippingDefaults.weightG}
-                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, weightG: e.target.value } })}
-                      />
+
+                    <div className="grid grid-cols-12 gap-4 items-end">
+                      <div className="col-span-3 space-y-2">
+                        <Label>Length (cm)</Label>
+                        <Input 
+                          type="number"
+                          value={formData.shippingDefaults.length}
+                          onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, length: e.target.value } })}
+                        />
+                      </div>
+                      <div className="col-span-3 space-y-2">
+                        <Label>Width (cm)</Label>
+                        <Input 
+                          type="number"
+                          value={formData.shippingDefaults.width}
+                          onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, width: e.target.value } })}
+                        />
+                      </div>
+                      <div className="col-span-4 space-y-2">
+                        <Label>Height (cm)</Label>
+                        <Input 
+                          type="number"
+                          value={formData.shippingDefaults.height}
+                          onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, height: e.target.value } })}
+                        />
+                      </div>
+                      <div className="col-span-2 flex flex-col items-center gap-2">
+                        <Label className="text-[10px]">Overwrite</Label>
+                        <Select 
+                          value={formData.shippingDefaults.overwriteLength ? "yes" : "no"}
+                          onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, overwriteLength: v === "yes", overwriteWidth: v === "yes", overwriteHeight: v === "yes" } })}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="yes">Yes</SelectItem>
+                            <SelectItem value="no">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Length (cm)</Label>
-                      <Input 
-                        type="number"
-                        value={formData.shippingDefaults.length}
-                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, length: e.target.value } })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Width (cm)</Label>
-                      <Input 
-                        type="number"
-                        value={formData.shippingDefaults.width}
-                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, width: e.target.value } })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Height (cm)</Label>
-                      <Input 
-                        type="number"
-                        value={formData.shippingDefaults.height}
-                        onChange={(e) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, height: e.target.value } })}
-                      />
+
+                    <div className="grid grid-cols-12 gap-4 items-end">
+                      <div className="col-span-5 space-y-2">
+                        <Label>Bill Shipping To</Label>
+                        <Select 
+                          value={formData.shippingDefaults.billShippingTo}
+                          onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billShippingTo: v } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
+                            <SelectItem value="recipient">Recipient (Collect)</SelectItem>
+                            <SelectItem value="third_party">Third Party</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-5 space-y-2">
+                        <Label>Bill Duties To</Label>
+                        <Select 
+                          value={formData.shippingDefaults.billDutiesTo}
+                          onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billDutiesTo: v } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="shipper">Shipper (DDP)</SelectItem>
+                            <SelectItem value="recipient">Recipient (DDU/DAP)</SelectItem>
+                            <SelectItem value="third_party">Third Party</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 flex flex-col items-center gap-2">
+                        <Label className="text-[10px]">Overwrite</Label>
+                        <Select 
+                          value={formData.shippingDefaults.overwriteBillShippingTo ? "yes" : "no"}
+                          onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, overwriteBillShippingTo: v === "yes", overwriteBillDutiesTo: v === "yes" } })}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="yes">Yes</SelectItem>
+                            <SelectItem value="no">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
 
                   <Separator />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Bill Shipping To</Label>
-                      <Select 
-                        value={formData.shippingDefaults.billShippingTo}
-                        onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billShippingTo: v } })}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">Country-Specific Defaults</h3>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={() => {
+                          const country = prompt("Enter ISO Country Code (e.g. US, DE, FR):");
+                          if (country && country.length === 2) {
+                            const code = country.toUpperCase();
+                            setFormData({
+                              ...formData,
+                              countryDefaults: {
+                                ...formData.countryDefaults,
+                                [code]: { ...formData.shippingDefaults }
+                              }
+                            });
+                          }
+                        }}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select billing">
-                            {formData.shippingDefaults.billShippingTo === 'shipper' ? 'Shipper (Prepaid)' : formData.shippingDefaults.billShippingTo === 'recipient' ? 'Recipient (Collect)' : 'Third Party'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="shipper">Shipper (Prepaid)</SelectItem>
-                          <SelectItem value="recipient">Recipient (Collect)</SelectItem>
-                          <SelectItem value="third_party">Third Party</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Plus size={14} /> Add Country
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Bill Duties/Taxes To</Label>
-                      <Select 
-                        value={formData.shippingDefaults.billDutiesTo}
-                        onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, billDutiesTo: v } })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select billing">
-                            {formData.shippingDefaults.billDutiesTo === 'shipper' ? 'Shipper (DDP)' : formData.shippingDefaults.billDutiesTo === 'recipient' ? 'Recipient (DDU/DAP)' : 'Third Party'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="shipper">Shipper (DDP)</SelectItem>
-                          <SelectItem value="recipient">Recipient (DDU/DAP)</SelectItem>
-                          <SelectItem value="third_party">Third Party</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between pt-2">
-                    <Label htmlFor="overwrite" className="text-sm font-medium">
-                      Overwrite existing order information with these defaults
-                    </Label>
-                    <Select 
-                      value={formData.shippingDefaults.overwriteExisting ? "yes" : "no"}
-                      onValueChange={(v) => setFormData({ ...formData, shippingDefaults: { ...formData.shippingDefaults, overwriteExisting: v === "yes" } })}
-                    >
-                      <SelectTrigger id="overwrite" className="w-[100px]">
-                        <SelectValue placeholder="Select">
-                          {formData.shippingDefaults.overwriteExisting ? "Yes" : "No"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yes">Yes</SelectItem>
-                        <SelectItem value="no">No</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {Object.keys(formData.countryDefaults || {}).length === 0 ? (
+                      <p className="text-xs text-zinc-500 italic">No country-specific defaults set.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {Object.entries(formData.countryDefaults).map(([code, defaults]) => (
+                          <Card key={code} className="border-zinc-200">
+                            <CardHeader className="py-3 flex flex-row items-center justify-between">
+                              <CardTitle className="text-sm">{COUNTRY_NAMES[code] || code} Defaults</CardTitle>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-red-500"
+                                onClick={() => {
+                                  const newDefaults = { ...formData.countryDefaults };
+                                  delete newDefaults[code];
+                                  setFormData({ ...formData, countryDefaults: newDefaults });
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </CardHeader>
+                            <CardContent className="py-3 space-y-3">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px]">Weight (kg/g)</Label>
+                                  <div className="flex gap-1">
+                                    <Input 
+                                      className="h-7 text-xs" 
+                                      placeholder="kg"
+                                      value={defaults.weightKg}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          countryDefaults: {
+                                            ...formData.countryDefaults,
+                                            [code]: { ...defaults, weightKg: e.target.value }
+                                          }
+                                        });
+                                      }}
+                                    />
+                                    <Input 
+                                      className="h-7 text-xs" 
+                                      placeholder="g"
+                                      value={defaults.weightG}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          countryDefaults: {
+                                            ...formData.countryDefaults,
+                                            [code]: { ...defaults, weightG: e.target.value }
+                                          }
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[10px]">Dimensions (L/W/H)</Label>
+                                  <div className="flex gap-1">
+                                    <Input 
+                                      className="h-7 text-xs" 
+                                      placeholder="L"
+                                      value={defaults.length}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          countryDefaults: {
+                                            ...formData.countryDefaults,
+                                            [code]: { ...defaults, length: e.target.value }
+                                          }
+                                        });
+                                      }}
+                                    />
+                                    <Input 
+                                      className="h-7 text-xs" 
+                                      placeholder="W"
+                                      value={defaults.width}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          countryDefaults: {
+                                            ...formData.countryDefaults,
+                                            [code]: { ...defaults, width: e.target.value }
+                                          }
+                                        });
+                                      }}
+                                    />
+                                    <Input 
+                                      className="h-7 text-xs" 
+                                      placeholder="H"
+                                      value={defaults.height}
+                                      onChange={(e) => {
+                                        setFormData({
+                                          ...formData,
+                                          countryDefaults: {
+                                            ...formData.countryDefaults,
+                                            [code]: { ...defaults, height: e.target.value }
+                                          }
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -450,11 +726,28 @@ export default function Settings({
 
             <TabsContent value="ups" className="space-y-4 mt-6">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck size={20} /> UPS API (OAuth 2.0)
-                  </CardTitle>
-                  <CardDescription>Modern UPS REST API credentials.</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Truck size={20} /> UPS API (OAuth 2.0)
+                    </CardTitle>
+                    <CardDescription>Modern UPS REST API credentials.</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="ups-enabled" className="text-xs">Enabled</Label>
+                    <Select 
+                      value={formData.ups.enabled ? "yes" : "no"}
+                      onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, enabled: v === "yes" } })}
+                    >
+                      <SelectTrigger id="ups-enabled" className="w-[80px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -478,28 +771,36 @@ export default function Settings({
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="ups-account">Account Number</Label>
+                      <Label htmlFor="ups-domestic-account">Domestic Account Number</Label>
                       <Input 
-                        id="ups-account" 
-                        value={formData.ups.accountNumber}
-                        onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, accountNumber: e.target.value } })}
+                        id="ups-domestic-account" 
+                        value={formData.ups.domesticAccountNumber}
+                        onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, domesticAccountNumber: e.target.value } })}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ups-env">Environment</Label>
-                      <Select 
-                        value={formData.ups.isSandbox ? "sandbox" : "production"}
-                        onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, isSandbox: v === "sandbox" } })}
-                      >
-                        <SelectTrigger id="ups-env">
-                          <SelectValue placeholder="Select environment" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
-                          <SelectItem value="production">Production (Live)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="ups-global-account">Global Account Number</Label>
+                      <Input 
+                        id="ups-global-account" 
+                        value={formData.ups.globalAccountNumber}
+                        onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, globalAccountNumber: e.target.value } })}
+                      />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ups-env">Environment</Label>
+                    <Select 
+                      value={formData.ups.isSandbox ? "sandbox" : "production"}
+                      onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, isSandbox: v === "sandbox" } })}
+                    >
+                      <SelectTrigger id="ups-env">
+                        <SelectValue placeholder="Select environment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
+                        <SelectItem value="production">Production (Live)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>
@@ -507,11 +808,28 @@ export default function Settings({
 
             <TabsContent value="fedex" className="space-y-4 mt-6">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck size={20} /> FedEx API
-                  </CardTitle>
-                  <CardDescription>FedEx REST API credentials.</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Truck size={20} /> FedEx API
+                    </CardTitle>
+                    <CardDescription>FedEx REST API credentials.</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="fedex-enabled" className="text-xs">Enabled</Label>
+                    <Select 
+                      value={formData.fedex.enabled ? "yes" : "no"}
+                      onValueChange={(v) => setFormData({ ...formData, fedex: { ...formData.fedex, enabled: v === "yes" } })}
+                    >
+                      <SelectTrigger id="fedex-enabled" className="w-[80px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -535,28 +853,36 @@ export default function Settings({
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="fedex-account">Account Number</Label>
+                      <Label htmlFor="fedex-domestic-account">Domestic Account Number</Label>
                       <Input 
-                        id="fedex-account" 
-                        value={formData.fedex.accountNumber}
-                        onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, accountNumber: e.target.value } })}
+                        id="fedex-domestic-account" 
+                        value={formData.fedex.domesticAccountNumber}
+                        onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, domesticAccountNumber: e.target.value } })}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="fedex-env">Environment</Label>
-                      <Select 
-                        value={formData.fedex.isSandbox ? "sandbox" : "production"}
-                        onValueChange={(v) => setFormData({ ...formData, fedex: { ...formData.fedex, isSandbox: v === "sandbox" } })}
-                      >
-                        <SelectTrigger id="fedex-env">
-                          <SelectValue placeholder="Select environment" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
-                          <SelectItem value="production">Production (Live)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="fedex-global-account">Global Account Number</Label>
+                      <Input 
+                        id="fedex-global-account" 
+                        value={formData.fedex.globalAccountNumber}
+                        onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, globalAccountNumber: e.target.value } })}
+                      />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fedex-env">Environment</Label>
+                    <Select 
+                      value={formData.fedex.isSandbox ? "sandbox" : "production"}
+                      onValueChange={(v) => setFormData({ ...formData, fedex: { ...formData.fedex, isSandbox: v === "sandbox" } })}
+                    >
+                      <SelectTrigger id="fedex-env">
+                        <SelectValue placeholder="Select environment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
+                        <SelectItem value="production">Production (Live)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>

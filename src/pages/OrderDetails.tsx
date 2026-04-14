@@ -19,7 +19,34 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<MagentoOrder | null>(location.state?.order || null);
+  
+  const createBlankOrder = (): MagentoOrder => ({
+    entity_id: 0,
+    increment_id: 'MANUAL',
+    customer_email: '',
+    customer_firstname: '',
+    customer_lastname: '',
+    grand_total: 0,
+    status: 'manual',
+    created_at: new Date().toISOString(),
+    shipping_address: {
+      firstname: '',
+      lastname: '',
+      company: '',
+      street: ['', '', ''],
+      city: '',
+      region: '',
+      postcode: '',
+      country_id: 'GB',
+      telephone: ''
+    },
+    items: []
+  });
+
+  const [order, setOrder] = useState<MagentoOrder | null>(() => {
+    if (id === 'manual') return createBlankOrder();
+    return location.state?.order || null;
+  });
   const [productDetails, setProductDetails] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingProducts, setIsFetchingProducts] = useState(false);
@@ -47,20 +74,28 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   // Apply defaults
   useEffect(() => {
     if (order && credentials.shippingDefaults) {
-      const defaults = credentials.shippingDefaults;
-      const shouldApply = defaults.overwriteExisting || (!weightKg && !weightG && !length && !width && !height);
+      const destCountry = order.shipping_address?.country_id;
+      const countryDefaults = credentials.countryDefaults?.[destCountry || ''];
+      const defaults = countryDefaults || credentials.shippingDefaults;
       
-      if (shouldApply) {
-        if (defaults.weightKg) setWeightKg(defaults.weightKg);
-        if (defaults.weightG) setWeightG(defaults.weightG);
-        if (defaults.length) setLength(defaults.length);
-        if (defaults.width) setWidth(defaults.width);
-        if (defaults.height) setHeight(defaults.height);
-        if (defaults.billShippingTo) setBillShippingTo(defaults.billShippingTo);
-        if (defaults.billDutiesTo) setBillDutiesTo(defaults.billDutiesTo);
-      }
+      // Check if we should apply based on per-field overwrite or if empty
+      const applyWeightKg = defaults.overwriteWeightKg || !weightKg;
+      const applyWeightG = defaults.overwriteWeightG || !weightG;
+      const applyLength = defaults.overwriteLength || !length;
+      const applyWidth = defaults.overwriteWidth || !width;
+      const applyHeight = defaults.overwriteHeight || !height;
+      const applyBillShip = defaults.overwriteBillShippingTo || !billShippingTo;
+      const applyBillDuty = defaults.overwriteBillDutiesTo || !billDutiesTo;
+
+      if (applyWeightKg && defaults.weightKg) setWeightKg(defaults.weightKg);
+      if (applyWeightG && defaults.weightG) setWeightG(defaults.weightG);
+      if (applyLength && defaults.length) setLength(defaults.length);
+      if (applyWidth && defaults.width) setWidth(defaults.width);
+      if (applyHeight && defaults.height) setHeight(defaults.height);
+      if (applyBillShip && defaults.billShippingTo) setBillShippingTo(defaults.billShippingTo);
+      if (applyBillDuty && defaults.billDutiesTo) setBillDutiesTo(defaults.billDutiesTo);
     }
-  }, [order, credentials.shippingDefaults]);
+  }, [order, credentials.shippingDefaults, credentials.countryDefaults]);
 
   // Editing state
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -75,8 +110,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   }, [weightKg, weightG]);
 
   const handleWeightKgChange = (val: string) => {
+    const mode = credentials.general.weightDisplayMode || 'both';
     const num = parseFloat(val);
-    if (!isNaN(num)) {
+    if (!isNaN(num) && mode === 'both') {
       const kg = Math.floor(num);
       const remainder = num - kg;
       if (remainder > 0) {
@@ -91,8 +127,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   };
 
   const handleWeightGChange = (val: string) => {
+    const mode = credentials.general.weightDisplayMode || 'both';
     const num = parseFloat(val);
-    if (!isNaN(num) && num >= 1000) {
+    if (!isNaN(num) && num >= 1000 && mode === 'both') {
       const extraKg = Math.floor(num / 1000);
       const remainingG = num % 1000;
       setWeightKg((parseInt(weightKg || '0') + extraKg).toString());
@@ -113,7 +150,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   useEffect(() => {
     console.log(`[OrderDetails] Loading order ID: ${id}`);
     const fetchOrder = async () => {
-      if (order || !id || !credentials.magento.url || !credentials.magento.token) return;
+      if (order || !id || id === 'manual') return;
+      if (!credentials.magento.url || !credentials.magento.token) return;
       
       setIsLoading(true);
       setError(null);
@@ -141,7 +179,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
   useEffect(() => {
     const fetchProductInfo = async () => {
-      if (!order || !credentials.magento.url || !credentials.magento.token) return;
+      if (!order || id === 'manual' || !credentials.magento.url || !credentials.magento.token) return;
       
       console.log(`[OrderDetails] Fetching product details for ${order.items.length} items`);
       setIsFetchingProducts(true);
@@ -174,6 +212,29 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
   const fetchRates = async () => {
     if (!order) return;
+
+    // Validation
+    const errors = [];
+    if (!order.customer_firstname && !order.customer_lastname) errors.push("Customer Name");
+    if (!order.shipping_address?.street?.[0]) errors.push("Address Line 1");
+    if (!order.shipping_address?.city) errors.push("City");
+    if (!order.shipping_address?.postcode) errors.push("Postcode");
+    if (!order.shipping_address?.country_id) errors.push("Country");
+    
+    const hasWeight = (weightKg && parseFloat(weightKg) > 0) || (weightG && parseFloat(weightG) > 0);
+    if (!hasWeight) errors.push("Weight (KG or Grams)");
+    
+    if (!length || parseFloat(length) <= 0) errors.push("Length");
+    if (!width || parseFloat(width) <= 0) errors.push("Width");
+    if (!height || parseFloat(height) <= 0) errors.push("Height");
+
+    if (errors.length > 0) {
+      toast.error("Missing required fields", {
+        description: `Please fill in: ${errors.join(", ")}`
+      });
+      return;
+    }
+
     console.log(`[OrderDetails] Fetching live rates...`);
     setIsRating(true);
     setRates([]);
@@ -187,14 +248,20 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
       console.log(`[OrderDetails] Package: ${weightVal}kg, ${l}x${w}x${h}cm`);
 
-      // 1. Fetch UPS Rates if credentials exist
-      if (credentials.ups.clientId && credentials.ups.clientSecret) {
+      // 1. Fetch UPS Rates if credentials exist and enabled
+      if (credentials.ups.enabled && credentials.ups.clientId && credentials.ups.clientSecret) {
         try {
-          console.log(`[OrderDetails] Calling UPS API...`);
+          const destCountry = order.shipping_address?.country_id;
+          const isDomestic = destCountry === credentials.general.originCountry;
+          const accountNumber = isDomestic 
+            ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber)
+            : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber);
+
+          console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const ups = new UPSClient(
             credentials.ups.clientId,
             credentials.ups.clientSecret,
-            credentials.ups.accountNumber,
+            accountNumber,
             credentials.ups.isSandbox,
             credentials.general.proxyUrl
           );
@@ -256,62 +323,174 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         }
       }
 
-      // 2. Fetch FedEx Rates if credentials exist
-      if (credentials.fedex.apiKey && credentials.fedex.secretKey) {
+      // 2. Fetch FedEx Rates if credentials exist and enabled
+      if (credentials.fedex.enabled && credentials.fedex.apiKey && credentials.fedex.secretKey) {
         try {
+          const destCountry = order.shipping_address.country_id;
+          const isDomestic = destCountry === credentials.general.originCountry;
+          const accountNumber = isDomestic 
+            ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
+            : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
+
+          console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const fedex = new FedExClient(
             credentials.fedex.apiKey,
             credentials.fedex.secretKey,
-            credentials.fedex.accountNumber,
+            accountNumber,
             credentials.fedex.isSandbox,
             credentials.general.proxyUrl
           );
 
-          const fedexParams = {
-            accountNumber: { value: credentials.fedex.accountNumber },
+          const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
+
+          const fedexParams: any = {
+            accountNumber: { value: accountNumber },
             requestedShipment: {
               shipper: {
                 address: {
-                  postalCode: credentials.general.originCountry === 'GB' ? "SW1A 1AA" : "SW1A 1AA", // Use origin postal code if possible
-                  countryCode: credentials.general.originCountry || "GB"
+                  streetLines: [
+                    credentials.general.originStreet1,
+                    credentials.general.originStreet2
+                  ].filter(Boolean),
+                  city: credentials.general.originCity,
+                  stateOrProvinceCode: (credentials.general.originCountry === 'US' || credentials.general.originCountry === 'CA') ? credentials.general.originState : undefined,
+                  postalCode: credentials.general.originPostalCode,
+                  countryCode: credentials.general.originCountry
+                },
+                contact: {
+                  personName: credentials.general.originContactName,
+                  emailAddress: credentials.general.originEmail,
+                  phoneNumber: credentials.general.originPhone,
+                  companyName: credentials.general.originCompanyName
                 }
               },
               recipient: {
                 address: {
+                  streetLines: order.shipping_address.street,
+                  city: order.shipping_address.city,
+                  stateOrProvinceCode: (order.shipping_address.country_id === 'US' || order.shipping_address.country_id === 'CA') ? order.shipping_address.region : undefined,
                   postalCode: order.shipping_address.postcode,
                   countryCode: order.shipping_address.country_id
+                },
+                contact: {
+                  personName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`,
+                  emailAddress: order.customer_email,
+                  phoneNumber: order.shipping_address.telephone,
+                  companyName: order.shipping_address.company || ''
                 }
               },
               pickupType: credentials.general.fedexPickupType || "DROPOFF_AT_FEDEX_LOCATION",
               packagingType: "YOUR_PACKAGING",
-              rateRequestType: ["ACCOUNT"],
+              rateRequestType: ["ACCOUNT", "LIST"],
               requestedPackageLineItems: [{
                 weight: { units: "KG", value: weightVal },
-                dimensions: { length: l, width: w, height: h, units: "CM" }
+                dimensions: { length: Math.max(1, l), width: Math.max(1, w), height: Math.max(1, h), units: "CM" }
               }]
             }
           };
+
+          if (isInternational) {
+            const commodities = order.items.length > 0 
+              ? order.items.map(item => ({
+                  description: item.name,
+                  countryOfManufacture: credentials.general.originCountry,
+                  quantity: item.qty_ordered,
+                  quantityUnits: "PCS",
+                  unitPrice: {
+                    amount: item.price,
+                    currency: credentials.general.currency || "GBP"
+                  },
+                  customsValue: {
+                    amount: item.price * item.qty_ordered,
+                    currency: credentials.general.currency || "GBP"
+                  },
+                  weight: {
+                    units: "KG",
+                    value: item.weight || 0.1
+                  }
+                }))
+              : [{
+                  description: "Shipping Package",
+                  countryOfManufacture: credentials.general.originCountry,
+                  quantity: 1,
+                  quantityUnits: "PCS",
+                  unitPrice: {
+                    amount: 1,
+                    currency: credentials.general.currency || "GBP"
+                  },
+                  customsValue: {
+                    amount: 1,
+                    currency: credentials.general.currency || "GBP"
+                  },
+                  weight: {
+                    units: "KG",
+                    value: weightVal
+                  }
+                }];
+
+            fedexParams.requestedShipment.customsClearanceDetail = {
+              dutiesPayment: {
+                paymentType: "SENDER",
+                payor: {
+                  responsibleParty: {
+                    accountNumber: { value: accountNumber }
+                  }
+                }
+              },
+              commodities
+            };
+          }
 
           console.log("[FedExClient] Fetching rates", fedexParams);
           const fedexData = await fedex.getRates(fedexParams);
           
           if (fedexData?.errors && fedexData.errors.length > 0) {
-            const err = fedexData.errors[0];
-            toast.error(`FedEx Error: ${err.code}`, {
-              description: err.message || "Service type not allowed or invalid package combination.",
-              className: "bg-red-50 border-red-200 text-red-900",
+            fedexData.errors.forEach((err: any) => {
+              toast.error(`FedEx Error: ${err.code}`, {
+                description: err.message || "Service type not allowed or invalid package combination.",
+                duration: 10000,
+              });
             });
           }
 
           if (fedexData?.output?.rateReplyDetails) {
+            // Filter for UK/EU region services
+            const allowedServices = [
+              'FEDEX_INTERNATIONAL_PRIORITY_EXPRESS',
+              'INTERNATIONAL_PRIORITY_FREIGHT',
+              'FEDEX_INTERNATIONAL_PRIORITY',
+              'FEDEX_INTERNATIONAL_CONNECT_PLUS',
+              'INTERNATIONAL_ECONOMY',
+              'INTERNATIONAL_ECONOMY_FREIGHT',
+              'FEDEX_INTERNATIONAL_DEFERRED_FREIGHT',
+              'INTERNATIONAL_FIRST',
+              'INTERNATIONAL_PRIORITY_DISTRIBUTION',
+              'INTERNATIONAL_DISTRIBUTION_FREIGHT',
+              'INTERNATIONAL_ECONOMY_DISTRIBUTION',
+              'FEDEX_REGIONAL_ECONOMY',
+              'FEDEX_REGIONAL_ECONOMY_FREIGHT',
+              'PRIORITY_OVERNIGHT',
+              'FEDEX_FIRST',
+              'FEDEX_PRIORITY_EXPRESS',
+              'FEDEX_PRIORITY',
+              'FEDEX_PRIORITY_EXPRESS_FREIGHT',
+              'FEDEX_PRIORITY_FREIGHT',
+              'FEDEX_ECONOMY_SELECT'
+            ];
+            
             fedexData.output.rateReplyDetails.forEach((r: any) => {
-              allRates.push({
-                id: `fedex-${r.serviceType}`,
-                carrier: 'FedEx',
-                service: r.serviceName || r.serviceType,
-                price: r.ratedShipmentDetails?.[0]?.totalNetCharge || 0,
-                delivery: 'Live Rate'
-              });
+              const serviceCode = r.serviceType;
+              const isAllowed = allowedServices.some(s => serviceCode.includes(s));
+              
+              if (isAllowed) {
+                allRates.push({
+                  id: `fedex-${r.serviceType}`,
+                  carrier: 'FedEx',
+                  service: r.serviceName || r.serviceType,
+                  price: r.ratedShipmentDetails?.[0]?.totalNetCharge || 0,
+                  delivery: 'Live Rate'
+                });
+              }
             });
           }
         } catch (e) {
@@ -363,7 +542,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       setLabelUrl("https://www.ups.com/assets/resources/media/en_US/shipping_label_samples.pdf");
 
       // 2. Update Magento Shipment Status (if enabled)
-      if (credentials.general.markAsShipped) {
+      if (credentials.general.markAsShipped && id !== 'manual') {
         console.log(`[OrderDetails] Updating Magento shipment status...`);
         const client = new MagentoClient(
           credentials.magento.url,
@@ -419,16 +598,22 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Order #{order.increment_id}</h1>
-            <p className="text-zinc-500">Imported from Magento</p>
-          </div>
-        </div>
-        <Badge className="bg-zinc-900 text-white px-3 py-1 text-sm">{order.status}</Badge>
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+                <ArrowLeft size={20} />
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-zinc-900">
+                  {id === 'manual' ? 'Manual Shipment' : `Order #${order.increment_id}`}
+                </h1>
+                <p className="text-zinc-500">
+                  {id === 'manual' ? 'Create a shipment manually' : 'Imported from Magento'}
+                </p>
+              </div>
+            </div>
+            <Badge className="bg-zinc-900 text-white px-3 py-1 text-sm">
+              {id === 'manual' ? 'Draft' : order.status}
+            </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -452,21 +637,36 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     <DialogTitle>Edit Customer & Shipping Info</DialogTitle>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>First Name</Label>
-                        <Input 
-                          value={order.customer_firstname} 
-                          onChange={(e) => setOrder({...order, customer_firstname: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Last Name</Label>
-                        <Input 
-                          value={order.customer_lastname} 
-                          onChange={(e) => setOrder({...order, customer_lastname: e.target.value})}
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label>Full Name <span className="text-red-500">*</span></Label>
+                      <Input 
+                        value={`${order.customer_firstname} ${order.customer_lastname}`.trim()} 
+                        onChange={(e) => {
+                          const parts = e.target.value.split(' ');
+                          const first = parts[0] || '';
+                          const last = parts.slice(1).join(' ') || '';
+                          setOrder({
+                            ...order, 
+                            customer_firstname: first, 
+                            customer_lastname: last,
+                            shipping_address: {
+                              ...order.shipping_address!,
+                              firstname: first,
+                              lastname: last
+                            }
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Company</Label>
+                      <Input 
+                        value={order.shipping_address?.company || ''} 
+                        onChange={(e) => setOrder({
+                          ...order, 
+                          shipping_address: { ...order.shipping_address!, company: e.target.value }
+                        })}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Email</Label>
@@ -487,7 +687,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     </div>
                     <div className="space-y-2">
                       <Label className="flex justify-between">
-                        Address Line 1
+                        Address Line 1 <span className="text-red-500">*</span>
                         {(order.shipping_address?.street?.[0]?.length || 0) > 35 && (
                           <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
                         )}
@@ -535,7 +735,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>City</Label>
+                        <Label>City <span className="text-red-500">*</span></Label>
                         <Input 
                           value={order.shipping_address?.city || ''} 
                           onChange={(e) => setOrder({
@@ -557,7 +757,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Postcode</Label>
+                        <Label>Postcode <span className="text-red-500">*</span></Label>
                         <Input 
                           value={order.shipping_address?.postcode || ''} 
                           onChange={(e) => setOrder({
@@ -567,7 +767,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Country</Label>
+                        <Label>Country <span className="text-red-500">*</span></Label>
                         <Select 
                           value={order.shipping_address?.country_id}
                           onValueChange={(v) => setOrder({
@@ -599,6 +799,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               <div className="space-y-1">
                 <p className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Customer</p>
                 <p className="font-bold text-lg">{order.customer_firstname} {order.customer_lastname}</p>
+                {order.shipping_address?.company && <p className="text-zinc-700 font-medium">{order.shipping_address.company}</p>}
                 <p className="text-zinc-600">{order.customer_email}</p>
                 <p className="text-zinc-600">{order.shipping_address?.telephone || 'No phone number'}</p>
               </div>
@@ -616,10 +817,28 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Package size={20} /> Order Items
               </CardTitle>
+              {id === 'manual' && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    const newItem = {
+                      name: 'Manual Item',
+                      sku: `MAN-${Date.now()}`,
+                      qty_ordered: 1,
+                      price: 0,
+                      weight: 0.1
+                    };
+                    setOrder({ ...order, items: [...order.items, newItem] });
+                  }}
+                >
+                  Add Item
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <Table>
@@ -678,7 +897,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         <TableCell className="text-right font-bold">
                           {currencySymbol}{total.toFixed(2)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="flex gap-1">
                           <Dialog open={editingItem?.sku === item.sku} onOpenChange={(open) => !open && setEditingItem(null)}>
                             <DialogTrigger
                               render={
@@ -692,6 +911,17 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                 <DialogTitle>Edit Item: {item.name}</DialogTitle>
                               </DialogHeader>
                               <div className="grid gap-4 py-4">
+                                <div className="space-y-2">
+                                  <Label>Item Name</Label>
+                                  <Input 
+                                    value={item.name} 
+                                    onChange={(e) => {
+                                      const newItems = [...order.items];
+                                      newItems[idx] = { ...item, name: e.target.value };
+                                      setOrder({ ...order, items: newItems });
+                                    }}
+                                  />
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2">
                                     <Label>Price</Label>
@@ -726,6 +956,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                       onChange={(e) => {
                                         const newProductDetails = { ...productDetails };
                                         const product = { ...newProductDetails[item.sku] };
+                                        if (!product.sku) product.sku = item.sku;
                                         const attrs = [...(product.custom_attributes || [])];
                                         const htsIdx = attrs.findIndex(a => a.attribute_code === 'commodity_code');
                                         if (htsIdx > -1) attrs[htsIdx] = { ...attrs[htsIdx], value: e.target.value };
@@ -743,6 +974,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                       onChange={(e) => {
                                         const newProductDetails = { ...productDetails };
                                         const product = { ...newProductDetails[item.sku] };
+                                        if (!product.sku) product.sku = item.sku;
                                         const attrs = [...(product.custom_attributes || [])];
                                         const cooIdx = attrs.findIndex(a => a.attribute_code === 'country_of_manufacture');
                                         if (cooIdx > -1) attrs[cooIdx] = { ...attrs[cooIdx], value: e.target.value };
@@ -760,6 +992,19 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
+                          {id === 'manual' && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" 
+                              onClick={() => {
+                                const newItems = order.items.filter((_, i) => i !== idx);
+                                setOrder({ ...order, items: newItems });
+                              }}
+                            >
+                              <X size={14} />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -787,62 +1032,79 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             </div>
             <CardContent className="p-6 space-y-6">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold uppercase text-zinc-500">Package Details</Label>
-                  <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={clearPackageDetails}>
-                    <RotateCcw size={10} /> Clear
-                  </Button>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="weightKg">Weight (KG)</Label>
-                    <Input 
-                      id="weightKg" 
-                      type="number" 
-                      step="0.1"
-                      value={weightKg} 
-                      onChange={(e) => handleWeightKgChange(e.target.value)}
-                    />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold uppercase text-zinc-500">Weight <span className="text-red-500">*</span></Label>
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => { setWeightKg(''); setWeightG(''); }}>
+                      <RotateCcw size={10} /> Clear Weight
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="weightG">Weight (Grams)</Label>
-                    <Input 
-                      id="weightG" 
-                      type="number" 
-                      value={weightG} 
-                      onChange={(e) => handleWeightGChange(e.target.value)}
-                    />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    {(credentials.general.weightDisplayMode === 'both' || credentials.general.weightDisplayMode === 'kg') && (
+                      <div className="space-y-2">
+                        <Label htmlFor="weightKg">kg</Label>
+                        <Input 
+                          id="weightKg" 
+                          type="number" 
+                          step="0.1"
+                          value={weightKg} 
+                          onChange={(e) => handleWeightKgChange(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    {(credentials.general.weightDisplayMode === 'both' || credentials.general.weightDisplayMode === 'grams') && (
+                      <div className="space-y-2">
+                        <Label htmlFor="weightG">g</Label>
+                        <Input 
+                          id="weightG" 
+                          type="number" 
+                          value={weightG} 
+                          onChange={(e) => handleWeightGChange(e.target.value)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="length">L (cm)</Label>
-                    <Input 
-                      id="length" 
-                      type="number" 
-                      value={length} 
-                      onChange={(e) => setLength(e.target.value)}
-                    />
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold uppercase text-zinc-500">Dimensions (cm) <span className="text-red-500">*</span></Label>
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => { setLength(''); setWidth(''); setHeight(''); }}>
+                      <RotateCcw size={10} /> Clear Dims
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="width">W (cm)</Label>
-                    <Input 
-                      id="width" 
-                      type="number" 
-                      value={width} 
-                      onChange={(e) => setWidth(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="height">H (cm)</Label>
-                    <Input 
-                      id="height" 
-                      type="number" 
-                      value={height} 
-                      onChange={(e) => setHeight(e.target.value)}
-                    />
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="length">L</Label>
+                      <Input 
+                        id="length" 
+                        type="number" 
+                        value={length} 
+                        onChange={(e) => setLength(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="width">W</Label>
+                      <Input 
+                        id="width" 
+                        type="number" 
+                        value={width} 
+                        onChange={(e) => setWidth(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="height">H</Label>
+                      <Input 
+                        id="height" 
+                        type="number" 
+                        value={height} 
+                        onChange={(e) => setHeight(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -1,21 +1,45 @@
 import { useState, useEffect } from 'react';
 import { encrypt, decrypt } from '@/src/lib/crypto';
 
+export interface ShippingDefaults {
+  weightKg: string;
+  weightG: string;
+  length: string;
+  width: string;
+  height: string;
+  billShippingTo: string;
+  billDutiesTo: string;
+  // Overwrite toggles
+  overwriteWeightKg: boolean;
+  overwriteWeightG: boolean;
+  overwriteLength: boolean;
+  overwriteWidth: boolean;
+  overwriteHeight: boolean;
+  overwriteBillShippingTo: boolean;
+  overwriteBillDutiesTo: boolean;
+}
+
 export interface SawyerCredentials {
   magento: {
     url: string;
     token: string;
   };
   ups: {
+    enabled: boolean;
     clientId: string;
     clientSecret: string;
-    accountNumber: string;
+    accountNumber: string; // Legacy, kept for migration
+    domesticAccountNumber: string;
+    globalAccountNumber: string;
     isSandbox: boolean;
   };
   fedex: {
+    enabled: boolean;
     apiKey: string;
     secretKey: string;
-    accountNumber: string;
+    accountNumber: string; // Legacy, kept for migration
+    domesticAccountNumber: string;
+    globalAccountNumber: string;
     isSandbox: boolean;
   };
   general: {
@@ -24,48 +48,85 @@ export interface SawyerCredentials {
     currency: string;
     autoLockMinutes: number;
     originCountry: string;
+    originState: string;
+    originCity: string;
+    originPostalCode: string;
+    originStreet1: string;
+    originStreet2: string;
+    originContactName: string;
+    originCompanyName: string;
+    originPhone: string;
+    originEmail: string;
     alwaysShowDuties: boolean;
     markAsShipped: boolean;
     upsPickupType: string;
     fedexPickupType: string;
+    weightDisplayMode: 'both' | 'grams' | 'kg';
   };
-  shippingDefaults: {
-    weightKg: string;
-    weightG: string;
-    length: string;
-    width: string;
-    height: string;
-    overwriteExisting: boolean;
-    billShippingTo: string;
-    billDutiesTo: string;
-  };
+  shippingDefaults: ShippingDefaults;
+  countryDefaults: Record<string, ShippingDefaults>;
 }
+
+const DEFAULT_SHIPPING_DEFAULTS: ShippingDefaults = {
+  weightKg: '',
+  weightG: '',
+  length: '',
+  width: '',
+  height: '',
+  billShippingTo: 'shipper',
+  billDutiesTo: 'shipper',
+  overwriteWeightKg: false,
+  overwriteWeightG: false,
+  overwriteLength: false,
+  overwriteWidth: false,
+  overwriteHeight: false,
+  overwriteBillShippingTo: false,
+  overwriteBillDutiesTo: false
+};
 
 const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
-  ups: { clientId: '', clientSecret: '', accountNumber: '', isSandbox: true },
-  fedex: { apiKey: '', secretKey: '', accountNumber: '', isSandbox: true },
+  ups: { 
+    enabled: true, 
+    clientId: '', 
+    clientSecret: '', 
+    accountNumber: '', 
+    domesticAccountNumber: '', 
+    globalAccountNumber: '', 
+    isSandbox: true 
+  },
+  fedex: { 
+    enabled: true, 
+    apiKey: '', 
+    secretKey: '', 
+    accountNumber: '', 
+    domesticAccountNumber: '', 
+    globalAccountNumber: '', 
+    isSandbox: true 
+  },
   general: { 
     proxyUrl: 'https://cors-anywhere.herokuapp.com/', 
     labelFormat: 'PDF', 
     currency: 'GBP', 
     autoLockMinutes: 0,
     originCountry: 'GB',
+    originState: '',
+    originCity: '',
+    originPostalCode: '',
+    originStreet1: '',
+    originStreet2: '',
+    originContactName: '',
+    originCompanyName: '',
+    originPhone: '',
+    originEmail: '',
     alwaysShowDuties: false,
     markAsShipped: true,
     upsPickupType: '01',
-    fedexPickupType: 'DROPOFF_AT_FEDEX_LOCATION'
+    fedexPickupType: 'DROPOFF_AT_FEDEX_LOCATION',
+    weightDisplayMode: 'both'
   },
-  shippingDefaults: {
-    weightKg: '',
-    weightG: '',
-    length: '',
-    width: '',
-    height: '',
-    overwriteExisting: false,
-    billShippingTo: 'shipper',
-    billDutiesTo: 'shipper'
-  }
+  shippingDefaults: DEFAULT_SHIPPING_DEFAULTS,
+  countryDefaults: {}
 };
 
 export function useSawyerStorage() {
@@ -128,6 +189,13 @@ export function useSawyerStorage() {
     setMasterPassword(null);
   };
 
+  const resetData = () => {
+    localStorage.removeItem('sawyer_ship_data');
+    setCredentials(DEFAULT_CREDENTIALS);
+    setMasterPassword(null);
+    setIsLocked(true);
+  };
+
   return {
     isLocked,
     credentials,
@@ -136,6 +204,7 @@ export function useSawyerStorage() {
     logout,
     exportData,
     importData,
+    resetData,
     hasStoredData: !!localStorage.getItem('sawyer_ship_data')
   };
 }

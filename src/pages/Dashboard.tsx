@@ -84,6 +84,15 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
               {isLoading ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Search className="w-4 h-4 mr-2" />}
               Search Magento
             </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => navigate('/order/manual')}
+              className="gap-2"
+            >
+              <Package className="w-4 h-4" />
+              Manual Shipment
+            </Button>
           </form>
         </CardContent>
       </Card>
