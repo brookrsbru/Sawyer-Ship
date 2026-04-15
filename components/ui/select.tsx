@@ -1,8 +1,14 @@
 import * as React from "react"
 import { Select as SelectPrimitive } from "@base-ui/react/select"
+import { Input } from "@/components/ui/input"
 
 import { cn } from "@/lib/utils"
-import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+import { ChevronDownIcon, CheckIcon, ChevronUpIcon, SearchIcon } from "lucide-react"
+
+const SelectSearchContext = React.createContext<{
+  search: string
+  setSearch: (val: string) => void
+}>({ search: "", setSearch: () => {} })
 
 const Select = SelectPrimitive.Root
 
@@ -68,6 +74,32 @@ function SelectContent({
     SelectPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
   >) {
+  const [search, setSearch] = React.useState("")
+  const [isSearchVisible, setIsSearchVisible] = React.useState(false)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    if (search.length > 0) {
+      setIsSearchVisible(true)
+    }
+  }, [search])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // If user starts typing alphanumeric characters and search is not visible, show it
+    if (!isSearchVisible && e.key.length === 1 && /[a-z0-9]/i.test(e.key)) {
+      setIsSearchVisible(true)
+      setSearch(e.key)
+      // We need to focus the input after it renders
+      setTimeout(() => inputRef.current?.focus(), 0)
+    }
+    // Escape clears search and hides it
+    if (e.key === "Escape" && isSearchVisible) {
+      setSearch("")
+      setIsSearchVisible(false)
+      e.stopPropagation()
+    }
+  }
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner
@@ -82,11 +114,32 @@ function SelectContent({
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
           className={cn("relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          onKeyDown={handleKeyDown}
           {...props}
         >
-          <SelectScrollUpButton />
-          <SelectPrimitive.List>{children}</SelectPrimitive.List>
-          <SelectScrollDownButton />
+          <SelectSearchContext.Provider value={{ search, setSearch }}>
+            {isSearchVisible && (
+              <div className="sticky top-0 z-20 bg-popover p-1 border-b">
+                <div className="relative">
+                  <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                  <Input
+                    ref={inputRef}
+                    placeholder="Search..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-8 pl-7 text-xs"
+                    onKeyDown={(e) => {
+                      // Prevent the select from closing when typing spaces in search
+                      if (e.key === " ") e.stopPropagation()
+                      // Prevent default select type-ahead behavior
+                      e.stopPropagation()
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            <SelectPrimitive.List>{children}</SelectPrimitive.List>
+          </SelectSearchContext.Provider>
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
     </SelectPrimitive.Portal>
@@ -111,6 +164,22 @@ function SelectItem({
   children,
   ...props
 }: SelectPrimitive.Item.Props) {
+  const { search } = React.useContext(SelectSearchContext)
+  
+  const isVisible = React.useMemo(() => {
+    if (!search) return true
+    const text = React.Children.toArray(children)
+      .map(child => {
+        if (typeof child === "string" || typeof child === "number") return String(child)
+        return ""
+      })
+      .join("")
+      .toLowerCase()
+    return text.includes(search.toLowerCase())
+  }, [children, search])
+
+  if (!isVisible) return null
+
   return (
     <SelectPrimitive.Item
       data-slot="select-item"

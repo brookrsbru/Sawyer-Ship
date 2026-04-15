@@ -163,6 +163,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
   "NG": "Nigeria",
   "NU": "Niue",
   "NF": "Norfolk Island",
+  "XI": "Northern Ireland",
   "MP": "Northern Mariana Islands",
   "NO": "Norway",
   "OM": "Oman",
