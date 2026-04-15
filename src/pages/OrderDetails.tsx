@@ -484,7 +484,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 paymentType: "SENDER",
                 payor: {
                   responsibleParty: {
-                    accountNumber: { value: accountNumber }
+                    accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
                   }
                 }
               },
@@ -738,6 +738,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
         const fedexParams: any = {
           labelResponseOptions: "URL_ONLY",
+          accountNumber: { value: accountNumber },
           requestedShipment: {
             shipper: {
               contact: {
@@ -775,7 +776,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: accountNumber }
+                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
                 }
               }
             },
@@ -798,7 +799,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: billDutiesTo === 'recipient' ? "RECIPIENT" : "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: accountNumber }
+                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
                 }
               }
             },

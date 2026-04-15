@@ -40,6 +40,7 @@ export interface SawyerCredentials {
     accountNumber: string; // Legacy, kept for migration
     domesticAccountNumber: string;
     globalAccountNumber: string;
+    paymentAccountNumber: string;
     isSandbox: boolean;
   };
   general: {
@@ -102,6 +103,7 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     accountNumber: '', 
     domesticAccountNumber: '', 
     globalAccountNumber: '', 
+    paymentAccountNumber: '',
     isSandbox: true 
   },
   general: { 

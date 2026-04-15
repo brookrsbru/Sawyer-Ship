@@ -1074,6 +1074,16 @@ export default function Settings({
                           />
                         </div>
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fedex-payment-account">Payment Account Number (Payor)</Label>
+                        <Input 
+                          id="fedex-payment-account" 
+                          placeholder="Used for shipping charges payment"
+                          value={formData.fedex.paymentAccountNumber}
+                          onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, paymentAccountNumber: e.target.value } })}
+                        />
+                        <p className="text-[10px] text-zinc-500">The account number that will be listed as the payor for shipping charges.</p>
+                      </div>
                     </div>
                   </div>
 
