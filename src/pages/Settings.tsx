@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useBlocker } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -50,10 +51,36 @@ export default function Settings({
   onImport: (data: string) => void
 }) {
   const [formData, setFormData] = useState<SawyerCredentials>(credentials);
+  const [isSaving, setIsSaving] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<string | null>(null);
   const [devOrderId, setDevOrderId] = useState(() => localStorage.getItem('sawyer_last_search') || '');
   const [devOrderData, setDevOrderData] = useState<any>(null);
   const [isDevLoading, setIsDevLoading] = useState(false);
+
+  // Check for unsaved changes
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(formData) !== JSON.stringify(credentials);
+  }, [formData, credentials]);
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasChanges && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  const handleSave = async (exitAfter = false) => {
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+      toast.success("Settings saved successfully.");
+      if (exitAfter && blocker.state === 'blocked') {
+        blocker.proceed();
+      }
+    } catch (e) {
+      toast.error("Failed to save settings.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleDevFetch = async () => {
     if (!devOrderId) return;
@@ -79,15 +106,6 @@ export default function Settings({
   useEffect(() => {
     setFormData(credentials);
   }, [credentials]);
-
-  const handleSave = async () => {
-    try {
-      await onSave(formData);
-      toast.success("Settings saved successfully.");
-    } catch (e) {
-      toast.error("Failed to save settings.");
-    }
-  };
 
   const handleExport = () => {
     const data = onExport();
@@ -140,8 +158,13 @@ export default function Settings({
           <h1 className="text-3xl font-bold text-zinc-900">Settings</h1>
           <p className="text-zinc-500">Manage your API credentials and application preferences.</p>
         </div>
-        <Button onClick={handleSave} className="bg-zinc-900 hover:bg-zinc-800 gap-2 shadow-lg">
-          <Save size={18} /> Save All Settings
+        <Button 
+          onClick={() => handleSave(false)} 
+          disabled={isSaving || !hasChanges}
+          className="bg-zinc-900 hover:bg-zinc-800 gap-2 shadow-lg"
+        >
+          {isSaving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save size={18} />}
+          {hasChanges ? "Save All Settings" : "Saved"}
         </Button>
       </header>
 
@@ -1199,6 +1222,44 @@ export default function Settings({
                 </CardContent>
               </Card>
             </section>
+
+            {/* Navigation Guard Dialog */}
+            <AlertDialog open={blocker.state === 'blocked'}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <Shield className="text-amber-500" /> Unsaved Changes
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You have unsaved changes in your settings. Are you sure you want to exit?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                  <AlertDialogCancel 
+                    onClick={() => blocker.reset?.()}
+                    className="mt-0"
+                    variant="outline"
+                    size="default"
+                  >
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => blocker.proceed?.()}
+                    variant="outline"
+                    className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200 border-zinc-200"
+                  >
+                    Exit without saving
+                  </AlertDialogAction>
+                  <AlertDialogAction 
+                    onClick={() => handleSave(true)}
+                    variant="default"
+                    className="bg-zinc-900 text-white hover:bg-zinc-800"
+                  >
+                    Save and exit
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Dev Menu Section */}
             <section id="dev" className="scroll-mt-24 space-y-6">

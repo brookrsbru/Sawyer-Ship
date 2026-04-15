@@ -4,16 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Package, ArrowRight, Loader2, AlertCircle, X } from 'lucide-react';
+import { Search, Package, ArrowRight, Loader2, AlertCircle, X, Info, Globe, Truck, ShieldCheck } from 'lucide-react';
 import { MagentoClient, MagentoOrder } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function Dashboard({ credentials }: { credentials: SawyerCredentials }) {
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('sawyer_last_search') || '');
   const [orders, setOrders] = useState<MagentoOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,6 +32,7 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
     }
 
     setIsLoading(true);
+    setHasSearched(true);
     try {
       const client = new MagentoClient(
         credentials.magento.url, 
@@ -37,7 +42,7 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
       const results = await client.searchOrders(searchQuery);
       setOrders(results);
       if (results.length === 0) {
-        toast.info("No orders found matching your search.");
+        setShowHelp(true);
       }
     } catch (error: any) {
       console.error(error);
@@ -83,6 +88,16 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
             <Button type="submit" disabled={isLoading} className="bg-zinc-900 hover:bg-zinc-800">
               {isLoading ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Search className="w-4 h-4 mr-2" />}
               Search Magento
+            </Button>
+            <Button 
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowHelp(true)}
+              className="text-zinc-400 hover:text-zinc-600"
+              title="How to search"
+            >
+              <Info size={20} />
             </Button>
             <Button 
               type="button" 
@@ -150,13 +165,79 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
         </Card>
       )}
 
-      {!isLoading && orders.length === 0 && searchQuery && (
-        <div className="text-center py-12 bg-zinc-100 rounded-xl border-2 border-dashed border-zinc-200">
-          <Package className="mx-auto w-12 h-12 text-zinc-300 mb-4" />
-          <h3 className="text-lg font-medium text-zinc-900">No orders found</h3>
-          <p className="text-zinc-500">Try searching for a different order number or email.</p>
+      {!isLoading && orders.length === 0 && hasSearched && (
+        <div className="text-center py-12 bg-zinc-50 rounded-xl border-2 border-dashed border-zinc-200">
+          <Search className="mx-auto w-12 h-12 text-zinc-300 mb-4" />
+          <h3 className="text-lg font-medium text-zinc-900">No results found</h3>
+          <p className="text-zinc-500 mb-6">We couldn't find any orders matching "{searchQuery}".</p>
+          <Button variant="outline" onClick={() => setShowHelp(true)} className="gap-2">
+            <Info size={16} /> How to search
+          </Button>
         </div>
       )}
+
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <Search className="text-zinc-400" /> Search for an Order
+            </DialogTitle>
+            <DialogDescription>
+              Use the search bar to import orders from Magento or create manual shipments.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="flex gap-3 items-start p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+                <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0">
+                  <Globe size={16} className="text-zinc-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-zinc-900">Search & Import</h4>
+                  <p className="text-xs text-zinc-500">Enter a Magento Order ID or Customer Email to pull full order details, items, and customs data.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 items-start p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+                <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0">
+                  <Package size={16} className="text-zinc-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-zinc-900">Manual Shipments</h4>
+                  <p className="text-xs text-zinc-500">No order in Magento? Use the "Manual Shipment" button to create a label from scratch.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 items-start p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+                <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0">
+                  <Truck size={16} className="text-zinc-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-zinc-900">Live Carrier Rates</h4>
+                  <p className="text-xs text-zinc-500">Get real-time shipping quotes and generate labels for FedEx and UPS in seconds.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 items-start p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+                <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0">
+                  <ShieldCheck size={16} className="text-zinc-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-zinc-900">Customs & NI Support</h4>
+                  <p className="text-xs text-zinc-500">Automatic HTS/Commodity code resolution and seamless domestic shipping for Northern Ireland.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowHelp(false)} className="w-full bg-zinc-900 hover:bg-zinc-800">
+              Got it, let's ship!
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {(!credentials.magento.url || !credentials.magento.token) && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex gap-3 items-start">

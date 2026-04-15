@@ -374,6 +374,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           const accountNumber = isDomestic 
             ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
             : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
+          
+          const effectiveAccountNumber = credentials.fedex.paymentAccountNumber || accountNumber;
 
           console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const fedex = new FedExClient(
@@ -389,7 +391,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           const getCarrierCountryCode = (code: string) => code === 'XI' ? 'GB' : code;
 
           const fedexParams: any = {
-            accountNumber: { value: accountNumber },
+            accountNumber: { value: effectiveAccountNumber },
             requestedShipment: {
               shipper: {
                 address: {
@@ -726,6 +728,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
           : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
 
+        const effectiveAccountNumber = credentials.fedex.paymentAccountNumber || accountNumber;
+
         const fedex = new FedExClient(
           credentials.fedex.apiKey,
           credentials.fedex.secretKey,
@@ -738,7 +742,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
         const fedexParams: any = {
           labelResponseOptions: "URL_ONLY",
-          accountNumber: { value: accountNumber },
+          accountNumber: { value: effectiveAccountNumber },
           requestedShipment: {
             shipper: {
               contact: {
@@ -776,7 +780,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
+                  accountNumber: { value: effectiveAccountNumber }
                 }
               }
             },
@@ -799,7 +803,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: billDutiesTo === 'recipient' ? "RECIPIENT" : "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
+                  accountNumber: { value: effectiveAccountNumber }
                 }
               }
             },
