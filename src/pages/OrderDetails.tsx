@@ -73,6 +73,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [billShippingTo, setBillShippingTo] = useState('shipper');
   const [billDutiesTo, setBillDutiesTo] = useState('shipper');
 
+  const getCarrierCountryCode = (code: string) => code === 'XI' ? 'GB' : code;
+
   useEffect(() => {
     if (order && order.items && order.items.length > 0) {
       const fetchOptions = async () => {
@@ -306,37 +308,37 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           // Simplified UPS Rating Request
           const upsParams = {
             RateRequest: {
-              Request: { RequestOption: "Shop" },
+              Request: { 
+                RequestOption: "Shop",
+                TransactionReference: { CustomerContext: "Rating and Service" }
+              },
               Shipment: {
                 Shipper: {
                   Address: {
-                    PostalCode: "SW1A 1AA", // Example origin
-                    CountryCode: "GB"
+                    PostalCode: credentials.general.originPostalCode,
+                    CountryCode: getCarrierCountryCode(credentials.general.originCountry)
                   }
                 },
                 ShipTo: {
                   Address: {
                     PostalCode: order.shipping_address.postcode,
-                    CountryCode: order.shipping_address.country_id
+                    CountryCode: getCarrierCountryCode(order.shipping_address.country_id)
                   }
                 },
                 PickupType: { Code: credentials.general.upsPickupType || "01" },
-                Service: { Code: "03" },
+                DeliveryTimeInformation: { PackageBillType: "03" },
+                ShipmentRatingOptions: { UserLevelDiscountIndicator: "TRUE" },
                 Package: {
                   PackagingType: { Code: "02" },
                   Dimensions: {
                     UnitOfMeasurement: { Code: "CM" },
-                    Length: l.toString(),
-                    Width: w.toString(),
-                    Height: h.toString()
+                    Length: Math.max(1, l).toString(),
+                    Width: Math.max(1, w).toString(),
+                    Height: Math.max(1, h).toString()
                   },
                   PackageWeight: {
                     UnitOfMeasurement: { Code: "KGS" },
                     Weight: weightVal.toString()
-                  },
-                  ReferenceNumber: {
-                    Code: "01",
-                    Value: order.increment_id
                   }
                 }
               }
@@ -350,12 +352,47 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               : [upsData.RateResponse.RatedShipment];
             
             shipments.forEach((s: any) => {
+              let deliveryInfo = 'Live Rate';
+              const arrivalDate = s.TimeInTransit?.ServiceSummary?.EstimatedArrival?.Arrival?.Date;
+              const arrivalTime = s.TimeInTransit?.ServiceSummary?.EstimatedArrival?.Arrival?.Time;
+              
+              if (arrivalDate) {
+                try {
+                  // UPS date format is YYYYMMDD
+                  const year = parseInt(arrivalDate.substring(0, 4));
+                  const month = parseInt(arrivalDate.substring(4, 6)) - 1;
+                  const day = parseInt(arrivalDate.substring(6, 8));
+                  const date = new Date(year, month, day);
+                  
+                  if (arrivalTime) {
+                    const hours = parseInt(arrivalTime.substring(0, 2));
+                    const mins = parseInt(arrivalTime.substring(2, 4));
+                    date.setHours(hours, mins);
+                  }
+
+                  const now = new Date();
+                  const tomorrow = new Date();
+                  tomorrow.setDate(now.getDate() + 1);
+                  
+                  if (date.toDateString() === tomorrow.toDateString()) {
+                    const time = arrivalTime ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                    deliveryInfo = `Tomorrow${time ? ` at ${time}` : ''}`;
+                  } else if (date.toDateString() === now.toDateString()) {
+                    deliveryInfo = 'Today';
+                  } else {
+                    deliveryInfo = date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+                  }
+                } catch (e) {
+                  deliveryInfo = arrivalDate;
+                }
+              }
+
               allRates.push({
                 id: `ups-${s.Service.Code}`,
                 carrier: 'UPS',
                 service: `Service ${s.Service.Code}`,
                 price: parseFloat(s.TotalCharges.MonetaryValue),
-                delivery: 'Live Rate'
+                delivery: deliveryInfo
               });
             });
           }
@@ -375,8 +412,6 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
             : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
           
-          const effectiveAccountNumber = credentials.fedex.paymentAccountNumber || accountNumber;
-
           console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const fedex = new FedExClient(
             credentials.fedex.apiKey,
@@ -388,10 +423,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
           const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
 
-          const getCarrierCountryCode = (code: string) => code === 'XI' ? 'GB' : code;
-
           const fedexParams: any = {
-            accountNumber: { value: effectiveAccountNumber },
+            accountNumber: { value: accountNumber },
             requestedShipment: {
               shipper: {
                 address: {
@@ -536,12 +569,35 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               const isAllowed = allowedServices.some(s => serviceCode.includes(s));
               
               if (isAllowed) {
+                // Try to extract delivery date
+                let deliveryInfo = 'Live Rate';
+                const commitDate = r.commit?.dateDetail?.dayFormat;
+                if (commitDate) {
+                  try {
+                    const date = new Date(commitDate);
+                    const now = new Date();
+                    const tomorrow = new Date();
+                    tomorrow.setDate(now.getDate() + 1);
+                    
+                    if (date.toDateString() === tomorrow.toDateString()) {
+                      const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      deliveryInfo = `Tomorrow at ${time}`;
+                    } else if (date.toDateString() === now.toDateString()) {
+                      deliveryInfo = 'Today';
+                    } else {
+                      deliveryInfo = date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+                    }
+                  } catch (e) {
+                    deliveryInfo = commitDate;
+                  }
+                }
+
                 allRates.push({
                   id: `fedex-${r.serviceType}`,
                   carrier: 'FedEx',
                   service: r.serviceName || r.serviceType,
                   price: r.ratedShipmentDetails?.[0]?.totalNetCharge || 0,
-                  delivery: 'Live Rate'
+                  delivery: deliveryInfo
                 });
               }
             });
@@ -551,20 +607,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         }
       }
 
-      // Fallback to mock if no rates found and no credentials
-      if (allRates.length === 0) {
-        const mockRates = [
-          { id: 'ups-1', carrier: 'UPS', service: 'Ground', price: 12.45, delivery: '3-5 Days' },
-          { id: 'ups-2', carrier: 'UPS', service: 'Next Day Air', price: 45.20, delivery: 'Tomorrow' },
-          { id: 'fedex-1', carrier: 'FedEx', service: 'Home Delivery', price: 13.10, delivery: '3-4 Days' },
-          { id: 'fedex-2', carrier: 'FedEx', service: 'Express Saver', price: 28.50, delivery: '3 Days' },
-        ];
-        setRates(mockRates.sort((a, b) => a.price - b.price));
-      } else {
-        setRates(allRates.sort((a, b) => a.price - b.price));
-      }
+      // Update rates state
+      setRates(allRates.sort((a, b) => a.price - b.price));
       
-      toast.success("Fetched live rates from carriers.");
+      if (allRates.length > 0) {
+        toast.success("Fetched live rates from carriers.");
+      } else {
+        toast.error("No live rates returned from carriers.");
+      }
     } catch (error) {
       toast.error("Failed to fetch rates. Check carrier credentials.");
     } finally {
@@ -728,8 +778,6 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
           : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
 
-        const effectiveAccountNumber = credentials.fedex.paymentAccountNumber || accountNumber;
-
         const fedex = new FedExClient(
           credentials.fedex.apiKey,
           credentials.fedex.secretKey,
@@ -738,11 +786,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           credentials.general.proxyUrl
         );
 
-        const getCarrierCountryCode = (code: string) => code === 'XI' ? 'GB' : code;
-
         const fedexParams: any = {
           labelResponseOptions: "URL_ONLY",
-          accountNumber: { value: effectiveAccountNumber },
+          accountNumber: { value: accountNumber },
           requestedShipment: {
             shipper: {
               contact: {
@@ -780,7 +826,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: effectiveAccountNumber }
+                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
                 }
               }
             },
@@ -803,7 +849,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: billDutiesTo === 'recipient' ? "RECIPIENT" : "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: effectiveAccountNumber }
+                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
                 }
               }
             },
