@@ -1853,11 +1853,13 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     )}
                   </div>
                   <Dialog open={isLabelViewerOpen} onOpenChange={setIsLabelViewerOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full gap-2">
-                        <Printer size={18} /> View & Print Label
-                      </Button>
-                    </DialogTrigger>
+                    <DialogTrigger
+                      render={
+                        <Button variant="outline" className="w-full gap-2">
+                          <Printer size={18} /> View & Print Label
+                        </Button>
+                      }
+                    />
                     <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
                       <DialogHeader className="p-4 border-b">
                         <DialogTitle className="flex items-center gap-2">
