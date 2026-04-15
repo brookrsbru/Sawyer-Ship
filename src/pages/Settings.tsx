@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Settings as SettingsIcon } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,8 @@ const FEDEX_PICKUP_LABELS: Record<string, string> = {
   "USE_SCHEDULED_PICKUP": "Use Scheduled Pickup"
 };
 
+import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
+
 export default function Settings({ 
   credentials, 
   onSave, 
@@ -49,6 +51,29 @@ export default function Settings({
 }) {
   const [formData, setFormData] = useState<SawyerCredentials>(credentials);
   const [pendingImportData, setPendingImportData] = useState<string | null>(null);
+  const [devOrderId, setDevOrderId] = useState('');
+  const [devOrderData, setDevOrderData] = useState<any>(null);
+  const [isDevLoading, setIsDevLoading] = useState(false);
+
+  const handleDevFetch = async () => {
+    if (!devOrderId) return;
+    setIsDevLoading(true);
+    setDevOrderData(null);
+    try {
+      const client = new MagentoClient(
+        credentials.magento.url,
+        credentials.magento.token,
+        credentials.general.proxyUrl
+      );
+      const data = await client.getDevOrderData(devOrderId);
+      setDevOrderData(data);
+      toast.success("Order data fetched successfully.");
+    } catch (e: any) {
+      toast.error(`Failed to fetch order: ${e.message}`);
+    } finally {
+      setIsDevLoading(false);
+    }
+  };
 
   // Sync state if credentials change (e.g. after a save or import)
   useEffect(() => {
@@ -137,6 +162,7 @@ export default function Settings({
                     { id: 'ups', label: 'UPS Integration', icon: Truck },
                     { id: 'fedex', label: 'FedEx Integration', icon: Truck },
                     { id: 'security', label: 'Security & Backup', icon: Shield },
+                    { id: 'dev', label: 'Dev Menu', icon: FileJson },
                     { id: 'help', label: 'Help Desk', icon: Info },
                   ].map((item) => (
                     <button
@@ -1160,6 +1186,53 @@ export default function Settings({
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Dev Menu Section */}
+            <section id="dev" className="scroll-mt-24 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Dev Menu</h2>
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileJson size={20} /> Magento Order Inspector
+                  </CardTitle>
+                  <CardDescription>Pull raw order data from Magento to inspect all attributes and structures.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Enter Order ID (e.g. 000000123)" 
+                      value={devOrderId}
+                      onChange={(e) => setDevOrderId(e.target.value)}
+                    />
+                    <Button onClick={handleDevFetch} disabled={isDevLoading || !devOrderId}>
+                      {isDevLoading ? <Loader2 className="animate-spin" size={18} /> : 'Fetch Raw Data'}
+                    </Button>
+                  </div>
+                  
+                  {devOrderData && (
+                    <div className="space-y-4">
+                      <div className="bg-zinc-950 rounded-lg p-4 overflow-auto max-h-[500px]">
+                        <pre className="text-[10px] text-zinc-300 font-mono">
+                          {JSON.stringify(devOrderData, null, 2)}
+                        </pre>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => {
+                        const blob = new Blob([JSON.stringify(devOrderData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `order-${devOrderId}-raw.json`;
+                        link.click();
+                      }}>Download JSON</Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </section>

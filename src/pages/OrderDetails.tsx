@@ -51,6 +51,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingProducts, setIsFetchingProducts] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attributeOptions, setAttributeOptions] = useState<Record<string, any[]>>({});
 
   // Package details
   const [weight, setWeight] = useState('1.0');
@@ -71,6 +72,33 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [weightG, setWeightG] = useState('');
   const [billShippingTo, setBillShippingTo] = useState('shipper');
   const [billDutiesTo, setBillDutiesTo] = useState('shipper');
+
+  useEffect(() => {
+    if (order && order.items && order.items.length > 0) {
+      const fetchOptions = async () => {
+        try {
+          const client = new MagentoClient(
+            credentials.magento.url,
+            credentials.magento.token,
+            credentials.general.proxyUrl
+          );
+          // Fetch options for attributes that might be dropdowns
+          const codes = ['commodity_code', 'harmonized_system_code'];
+          const optionsMap: Record<string, any[]> = {};
+          
+          for (const code of codes) {
+            const options = await client.getAttributeOptions(code);
+            optionsMap[code] = options;
+          }
+          
+          setAttributeOptions(optionsMap);
+        } catch (e) {
+          console.error("Failed to fetch attribute options:", e);
+        }
+      };
+      fetchOptions();
+    }
+  }, [order?.increment_id]);
 
   // Apply defaults
   useEffect(() => {
@@ -581,14 +609,13 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         };
         const serviceCode = serviceMap[selectedRate.service] || '03';
 
-        const upsParams = {
+        const upsParams: any = {
           ShipmentRequest: {
             Shipment: {
               Description: `Order #${order.increment_id}`,
               Shipper: {
                 Name: credentials.general.originContactName,
                 AttentionName: credentials.general.originContactName,
-                TaxIdentificationNumber: "",
                 Phone: { Number: credentials.general.originPhone },
                 ShipperNumber: isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber,
                 Address: {
@@ -640,6 +667,45 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           }
         };
 
+        // Add International Forms if needed
+        if (!isDomestic) {
+          const totalValue = order.items.reduce((sum, item) => sum + (item.price * item.qty_ordered), 0);
+          upsParams.ShipmentRequest.Shipment.ShipmentServiceOptions = {
+            InternationalForms: {
+              FormType: ["01"], // Commercial Invoice
+              InvoiceNumber: order.increment_id,
+              InvoiceDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
+              ReasonForExport: "SALE",
+              CurrencyCode: credentials.general.currency || "GBP",
+              Product: order.items.map(item => {
+                const product = productDetails[item.sku];
+                const getAttr = (code: string) => {
+                  const attr = product?.custom_attributes?.find((a: any) => a.attribute_code === code);
+                  let val = attr?.value;
+                  if (val === undefined && code === 'commodity_code') {
+                    const htsAttr = product?.custom_attributes?.find((a: any) => 
+                      ['hts_code', 'ts_hts_code', 'ts_commodity_code', 'hs_code', 'commodity_code'].includes(a.attribute_code)
+                    );
+                    val = htsAttr?.value;
+                  }
+                  return val || '';
+                };
+                
+                return {
+                  Description: item.name,
+                  Unit: {
+                    Number: item.qty_ordered.toString(),
+                    Value: item.price.toString(),
+                    UnitOfMeasurement: { Code: "PCS" }
+                  },
+                  CommodityCode: getAttr('commodity_code'),
+                  OriginCountryCode: getAttr('country_of_manufacture') || credentials.general.originCountry
+                };
+              })
+            }
+          };
+        }
+
         const upsData = await ups.createShipment(upsParams);
         if (upsData.ShipmentResponse?.Response?.ResponseStatus?.Code === "1") {
           tracking = upsData.ShipmentResponse.ShipmentResults.ShipmentIdentificationNumber;
@@ -658,7 +724,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           credentials.general.proxyUrl
         );
 
-        const fedexParams = {
+        const fedexParams: any = {
           labelResponseOptions: "URL_ONLY",
           requestedShipment: {
             shipper: {
@@ -712,6 +778,45 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             }]
           }
         };
+
+        // Add International Customs if needed
+        if (!isDomestic) {
+          fedexParams.requestedShipment.customsClearanceDetail = {
+            dutiesPayment: {
+              paymentType: billDutiesTo === 'recipient' ? "RECIPIENT" : "SENDER",
+              payor: {
+                responsibleParty: {
+                  accountNumber: { value: isDomestic ? credentials.fedex.domesticAccountNumber : credentials.fedex.globalAccountNumber }
+                }
+              }
+            },
+            commodities: order.items.map(item => {
+              const product = productDetails[item.sku];
+              const getAttr = (code: string) => {
+                const attr = product?.custom_attributes?.find((a: any) => a.attribute_code === code);
+                let val = attr?.value;
+                if (val === undefined && code === 'commodity_code') {
+                  const htsAttr = product?.custom_attributes?.find((a: any) => 
+                    ['hts_code', 'ts_hts_code', 'ts_commodity_code', 'hs_code', 'commodity_code'].includes(a.attribute_code)
+                  );
+                  val = htsAttr?.value;
+                }
+                return val || '';
+              };
+              
+              return {
+                description: item.name,
+                countryOfManufacture: getAttr('country_of_manufacture') || credentials.general.originCountry,
+                harmonizedCode: getAttr('commodity_code'),
+                quantity: item.qty_ordered,
+                quantityUnits: "PCS",
+                unitPrice: { amount: item.price, currency: credentials.general.currency || "GBP" },
+                customsValue: { amount: item.price * item.qty_ordered, currency: credentials.general.currency || "GBP" },
+                weight: { units: "KG", value: item.weight || 0.1 }
+              };
+            })
+          };
+        }
 
         const fedexData = await fedex.createShipment(fedexParams);
         if (fedexData.output?.transactionShipments?.[0]) {
@@ -872,6 +977,30 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
                 }}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Address Line 2</Label>
+                <Input 
+                  value={order.shipping_address?.street?.[1] || ''} 
+                  onChange={(e) => {
+                    const street = [...(order.shipping_address?.street || [])];
+                    street[1] = e.target.value;
+                    setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Address Line 3</Label>
+                <Input 
+                  value={order.shipping_address?.street?.[2] || ''} 
+                  onChange={(e) => {
+                    const street = [...(order.shipping_address?.street || [])];
+                    street[2] = e.target.value;
+                    setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                  }}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1192,7 +1321,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   <TableRow>
                     <TableHead>Item</TableHead>
                     <TableHead className="text-center">Qty</TableHead>
-                    <TableHead className="text-right">Customs/HTS</TableHead>
+                    <TableHead className="text-left">Customs</TableHead>
                     <TableHead className="text-right">Price</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -1204,18 +1333,46 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     
                     // Helper to get attribute value or label
                     const getAttr = (code: string) => {
-                      const attr = product?.custom_attributes?.find((a: any) => a.attribute_code === code);
-                      const val = attr?.value || 'N/A';
+                      if (!product) return 'N/A';
                       
-                      // If it's a country code, try to map to full name
-                      if (code === 'country_of_manufacture' && val.length === 2) {
-                        return COUNTRY_NAMES[val] || val;
+                      // Try custom_attributes first
+                      const attr = product.custom_attributes?.find((a: any) => a.attribute_code === code);
+                      let val = attr?.value;
+                      
+                      // Fallback for HTS/Commodity codes
+                      if (val === undefined && code === 'commodity_code') {
+                        const htsAttr = product.custom_attributes?.find((a: any) => 
+                          ['hts_code', 'ts_hts_code', 'ts_commodity_code', 'hs_code', 'commodity_code', 'harmonized_system_code'].includes(a.attribute_code)
+                        );
+                        val = htsAttr?.value;
                       }
                       
-                      return val;
+                      // Fallback to top-level property
+                      if (val === undefined && product[code] !== undefined) {
+                        val = product[code];
+                      }
+                      
+                      if (val === undefined || val === null) return 'N/A';
+                      
+                      // If it's a dropdown/select, try to find the label
+                      const options = attributeOptions[code] || [];
+                      if (options.length > 0) {
+                        const option = options.find(o => String(o.value) === String(val));
+                        if (option && option.label) {
+                          return option.label;
+                        }
+                      }
+                      
+                      // If it's a country code, try to map to full name
+                      if (code === 'country_of_manufacture' && String(val).length === 2) {
+                        return COUNTRY_NAMES[String(val)] || String(val);
+                      }
+                      
+                      return String(val);
                     };
 
                     const htsCode = getAttr('commodity_code');
+                    const hscCode = getAttr('harmonized_system_code');
                     const coo = getAttr('country_of_manufacture');
                     const currencySymbol = credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$';
                     const total = item.price * item.qty_ordered;
@@ -1228,12 +1385,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           <div title={item.name}>
                             <p>{truncatedName}</p>
                             <p className="text-zinc-500 font-mono text-[10px]">{item.sku}</p>
+                            <p className="text-zinc-400 text-[9px] mt-1">Weight: {product?.weight || item.weight || '0.00'} kg</p>
                           </div>
                         </TableCell>
                         <TableCell className="text-center">{item.qty_ordered}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-left">
                           <div className="text-xs">
                             <p><span className="text-zinc-400">HTS:</span> {htsCode}</p>
+                            {hscCode !== 'N/A' && <p><span className="text-zinc-400">HSC:</span> {hscCode}</p>}
                             <p><span className="text-zinc-400">COO:</span> {coo}</p>
                           </div>
                         </TableCell>
@@ -1296,7 +1455,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2">
-                                    <Label>HTS Code</Label>
+                                    <Label>Commodity Code</Label>
                                     <Input 
                                       value={htsCode} 
                                       onChange={(e) => {
@@ -1304,9 +1463,17 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                         const product = { ...newProductDetails[item.sku] };
                                         if (!product.sku) product.sku = item.sku;
                                         const attrs = [...(product.custom_attributes || [])];
-                                        const htsIdx = attrs.findIndex(a => a.attribute_code === 'commodity_code');
-                                        if (htsIdx > -1) attrs[htsIdx] = { ...attrs[htsIdx], value: e.target.value };
-                                        else attrs.push({ attribute_code: 'commodity_code', value: e.target.value });
+                                        
+                                        // Find any existing HTS-related attribute
+                                        const htsCodes = ['commodity_code', 'hts_code', 'ts_hts_code', 'ts_commodity_code', 'hs_code'];
+                                        const htsIdx = attrs.findIndex(a => htsCodes.includes(a.attribute_code));
+                                        
+                                        if (htsIdx > -1) {
+                                          attrs[htsIdx] = { ...attrs[htsIdx], value: e.target.value };
+                                        } else {
+                                          attrs.push({ attribute_code: 'commodity_code', value: e.target.value });
+                                        }
+                                        
                                         product.custom_attributes = attrs;
                                         newProductDetails[item.sku] = product;
                                         setProductDetails(newProductDetails);
@@ -1314,23 +1481,63 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label>Country of Origin</Label>
+                                    <Label>HSC</Label>
                                     <Input 
-                                      value={coo} 
+                                      value={hscCode} 
                                       onChange={(e) => {
                                         const newProductDetails = { ...productDetails };
                                         const product = { ...newProductDetails[item.sku] };
                                         if (!product.sku) product.sku = item.sku;
                                         const attrs = [...(product.custom_attributes || [])];
-                                        const cooIdx = attrs.findIndex(a => a.attribute_code === 'country_of_manufacture');
-                                        if (cooIdx > -1) attrs[cooIdx] = { ...attrs[cooIdx], value: e.target.value };
-                                        else attrs.push({ attribute_code: 'country_of_manufacture', value: e.target.value });
+                                        const hscIdx = attrs.findIndex(a => a.attribute_code === 'harmonized_system_code');
+                                        if (hscIdx > -1) attrs[hscIdx] = { ...attrs[hscIdx], value: e.target.value };
+                                        else attrs.push({ attribute_code: 'harmonized_system_code', value: e.target.value });
                                         product.custom_attributes = attrs;
                                         newProductDetails[item.sku] = product;
                                         setProductDetails(newProductDetails);
                                       }}
                                     />
                                   </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Country of Origin</Label>
+                                  <Input 
+                                    value={coo} 
+                                    onChange={(e) => {
+                                      const newProductDetails = { ...productDetails };
+                                      const product = { ...newProductDetails[item.sku] };
+                                      if (!product.sku) product.sku = item.sku;
+                                      const attrs = [...(product.custom_attributes || [])];
+                                      const cooIdx = attrs.findIndex(a => a.attribute_code === 'country_of_manufacture');
+                                      if (cooIdx > -1) attrs[cooIdx] = { ...attrs[cooIdx], value: e.target.value };
+                                      else attrs.push({ attribute_code: 'country_of_manufacture', value: e.target.value });
+                                      product.custom_attributes = attrs;
+                                      newProductDetails[item.sku] = product;
+                                      setProductDetails(newProductDetails);
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Weight (kg)</Label>
+                                  <Input 
+                                    type="number"
+                                    step="0.01"
+                                    value={product?.weight || item.weight || ''} 
+                                    onChange={(e) => {
+                                      const newWeight = parseFloat(e.target.value) || 0;
+                                      const newProductDetails = { ...productDetails };
+                                      const product = { ...newProductDetails[item.sku] };
+                                      if (!product.sku) product.sku = item.sku;
+                                      product.weight = newWeight;
+                                      newProductDetails[item.sku] = product;
+                                      setProductDetails(newProductDetails);
+                                      
+                                      // Also update the item weight in the order if it's a manual order or for consistency
+                                      const newItems = [...order.items];
+                                      newItems[idx] = { ...item, weight: newWeight };
+                                      setOrder({ ...order, items: newItems });
+                                    }}
+                                  />
                                 </div>
                               </div>
                               <DialogFooter>
@@ -1389,11 +1596,13 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   <div className="grid grid-cols-2 gap-4">
                     {(credentials.general.weightDisplayMode === 'both' || credentials.general.weightDisplayMode === 'kg') && (
                       <div className="space-y-2">
-                        <Label htmlFor="weightKg">kg</Label>
+
+                        <Label htmlFor="weightKg">Kilograms</Label>
                         <Input 
                           id="weightKg" 
                           type="number" 
                           step="0.1"
+                          placeholder="0"
                           value={weightKg} 
                           onChange={(e) => handleWeightKgChange(e.target.value)}
                         />
@@ -1401,10 +1610,11 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     )}
                     {(credentials.general.weightDisplayMode === 'both' || credentials.general.weightDisplayMode === 'grams') && (
                       <div className="space-y-2">
-                        <Label htmlFor="weightG">g</Label>
+                        <Label htmlFor="weightG">Grams</Label>
                         <Input 
                           id="weightG" 
                           type="number" 
+                          placeholder="0"
                           value={weightG} 
                           onChange={(e) => handleWeightGChange(e.target.value)}
                         />
@@ -1425,28 +1635,31 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
                   <div className="grid grid-cols-3 gap-2">
                     <div className="space-y-2">
-                      <Label htmlFor="length">L</Label>
+                      <Label htmlFor="length">Length</Label>
                       <Input 
                         id="length" 
                         type="number" 
+                        placeholder="0"
                         value={length} 
                         onChange={(e) => setLength(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="width">W</Label>
+                      <Label htmlFor="width">Width</Label>
                       <Input 
                         id="width" 
                         type="number" 
+                        placeholder="0"
                         value={width} 
                         onChange={(e) => setWidth(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="height">H</Label>
+                      <Label htmlFor="height">Height</Label>
                       <Input 
                         id="height" 
                         type="number" 
+                        placeholder="0"
                         value={height} 
                         onChange={(e) => setHeight(e.target.value)}
                       />

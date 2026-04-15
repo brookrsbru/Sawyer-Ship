@@ -91,7 +91,27 @@ export class MagentoClient {
 
   async getOrder(id: string): Promise<MagentoOrder> {
     console.log(`[MagentoClient] Fetching order: ${id}`);
-    const orderData = await this.fetch(`orders/${id}`);
+    let orderData;
+    
+    try {
+      // Try fetching by internal entity_id first
+      orderData = await this.fetch(`orders/${id}`);
+    } catch (error: any) {
+      // If 404, try searching by increment_id
+      if (error.message?.includes('404')) {
+        console.log(`[MagentoClient] Order ${id} not found by entity_id, trying increment_id search...`);
+        const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${id}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+        const data = await this.fetch(`orders?${searchCriteria}`);
+        if (data.items && data.items.length > 0) {
+          orderData = data.items[0];
+        } else {
+          throw error; // Re-throw the original 404 if not found by increment_id either
+        }
+      } else {
+        throw error;
+      }
+    }
+
     const order = this.normalizeOrder(orderData);
 
     // Bulk fetch products for this order to limit API requests
@@ -109,6 +129,53 @@ export class MagentoClient {
     }
 
     return order;
+  }
+
+  async getDevOrderData(id: string): Promise<any> {
+    console.log(`[MagentoClient] Fetching raw dev data for order: ${id}`);
+    let rawOrder;
+    
+    try {
+      rawOrder = await this.fetch(`orders/${id}`);
+    } catch (error: any) {
+      if (error.message?.includes('404')) {
+        const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${id}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+        const data = await this.fetch(`orders?${searchCriteria}`);
+        if (data.items && data.items.length > 0) {
+          rawOrder = data.items[0];
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    const skus = rawOrder.items?.map((i: any) => i.sku) || [];
+    let rawProducts: any[] = [];
+    if (skus.length > 0) {
+      try {
+        rawProducts = await this.getProducts(skus);
+      } catch (e) {
+        console.error(`[MagentoClient] Failed to fetch raw products for dev:`, e);
+      }
+    }
+
+    return {
+      raw_order: rawOrder,
+      raw_products: rawProducts,
+      normalized_order: this.normalizeOrder(rawOrder)
+    };
+  }
+
+  async getAttributeOptions(attributeCode: string): Promise<any[]> {
+    try {
+      const data = await this.fetch(`products/attributes/${attributeCode}/options`);
+      return data || [];
+    } catch (e) {
+      console.error(`[MagentoClient] Failed to fetch options for ${attributeCode}:`, e);
+      return [];
+    }
   }
 
   private normalizeOrder(order: any): MagentoOrder {
