@@ -51,7 +51,7 @@ export default function Settings({
 }) {
   const [formData, setFormData] = useState<SawyerCredentials>(credentials);
   const [pendingImportData, setPendingImportData] = useState<string | null>(null);
-  const [devOrderId, setDevOrderId] = useState('');
+  const [devOrderId, setDevOrderId] = useState(() => localStorage.getItem('sawyer_last_search') || '');
   const [devOrderData, setDevOrderData] = useState<any>(null);
   const [isDevLoading, setIsDevLoading] = useState(false);
 
