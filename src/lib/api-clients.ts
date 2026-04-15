@@ -300,8 +300,12 @@ export class UPSClient {
     return this.isSandbox ? 'https://wwwcie.ups.com' : 'https://onlinetools.ups.com';
   }
 
+  private getProxyUrl() {
+    return this.proxyUrl ? (this.proxyUrl.endsWith('/') ? this.proxyUrl : `${this.proxyUrl}/`) : '';
+  }
+
   async getAccessToken(): Promise<string> {
-    const url = `${this.proxyUrl}${this.baseUrl}/security/v1/oauth/token`;
+    const url = `${this.getProxyUrl()}${this.baseUrl}/security/v1/oauth/token`;
     const auth = btoa(`${this.clientId}:${this.clientSecret}`);
     const response = await fetch(url, {
       method: 'POST',
@@ -320,7 +324,7 @@ export class UPSClient {
     console.log(`[UPSClient] Fetching rates`, params);
     const token = await this.getAccessToken();
     console.log(`[UPSClient] OAuth token obtained`);
-    const url = `${this.proxyUrl}${this.baseUrl}/api/rating/v1/shop`;
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/rating/v1/shop`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -337,7 +341,7 @@ export class UPSClient {
   async createShipment(params: any): Promise<any> {
     console.log(`[UPSClient] Creating shipment`, params);
     const token = await this.getAccessToken();
-    const url = `${this.proxyUrl}${this.baseUrl}/api/shipments/v1/ship`;
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/ship`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -360,8 +364,14 @@ export class FedExClient {
     return this.isSandbox ? 'https://apis-sandbox.fedex.com' : 'https://apis.fedex.com';
   }
 
+  private getProxyUrl() {
+    return this.proxyUrl ? (this.proxyUrl.endsWith('/') ? this.proxyUrl : `${this.proxyUrl}/`) : '';
+  }
+
   async getAccessToken(): Promise<string> {
-    const url = `${this.proxyUrl}${this.baseUrl}/oauth/token`;
+    const url = `${this.getProxyUrl()}${this.baseUrl}/oauth/token`;
+    console.log(`[FedExClient] Requesting token for Key: ${this.apiKey.substring(0, 4)}... from: ${url}`);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -373,15 +383,29 @@ export class FedExClient {
         client_secret: this.secretKey,
       }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[FedExClient] Token request failed (${response.status}):`, errorText);
+      throw new Error(`FedEx Auth Error: ${response.status} ${errorText}`);
+    }
+
     const data = await response.json();
-    return data.access_token;
+    if (!data.access_token) {
+      console.error(`[FedExClient] No access_token in response:`, data);
+      throw new Error('FedEx Auth Error: No access token returned');
+    }
+
+    return data.access_token.trim();
   }
 
   async getRates(params: any): Promise<any> {
-    console.log(`[FedExClient] Fetching rates`, params);
+    const rootAccount = params.accountNumber?.value;
+    const payorAccount = params.requestedShipment?.shippingChargesPayment?.payor?.responsibleParty?.accountNumber?.value;
+    console.log(`[FedExClient] Fetching rates. Root Account: ${rootAccount}, Payor Account: ${payorAccount}`);
+    
     const token = await this.getAccessToken();
-    console.log(`[FedExClient] OAuth token obtained`);
-    const url = `${this.proxyUrl}${this.baseUrl}/rate/v1/rates/quotes`;
+    const url = `${this.getProxyUrl()}${this.baseUrl}/rate/v1/rates/quotes`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -396,9 +420,12 @@ export class FedExClient {
   }
 
   async createShipment(params: any): Promise<any> {
-    console.log(`[FedExClient] Creating shipment`, params);
+    const rootAccount = params.accountNumber?.value;
+    const payorAccount = params.requestedShipment?.shippingChargesPayment?.payor?.responsibleParty?.accountNumber?.value;
+    console.log(`[FedExClient] Creating shipment. Root Account: ${rootAccount}, Payor Account: ${payorAccount}`);
+    
     const token = await this.getAccessToken();
-    const url = `${this.proxyUrl}${this.baseUrl}/ship/v1/shipments`;
+    const url = `${this.getProxyUrl()}${this.baseUrl}/ship/v1/shipments`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {

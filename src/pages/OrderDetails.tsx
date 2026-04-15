@@ -424,7 +424,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
 
           const fedexParams: any = {
-            accountNumber: { value: accountNumber },
+            accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber },
             requestedShipment: {
               shipper: {
                 address: {
@@ -462,6 +462,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               pickupType: credentials.general.fedexPickupType || "DROPOFF_AT_FEDEX_LOCATION",
               packagingType: "YOUR_PACKAGING",
               rateRequestType: ["ACCOUNT", "LIST"],
+              shippingChargesPayment: {
+                paymentType: "SENDER",
+                payor: {
+                  responsibleParty: {
+                    accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
+                  }
+                }
+              },
               requestedPackageLineItems: [{
                 weight: { units: "KG", value: weightVal },
                 dimensions: { length: Math.max(1, l), width: Math.max(1, w), height: Math.max(1, h), units: "CM" },
@@ -532,8 +540,15 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           
           if (fedexData?.errors && fedexData.errors.length > 0) {
             fedexData.errors.forEach((err: any) => {
+              let description = err.message || "Service type not allowed or invalid package combination.";
+              
+              if (err.code === 'ACCOUNT.NUMBER.MISMATCH' || err.code === 'RATE.ACCOUNTNUMBER.MISMATCH') {
+                const attemptedAccount = credentials.fedex.paymentAccountNumber || accountNumber;
+                description = `Account Mismatch: The API Key (starting with ${credentials.fedex.apiKey.substring(0, 4)}) is not authorized for account ${attemptedAccount}. Please ensure your 'Domestic/Global Account Number' matches the one in your FedEx Developer Portal for this API Key.`;
+              }
+
               toast.error(`FedEx Error: ${err.code}`, {
-                description: err.message || "Service type not allowed or invalid package combination.",
+                description: description,
                 duration: 10000,
               });
             });
@@ -788,7 +803,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
         const fedexParams: any = {
           labelResponseOptions: "URL_ONLY",
-          accountNumber: { value: accountNumber },
+          accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber },
           requestedShipment: {
             shipper: {
               contact: {
