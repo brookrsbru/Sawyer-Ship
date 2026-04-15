@@ -1,7 +1,7 @@
-import { HashRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { createHashRouter, RouterProvider, Routes, Route, Navigate, Link, Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { useSawyerStorage } from '@/src/hooks/use-sawyer-storage';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -96,7 +96,7 @@ function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: strin
   );
 }
 
-function Layout({ children, onLogout }: { children: React.ReactNode, onLogout: () => void }) {
+function Layout({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="min-h-screen bg-zinc-50 flex">
       {/* Sidebar */}
@@ -132,7 +132,7 @@ function Layout({ children, onLogout }: { children: React.ReactNode, onLogout: (
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         <div className="max-w-6xl mx-auto p-8">
-          {children}
+          <Outlet />
         </div>
       </main>
     </div>
@@ -179,27 +179,42 @@ export default function App() {
     );
   }
 
+  const router = useMemo(() => createHashRouter([
+    {
+      path: "/",
+      element: <Layout onLogout={logout} />,
+      children: [
+        {
+          index: true,
+          element: <Dashboard credentials={credentials} />,
+        },
+        {
+          path: "order/:id",
+          element: <OrderDetails credentials={credentials} />,
+        },
+        {
+          path: "settings",
+          element: (
+            <Settings 
+              credentials={credentials} 
+              onSave={save} 
+              onExport={exportData} 
+              onImport={importData} 
+            />
+          ),
+        },
+        {
+          path: "*",
+          element: <Navigate to="/" replace />,
+        },
+      ],
+    },
+  ]), [credentials, logout, save, exportData, importData]);
+
   return (
-    <Router>
-      <Layout onLogout={logout}>
-        <Routes>
-          <Route path="/" element={<Dashboard credentials={credentials} />} />
-          <Route path="/order/:id" element={<OrderDetails credentials={credentials} />} />
-          <Route 
-            path="/settings" 
-            element={
-              <Settings 
-                credentials={credentials} 
-                onSave={save} 
-                onExport={exportData} 
-                onImport={importData} 
-              />
-            } 
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+    <>
+      <RouterProvider router={router} />
       <Toaster position="top-right" richColors expand={true} />
-    </Router>
+    </>
   );
 }
