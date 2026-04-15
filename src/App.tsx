@@ -170,15 +170,6 @@ export default function App() {
     };
   }, [isLocked, credentials.general.autoLockMinutes, logout]);
 
-  if (isLocked) {
-    return (
-      <>
-        <LockScreen onUnlock={unlock} onReset={resetData} hasStoredData={hasStoredData} />
-        <Toaster position="top-right" richColors expand={true} />
-      </>
-    );
-  }
-
   const router = useMemo(() => createHashRouter([
     {
       path: "/",
@@ -210,6 +201,15 @@ export default function App() {
       ],
     },
   ]), [credentials, logout, save, exportData, importData]);
+
+  if (isLocked) {
+    return (
+      <>
+        <LockScreen onUnlock={unlock} onReset={resetData} hasStoredData={hasStoredData} />
+        <Toaster position="top-right" richColors expand={true} />
+      </>
+    );
+  }
 
   return (
     <>
