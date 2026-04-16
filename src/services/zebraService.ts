@@ -11,12 +11,16 @@ export interface ZebraPrinter {
 export class ZebraService {
   private static getBaseUrls(): string[] {
     const isHttps = window.location.protocol === 'https:';
-    // Always include both, as localhost fetch behavior varies by browser/OS
+    // Try all possible port and protocol combinations for localhost/127.0.0.1
     return [
       'https://localhost:9100', 
       'https://127.0.0.1:9100',
       'http://localhost:9101',
-      'http://127.0.0.1:9101'
+      'http://127.0.0.1:9101',
+      'http://localhost:9100',
+      'http://127.0.0.1:9100',
+      'https://localhost:9101',
+      'https://127.0.0.1:9101'
     ];
   }
 

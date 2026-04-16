@@ -1953,8 +1953,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                         <strong>If no popup appears:</strong><br />
                                         Open one of these links and click <strong>Advanced &#8594; Proceed</strong>:
                                         <div className="flex flex-wrap gap-2 mt-1">
-                                          <a href="https://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTPS Localhost</a>
-                                          <a href="http://localhost:9101/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTP Localhost</a>
+                                          <a href="https://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTPS 9100</a>
+                                          <a href="http://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTP 9100</a>
+                                          <a href="http://localhost:9101/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTP 9101</a>
                                         </div>
                                       </li>
                                       <li>Refresh this page after confirming the setup.</li>
