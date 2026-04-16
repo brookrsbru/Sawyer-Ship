@@ -7,13 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Info } from 'lucide-react';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { ZebraService } from '@/src/services/zebraService';
 import { toast } from 'sonner';
 
 export default function OrderDetails({ credentials }: { credentials: SawyerCredentials }) {
@@ -67,16 +66,6 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLabelViewerOpen, setIsLabelViewerOpen] = useState(false);
-
-  useEffect(() => {
-    if (isLabelViewerOpen && credentials.general.labelFormat === 'ZPL') {
-      ZebraService.checkStatus().then(setIsZebraAvailable);
-    }
-  }, [isLabelViewerOpen, credentials.general.labelFormat]);
-
-  const [rawZpl, setRawZpl] = useState<string | null>(null);
-  const [isZebraPrinting, setIsZebraPrinting] = useState(false);
-  const [isZebraAvailable, setIsZebraAvailable] = useState<boolean | null>(null);
 
   // Weight fields
   const [weightKg, setWeightKg] = useState('');
@@ -957,10 +946,6 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             console.log(`[OrderDetails] Creating blob from base64 label (${labelType})`);
             const blob = b64ToBlob(labelBase64, labelType);
             setLabelUrl(URL.createObjectURL(blob));
-            
-            if (credentials.general.labelFormat === 'ZPL') {
-              setRawZpl(atob(labelBase64));
-            }
           } catch (e) {
             console.error("[OrderDetails] Error creating label blob:", e);
             toast.error("Label generated but failed to display. You can still find it in your carrier portal.");
@@ -1925,75 +1910,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                               <div className="bg-white p-6 rounded-lg shadow-sm border max-w-md w-full text-center space-y-4">
                                 <Package className="w-12 h-12 mx-auto text-zinc-400" />
                                 <h3 className="font-bold text-lg">ZPL Label Generated</h3>
-                                {isZebraAvailable === false && (
-                                  <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm text-left space-y-2">
-                                    <div className="font-bold flex items-center gap-2">
-                                      <Info size={16} /> Connection Required
-                                    </div>
-                                    <p className="text-xs leading-relaxed">
-                                      To print directly from this secure (HTTPS) site, you must manually allow the Zebra connection:
-                                    </p>
-                                    <ol className="text-xs list-decimal pl-4 space-y-2">
-                                      <li>
-                                        <strong>Trigger Connection Request:</strong><br />
-                                        Click this button, then look for a popup on your computer (desktop/taskbar) asking to "Allow this site":
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm" 
-                                          className="mt-1 w-full border-amber-400 text-amber-900 bg-amber-100 hover:bg-amber-200"
-                                          onClick={() => {
-                                            ZebraService.triggerHandshake();
-                                            toast.info("Handshake request sent. Check your desktop for a Zebra popup.");
-                                          }}
-                                        >
-                                          Send Handshake Request
-                                        </Button>
-                                      </li>
-                                      <li>
-                                        <strong>If no popup appears:</strong><br />
-                                        Open one of these links and click <strong>Advanced &#8594; Proceed</strong>:
-                                        <div className="flex flex-wrap gap-2 mt-1">
-                                          <a href="http://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTP 9100</a>
-                                          <a href="https://localhost:9101/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTPS 9101</a>
-                                          <a href="http://localhost:9101/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTP 9101</a>
-                                        </div>
-                                      </li>
-                                      <li>Refresh this page after confirming the setup.</li>
-                                    </ol>
-                                    <p className="text-[10px] opacity-80 pt-1 border-t border-amber-200">
-                                      Ensure Zebra Browser Print is running on your computer.
-                                    </p>
-                                  </div>
-                                )}
                                 <p className="text-sm text-zinc-500">
                                   ZPL labels are raw printer commands and cannot be previewed directly in the browser. 
                                   Please use a ZPL-compatible printer or utility to print this label.
                                 </p>
                                 <Button variant="outline" className="w-full" onClick={() => window.open(labelUrl!, '_blank')}>
                                   Download ZPL File
-                                </Button>
-                                <Button 
-                                  className="w-full bg-zinc-900 text-white hover:bg-zinc-800" 
-                                  onClick={async () => {
-                                    if (!rawZpl) return;
-                                    setIsZebraPrinting(true);
-                                    try {
-                                      const success = await ZebraService.printZPL(rawZpl);
-                                      if (success) {
-                                        toast.success("Sent to Zebra printer");
-                                      } else {
-                                        toast.error("Failed to send to Zebra printer. Is Browser Print running?");
-                                      }
-                                    } catch (err) {
-                                      toast.error("Zebra Print Error: " + (err instanceof Error ? err.message : String(err)));
-                                    } finally {
-                                      setIsZebraPrinting(false);
-                                    }
-                                  }}
-                                  disabled={isZebraPrinting}
-                                >
-                                  {isZebraPrinting ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Printer className="w-4 h-4 mr-2" />}
-                                  Print to Zebra Printer
                                 </Button>
                               </div>
                             </div>
