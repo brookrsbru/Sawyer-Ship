@@ -738,6 +738,10 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             },
             LabelSpecification: {
               LabelImageFormat: { Code: credentials.general.labelFormat || "PDF" },
+              LabelStockSize: {
+                Height: "6",
+                Width: "4"
+              },
               HTTPUserAgent: "Mozilla/4.5"
             }
           }
@@ -851,7 +855,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             labelSpecification: {
               labelFormatType: "COMMON2D",
               imageType: credentials.general.labelFormat || "PDF",
-              labelStockType: "PAPER_4X6"
+              labelStockType: "PAPER_4X6",
+              labelPrintingOrientation: "TOP_EDGE_OF_TEXT_FIRST"
             },
             requestedPackageLineItems: [{
               weight: { units: "KG", value: weightVal },
@@ -1923,7 +1928,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       <div className="flex-1 bg-zinc-100 relative">
                         {credentials.general.labelFormat === 'PDF' ? (
                           <iframe 
-                            src={`${labelUrl}#toolbar=1&navpanes=0&scrollbar=1`} 
+                            src={`${labelUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`} 
                             className="w-full h-full border-none"
                             title="Shipping Label"
                           />
@@ -1943,8 +1948,20 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           </div>
                         )}
                       </div>
-                      <DialogFooter className="p-4 border-t bg-zinc-50">
-                        <Button variant="ghost" onClick={() => setIsLabelViewerOpen(false)}>Close</Button>
+                      <DialogFooter className="p-4 border-t bg-zinc-50 flex justify-between items-center">
+                        <div className="flex gap-2">
+                          <Button variant="ghost" onClick={() => setIsLabelViewerOpen(false)}>Close</Button>
+                          {labelUrl && (
+                            <Button variant="outline" onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = labelUrl;
+                              link.download = `label-${trackingNumber || 'shipment'}.pdf`;
+                              link.click();
+                            }}>
+                              Download PDF
+                            </Button>
+                          )}
+                        </div>
                         {credentials.general.labelFormat === 'PDF' && (
                           <Button onClick={() => {
                             const iframe = document.querySelector('iframe[title="Shipping Label"]') as HTMLIFrameElement;
