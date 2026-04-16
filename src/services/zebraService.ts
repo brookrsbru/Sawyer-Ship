@@ -12,16 +12,16 @@ export class ZebraService {
   private static getBaseUrls(): string[] {
     const isHttps = window.location.protocol === 'https:';
     if (isHttps) {
-      // REQUIREMENT 3: If origin is https, prioritize https://localhost:9101
+      // User confirmed http://localhost:9100 is working
       return [
+        'http://localhost:9100',
+        'http://127.0.0.1:9100',
         'https://localhost:9101',
         'https://127.0.0.1:9101',
         'https://localhost:9100',
         'https://127.0.0.1:9100',
         'http://localhost:9101',
-        'http://127.0.0.1:9101',
-        'http://localhost:9100',
-        'http://127.0.0.1:9100'
+        'http://127.0.0.1:9101'
       ];
     }
     return [
@@ -49,7 +49,7 @@ export class ZebraService {
         const response = await fetch(`${baseUrl}${path}`, {
           ...options,
           headers: {
-            'Content-Type': 'text/plain',
+            'Content-Type': 'application/json',
             // REQUIREMENT 1 & 4: Include Private Network Access headers
             'Access-Control-Request-Private-Network': 'true',
             ...(options.headers || {})
