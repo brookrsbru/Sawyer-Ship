@@ -656,6 +656,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     try {
       let tracking = "";
       let labelBase64 = "";
+      let labelUrl = ""; // Local variable to track URL before state update
       let labelType = "application/pdf";
 
       const weightVal = parseFloat(weightKg || "0") + (parseFloat(weightG || "0") / 1000);
@@ -899,14 +900,20 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         }
 
         const fedexData = await fedex.createShipment(fedexParams);
+        labelType = credentials.general.labelFormat === 'ZPL' ? 'text/plain' : 'application/pdf';
+        
         if (fedexData.output?.transactionShipments?.[0]) {
           const ship = fedexData.output.transactionShipments[0];
           tracking = ship.masterTrackingNumber;
-          // FedEx often returns a URL or base64 depending on labelResponseOptions
-          if (ship.pieceResponses?.[0]?.packageDocuments?.[0]?.encodedLabel) {
-            labelBase64 = ship.pieceResponses[0].packageDocuments[0].encodedLabel;
-          } else if (ship.pieceResponses?.[0]?.packageDocuments?.[0]?.url) {
-            setLabelUrl(ship.pieceResponses[0].packageDocuments[0].url);
+          
+          // Check multiple locations for the label
+          const doc = ship.pieceResponses?.[0]?.packageDocuments?.[0] || ship.shipmentDocuments?.[0];
+          
+          if (doc?.encodedLabel) {
+            labelBase64 = doc.encodedLabel;
+          } else if (doc?.url) {
+            labelUrl = doc.url;
+            setLabelUrl(doc.url);
           }
         } else {
           const error = fedexData.errors?.[0] || { message: "FedEx Shipment Failed" };
@@ -916,13 +923,45 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
       if (tracking) {
         setTrackingNumber(tracking);
+        
+        // Helper to convert base64 to blob
+        const b64ToBlob = (b64: string, type: string) => {
+          const binStr = atob(b64);
+          const len = binStr.length;
+          const arr = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            arr[i] = binStr.charCodeAt(i);
+          }
+          return new Blob([arr], { type });
+        };
+
         if (labelBase64) {
           try {
-            const blob = await (await fetch(`data:${labelType};base64,${labelBase64}`)).blob();
+            console.log(`[OrderDetails] Creating blob from base64 label (${labelType})`);
+            const blob = b64ToBlob(labelBase64, labelType);
             setLabelUrl(URL.createObjectURL(blob));
           } catch (e) {
             console.error("[OrderDetails] Error creating label blob:", e);
             toast.error("Label generated but failed to display. You can still find it in your carrier portal.");
+          }
+        } else if (labelUrl) {
+          // If we only have a URL and it's FedEx (which often blocks iframes), try to fetch it via proxy
+          if (selectedRate.carrier === 'FedEx') {
+            try {
+              console.log(`[OrderDetails] Fetching FedEx label via proxy: ${labelUrl}`);
+              const cleanProxyUrl = credentials.general.proxyUrl ? (credentials.general.proxyUrl.endsWith('/') ? credentials.general.proxyUrl : `${credentials.general.proxyUrl}/`) : '';
+              const response = await fetch(`${cleanProxyUrl}${labelUrl}`);
+              if (response.ok) {
+                const blob = await response.blob();
+                // Ensure the blob has the correct type
+                const typedBlob = new Blob([blob], { type: labelType });
+                setLabelUrl(URL.createObjectURL(typedBlob));
+                console.log(`[OrderDetails] FedEx label fetched and blob created`);
+              }
+            } catch (e) {
+              console.error("[OrderDetails] Failed to fetch FedEx label via proxy:", e);
+              // Fallback to the original URL (though it might be blocked by X-Frame-Options)
+            }
           }
         }
 
