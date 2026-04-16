@@ -47,17 +47,18 @@ export class ZebraService {
     const urls = this.getBaseUrls();
     for (const baseUrl of urls) {
       try {
+        // Log attempt for user debugging in console
+        console.log(`[ZebraService] Trying ${baseUrl}${path}...`);
+        
         const response = await fetch(`${baseUrl}${path}`, {
           ...options,
-          headers: {
-            'Accept': 'application/json',
-            ...(options.headers || {})
-          },
-          // Chrome PNA flags
-          // @ts-ignore
-          targetAddressSpace: 'local',
+          // Removed targetAddressSpace as it can sometimes block in certain browser configs
         });
-        if (response.ok) return response;
+        
+        if (response.ok) {
+          console.log(`[ZebraService] Success on ${baseUrl}${path}`);
+          return response;
+        }
       } catch (err) {
         // Silent
       }
