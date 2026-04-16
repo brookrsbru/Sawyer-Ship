@@ -12,8 +12,13 @@ export class ZebraService {
   private static getBaseUrls(): string[] {
     const isHttps = window.location.protocol === 'https:';
     if (isHttps) {
-      // Chrome's Private Network Access policy sometimes treats localhost better than 127.0.0.1
-      return ['https://localhost:9100', 'https://127.0.0.1:9100'];
+      // Try HTTPS first, but fallback to HTTP as many browsers allow http://localhost from https
+      return [
+        'https://localhost:9100', 
+        'https://127.0.0.1:9100',
+        'http://localhost:9101',
+        'http://127.0.0.1:9101'
+      ];
     }
     return ['http://localhost:9101', 'http://127.0.0.1:9101'];
   }

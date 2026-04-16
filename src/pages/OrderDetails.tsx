@@ -1936,9 +1936,10 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                     <ol className="text-xs list-decimal pl-4 space-y-2">
                                       <li>
                                         Open one of these links and click <strong>Advanced &#8594; Proceed</strong>:
-                                        <div className="flex gap-2 mt-1">
-                                          <a href="https://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">Try localhost</a>
-                                          <a href="https://127.0.0.1:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">Try 127.0.0.1</a>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                          <a href="https://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTPS Localhost</a>
+                                          <a href="https://127.0.0.1:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTPS 127.0.0.1</a>
+                                          <a href="http://localhost:9101/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTP Localhost</a>
                                         </div>
                                       </li>
                                       <li>Refresh this page after you see the JSON response in the other tab.</li>
