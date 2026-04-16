@@ -168,7 +168,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     if (!isNaN(num) && num >= 1000 && mode === 'both') {
       const extraKg = Math.floor(num / 1000);
       const remainingG = num % 1000;
-      setWeightKg((parseFloat(weightKg || '0') + extraKg).toString());
+      setWeightKg(extraKg.toString());
       setWeightG(isNaN(remainingG) ? '0' : Math.round(remainingG).toString());
     }
   };
