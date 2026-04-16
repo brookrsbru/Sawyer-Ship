@@ -241,6 +241,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
         console.log(`[OrderDetails] Loaded details for ${products.length} products`);
         setProductDetails(details);
+      } catch (e) {
+        console.error("[OrderDetails] Failed to fetch product details:", e);
       } finally {
         setIsFetchingProducts(false);
       }
