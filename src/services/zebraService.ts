@@ -9,28 +9,58 @@ export interface ZebraPrinter {
 }
 
 export class ZebraService {
-  private static BASE_URL = 'http://localhost:9101';
+  private static getBaseUrls(): string[] {
+    const isHttps = window.location.protocol === 'https:';
+    if (isHttps) {
+      // Chrome's Private Network Access policy sometimes treats localhost better than 127.0.0.1
+      return ['https://localhost:9100', 'https://127.0.0.1:9100'];
+    }
+    return ['http://localhost:9101', 'http://127.0.0.1:9101'];
+  }
+
+  private static async tryFetch(path: string, options: RequestInit = {}): Promise<Response | null> {
+    const urls = this.getBaseUrls();
+    for (const baseUrl of urls) {
+      try {
+        const response = await fetch(`${baseUrl}${path}`, {
+          ...options,
+          headers: {
+            'Accept': 'application/json',
+            ...(options.headers || {})
+          },
+          // Private Network Access (PNA) flags for Chrome
+          // @ts-ignore
+          targetAddressSpace: 'local',
+        });
+        if (response.ok) return response;
+      } catch (err) {
+        // Silent unless debugging
+      }
+    }
+    return null;
+  }
 
   static async getAvailablePrinters(): Promise<ZebraPrinter[]> {
     try {
-      const response = await fetch(`${this.BASE_URL}/available`, {
-        method: 'GET',
-      });
-      if (!response.ok) throw new Error('Failed to fetch printers');
+      // Try GET first, then POST which some Zebra versions use to trigger handshakes
+      let response = await this.tryFetch('/available', { method: 'GET' });
+      if (!response) {
+        response = await this.tryFetch('/available', { method: 'POST' });
+      }
+      
+      if (!response) return [];
       const data = await response.json();
       return data.printer || [];
     } catch (error) {
-      console.error('Zebra Browser Print not found or error:', error);
+      console.error('Zebra Browser Print error:', error);
       return [];
     }
   }
 
   static async getDefaultPrinter(): Promise<ZebraPrinter | null> {
     try {
-      const response = await fetch(`${this.BASE_URL}/default`, {
-        method: 'GET',
-      });
-      if (!response.ok) return null;
+      const response = await this.tryFetch('/default', { method: 'GET' });
+      if (!response) return null;
       return await response.json();
     } catch (error) {
       return null;
@@ -57,7 +87,7 @@ export class ZebraService {
         throw new Error('No Zebra printer found');
       }
 
-      const response = await fetch(`${this.BASE_URL}/write`, {
+      const response = await this.tryFetch('/write', {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain',
@@ -68,7 +98,7 @@ export class ZebraService {
         })
       });
 
-      return response.ok;
+      return !!response?.ok;
     } catch (error) {
       console.error('Zebra Print Error:', error);
       throw error;
@@ -76,11 +106,7 @@ export class ZebraService {
   }
 
   static async checkStatus(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.BASE_URL}/available`, { method: 'GET' });
-      return response.ok;
-    } catch {
-      return false;
-    }
+    const response = await this.tryFetch('/available', { method: 'GET' });
+    return !!response?.ok;
   }
 }

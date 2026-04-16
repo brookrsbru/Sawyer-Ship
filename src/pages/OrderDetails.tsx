@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw } from 'lucide-react';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
@@ -1926,9 +1926,27 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                 <Package className="w-12 h-12 mx-auto text-zinc-400" />
                                 <h3 className="font-bold text-lg">ZPL Label Generated</h3>
                                 {isZebraAvailable === false && (
-                                  <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs text-left">
-                                    <strong>Zebra Browser Print not detected.</strong><br />
-                                    Please ensure Zebra Browser Print is running on your computer to print directly.
+                                  <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm text-left space-y-2">
+                                    <div className="font-bold flex items-center gap-2">
+                                      <Info size={16} /> Connection Required
+                                    </div>
+                                    <p className="text-xs leading-relaxed">
+                                      To print directly from this secure (HTTPS) site, you must manually allow the Zebra connection:
+                                    </p>
+                                    <ol className="text-xs list-decimal pl-4 space-y-2">
+                                      <li>
+                                        Open one of these links and click <strong>Advanced &#8594; Proceed</strong>:
+                                        <div className="flex gap-2 mt-1">
+                                          <a href="https://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">Try localhost</a>
+                                          <a href="https://127.0.0.1:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">Try 127.0.0.1</a>
+                                        </div>
+                                      </li>
+                                      <li>Refresh this page after you see the JSON response in the other tab.</li>
+                                      <li>Look for the <strong>Allow this site?</strong> popup from the Zebra app on your computer.</li>
+                                    </ol>
+                                    <p className="text-[10px] opacity-80 pt-1 border-t border-amber-200">
+                                      Ensure Zebra Browser Print is running on your computer.
+                                    </p>
                                   </div>
                                 )}
                                 <p className="text-sm text-zinc-500">
