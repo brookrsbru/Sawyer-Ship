@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
+import { ZebraService } from '@/src/services/zebraService';
 import { toast } from 'sonner';
 
 export default function OrderDetails({ credentials }: { credentials: SawyerCredentials }) {
@@ -66,6 +67,16 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLabelViewerOpen, setIsLabelViewerOpen] = useState(false);
+
+  useEffect(() => {
+    if (isLabelViewerOpen && credentials.general.labelFormat === 'ZPL') {
+      ZebraService.checkStatus().then(setIsZebraAvailable);
+    }
+  }, [isLabelViewerOpen, credentials.general.labelFormat]);
+
+  const [rawZpl, setRawZpl] = useState<string | null>(null);
+  const [isZebraPrinting, setIsZebraPrinting] = useState(false);
+  const [isZebraAvailable, setIsZebraAvailable] = useState<boolean | null>(null);
 
   // Weight fields
   const [weightKg, setWeightKg] = useState('');
@@ -946,6 +957,10 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             console.log(`[OrderDetails] Creating blob from base64 label (${labelType})`);
             const blob = b64ToBlob(labelBase64, labelType);
             setLabelUrl(URL.createObjectURL(blob));
+            
+            if (credentials.general.labelFormat === 'ZPL') {
+              setRawZpl(atob(labelBase64));
+            }
           } catch (e) {
             console.error("[OrderDetails] Error creating label blob:", e);
             toast.error("Label generated but failed to display. You can still find it in your carrier portal.");
@@ -1910,12 +1925,41 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                               <div className="bg-white p-6 rounded-lg shadow-sm border max-w-md w-full text-center space-y-4">
                                 <Package className="w-12 h-12 mx-auto text-zinc-400" />
                                 <h3 className="font-bold text-lg">ZPL Label Generated</h3>
+                                {isZebraAvailable === false && (
+                                  <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs text-left">
+                                    <strong>Zebra Browser Print not detected.</strong><br />
+                                    Please ensure Zebra Browser Print is running on your computer to print directly.
+                                  </div>
+                                )}
                                 <p className="text-sm text-zinc-500">
                                   ZPL labels are raw printer commands and cannot be previewed directly in the browser. 
                                   Please use a ZPL-compatible printer or utility to print this label.
                                 </p>
                                 <Button variant="outline" className="w-full" onClick={() => window.open(labelUrl!, '_blank')}>
                                   Download ZPL File
+                                </Button>
+                                <Button 
+                                  className="w-full bg-zinc-900 text-white hover:bg-zinc-800" 
+                                  onClick={async () => {
+                                    if (!rawZpl) return;
+                                    setIsZebraPrinting(true);
+                                    try {
+                                      const success = await ZebraService.printZPL(rawZpl);
+                                      if (success) {
+                                        toast.success("Sent to Zebra printer");
+                                      } else {
+                                        toast.error("Failed to send to Zebra printer. Is Browser Print running?");
+                                      }
+                                    } catch (err) {
+                                      toast.error("Zebra Print Error: " + (err instanceof Error ? err.message : String(err)));
+                                    } finally {
+                                      setIsZebraPrinting(false);
+                                    }
+                                  }}
+                                  disabled={isZebraPrinting}
+                                >
+                                  {isZebraPrinting ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Printer className="w-4 h-4 mr-2" />}
+                                  Print to Zebra Printer
                                 </Button>
                               </div>
                             </div>
