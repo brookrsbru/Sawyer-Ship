@@ -855,8 +855,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             labelSpecification: {
               labelFormatType: "COMMON2D",
               imageType: credentials.general.labelFormat || "PDF",
-              labelStockType: "PAPER_4X6",
-              labelPrintingOrientation: "TOP_EDGE_OF_TEXT_FIRST"
+              labelStockType: "STOCK_4X6",
+              labelPrintingOrientation: "TOP_EDGE_OF_TEXT_FIRST",
+              labelRotation: "NONE"
             },
             requestedPackageLineItems: [{
               weight: { units: "KG", value: weightVal },
@@ -1928,7 +1929,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       <div className="flex-1 bg-zinc-100 relative">
                         {credentials.general.labelFormat === 'PDF' ? (
                           <iframe 
-                            src={`${labelUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`} 
+                            src={`${labelUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`} 
                             className="w-full h-full border-none"
                             title="Shipping Label"
                           />
