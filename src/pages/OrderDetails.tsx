@@ -1245,7 +1245,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     </Button>
                   }
                 />
-                <DialogContent>
+                <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>Edit Customer & Shipping Info</DialogTitle>
                   </DialogHeader>
@@ -1855,6 +1855,101 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 Get Live Rates
               </Button>
 
+              <div className="space-y-4">
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  disabled={!selectedRate || isShipping || !!labelUrl}
+                  onClick={handleCreateLabel}
+                >
+                  {isShipping ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                  Create Label
+                </Button>
+
+                {labelUrl && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm space-y-2">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        <span className="font-bold">
+                          {credentials.general.markAsShipped && id !== 'manual' 
+                            ? "Label generated & Magento Updated!" 
+                            : "Label generated successfully!"}
+                        </span>
+                      </div>
+                      {trackingNumber && (
+                        <div className="pl-8 font-mono text-xs">
+                          Tracking: {trackingNumber}
+                        </div>
+                      )}
+                    </div>
+                    <Dialog open={isLabelViewerOpen} onOpenChange={setIsLabelViewerOpen}>
+                      <DialogTrigger
+                        render={
+                          <Button variant="outline" className="w-full gap-2">
+                            <Printer size={18} /> View & Print Label
+                          </Button>
+                        }
+                      />
+                      <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] flex flex-col p-0 overflow-hidden">
+                        <DialogHeader className="p-4 border-b">
+                          <DialogTitle className="flex items-center gap-2">
+                            <Printer className="w-5 h-5" /> Shipping Label Viewer
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="flex-1 bg-zinc-100 relative">
+                          {credentials.general.labelFormat === 'PDF' ? (
+                            <iframe 
+                              src={`${labelUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`} 
+                              className="w-full h-full border-none"
+                              title="Shipping Label"
+                            />
+                          ) : (
+                            <div className="p-8 flex items-center justify-center h-full">
+                              <div className="bg-white p-6 rounded-lg shadow-sm border max-w-md w-full text-center space-y-4">
+                                <Package className="w-12 h-12 mx-auto text-zinc-400" />
+                                <h3 className="font-bold text-lg">ZPL Label Generated</h3>
+                                <p className="text-sm text-zinc-500">
+                                  ZPL labels are raw printer commands and cannot be previewed directly in the browser. 
+                                  Please use a ZPL-compatible printer or utility to print this label.
+                                </p>
+                                <Button variant="outline" className="w-full" onClick={() => window.open(labelUrl!, '_blank')}>
+                                  Download ZPL File
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <DialogFooter className="p-4 border-t bg-zinc-50 flex justify-between items-center">
+                          <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => setIsLabelViewerOpen(false)}>Close</Button>
+                            {labelUrl && (
+                              <Button variant="outline" onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = labelUrl;
+                                link.download = `label-${trackingNumber || 'shipment'}.pdf`;
+                                link.click();
+                              }}>
+                                Download PDF
+                              </Button>
+                            )}
+                          </div>
+                          {credentials.general.labelFormat === 'PDF' && (
+                            <Button onClick={() => {
+                              const iframe = document.querySelector('iframe[title="Shipping Label"]') as HTMLIFrameElement;
+                              if (iframe && iframe.contentWindow) {
+                                iframe.contentWindow.print();
+                              }
+                            }}>
+                              Print Label
+                            </Button>
+                          )}
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                )}
+              </div>
+
               {rates.length > 0 && (
                 <div className="space-y-3">
                   <Separator />
@@ -1883,99 +1978,6 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       </div>
                     ))}
                   </div>
-
-                  <Button 
-                    className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white"
-                    disabled={!selectedRate || isShipping || !!labelUrl}
-                    onClick={handleCreateLabel}
-                  >
-                    {isShipping ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                    Create Label
-                  </Button>
-                </div>
-              )}
-
-              {labelUrl && (
-                <div className="space-y-4 pt-4">
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm space-y-2">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
-                      <span className="font-bold">
-                        {credentials.general.markAsShipped && id !== 'manual' 
-                          ? "Label generated & Magento Updated!" 
-                          : "Label generated successfully!"}
-                      </span>
-                    </div>
-                    {trackingNumber && (
-                      <div className="pl-8 font-mono text-xs">
-                        Tracking: {trackingNumber}
-                      </div>
-                    )}
-                  </div>
-                  <Dialog open={isLabelViewerOpen} onOpenChange={setIsLabelViewerOpen}>
-                    <DialogTrigger
-                      render={
-                        <Button variant="outline" className="w-full gap-2">
-                          <Printer size={18} /> View & Print Label
-                        </Button>
-                      }
-                    />
-                    <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
-                      <DialogHeader className="p-4 border-b">
-                        <DialogTitle className="flex items-center gap-2">
-                          <Printer className="w-5 h-5" /> Shipping Label Viewer
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="flex-1 bg-zinc-100 relative">
-                        {credentials.general.labelFormat === 'PDF' ? (
-                          <iframe 
-                            src={`${labelUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`} 
-                            className="w-full h-full border-none"
-                            title="Shipping Label"
-                          />
-                        ) : (
-                          <div className="p-8 flex items-center justify-center h-full">
-                            <div className="bg-white p-6 rounded-lg shadow-sm border max-w-md w-full text-center space-y-4">
-                              <Package className="w-12 h-12 mx-auto text-zinc-400" />
-                              <h3 className="font-bold text-lg">ZPL Label Generated</h3>
-                              <p className="text-sm text-zinc-500">
-                                ZPL labels are raw printer commands and cannot be previewed directly in the browser. 
-                                Please use a ZPL-compatible printer or utility to print this label.
-                              </p>
-                              <Button variant="outline" className="w-full" onClick={() => window.open(labelUrl!, '_blank')}>
-                                Download ZPL File
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <DialogFooter className="p-4 border-t bg-zinc-50 flex justify-between items-center">
-                        <div className="flex gap-2">
-                          <Button variant="ghost" onClick={() => setIsLabelViewerOpen(false)}>Close</Button>
-                          {labelUrl && (
-                            <Button variant="outline" onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = labelUrl;
-                              link.download = `label-${trackingNumber || 'shipment'}.pdf`;
-                              link.click();
-                            }}>
-                              Download PDF
-                            </Button>
-                          )}
-                        </div>
-                        {credentials.general.labelFormat === 'PDF' && (
-                          <Button onClick={() => {
-                            const iframe = document.querySelector('iframe[title="Shipping Label"]') as HTMLIFrameElement;
-                            if (iframe && iframe.contentWindow) {
-                              iframe.contentWindow.print();
-                            }
-                          }}>
-                            Print Label
-                          </Button>
-                        )}
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
                 </div>
               )}
             </CardContent>
