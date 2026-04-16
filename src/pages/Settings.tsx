@@ -1368,9 +1368,6 @@ export default function Settings({
                   <p>
                     <strong>CORS Proxy:</strong> Since this app runs in your browser, some APIs might block requests. Using a proxy helps bypass these restrictions.
                   </p>
-                  <p>
-                    <strong>ZPL Direct Print:</strong> To print ZPL labels directly from this secure site, you must use <strong>Zebra Browser Print</strong>. If you are on HTTPS, you must manually visit <a href="https://127.0.0.1:9100/available" target="_blank" className="underline text-amber-400">this link</a> once and "Accept Risk" (Advanced &#8594; Proceed) to allow the secure connection to your printer.
-                  </p>
                 </CardContent>
               </Card>
             </section>

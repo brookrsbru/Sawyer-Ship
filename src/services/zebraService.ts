@@ -9,16 +9,11 @@ export interface ZebraPrinter {
 }
 
 export class ZebraService {
-  private static getBaseUrl() {
-    const isHttps = window.location.protocol === 'https:';
-    // Use 127.0.0.1 for better compatibility, use 9100 for HTTPS, 9101 for HTTP
-    return isHttps ? 'https://127.0.0.1:9100' : 'http://127.0.0.1:9101';
-  }
+  private static BASE_URL = 'http://localhost:9101';
 
   static async getAvailablePrinters(): Promise<ZebraPrinter[]> {
     try {
-      const baseUrl = this.getBaseUrl();
-      const response = await fetch(`${baseUrl}/available`, {
+      const response = await fetch(`${this.BASE_URL}/available`, {
         method: 'GET',
       });
       if (!response.ok) throw new Error('Failed to fetch printers');
@@ -32,8 +27,7 @@ export class ZebraService {
 
   static async getDefaultPrinter(): Promise<ZebraPrinter | null> {
     try {
-      const baseUrl = this.getBaseUrl();
-      const response = await fetch(`${baseUrl}/default`, {
+      const response = await fetch(`${this.BASE_URL}/default`, {
         method: 'GET',
       });
       if (!response.ok) return null;
@@ -45,7 +39,6 @@ export class ZebraService {
 
   static async printZPL(zplData: string, printerUid?: string): Promise<boolean> {
     try {
-      const baseUrl = this.getBaseUrl();
       // If no printer UID provided, try to get default
       let targetUid = printerUid;
       if (!targetUid) {
@@ -64,7 +57,7 @@ export class ZebraService {
         throw new Error('No Zebra printer found');
       }
 
-      const response = await fetch(`${baseUrl}/write`, {
+      const response = await fetch(`${this.BASE_URL}/write`, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain',
@@ -84,8 +77,7 @@ export class ZebraService {
 
   static async checkStatus(): Promise<boolean> {
     try {
-      const baseUrl = this.getBaseUrl();
-      const response = await fetch(`${baseUrl}/available`, { method: 'GET' });
+      const response = await fetch(`${this.BASE_URL}/available`, { method: 'GET' });
       return response.ok;
     } catch {
       return false;
