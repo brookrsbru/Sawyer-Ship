@@ -804,7 +804,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         );
 
         const fedexParams: any = {
-          labelResponseOptions: "URL_ONLY",
+          labelResponseOptions: "LABEL",
           accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber },
           requestedShipment: {
             shipper: {
@@ -917,28 +917,41 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       if (tracking) {
         setTrackingNumber(tracking);
         if (labelBase64) {
-          const blob = await (await fetch(`data:${labelType};base64,${labelBase64}`)).blob();
-          setLabelUrl(URL.createObjectURL(blob));
+          try {
+            const blob = await (await fetch(`data:${labelType};base64,${labelBase64}`)).blob();
+            setLabelUrl(URL.createObjectURL(blob));
+          } catch (e) {
+            console.error("[OrderDetails] Error creating label blob:", e);
+            toast.error("Label generated but failed to display. You can still find it in your carrier portal.");
+          }
         }
 
         // 2. Update Magento Shipment Status (if enabled)
         if (credentials.general.markAsShipped && id !== 'manual') {
-          console.log(`[OrderDetails] Updating Magento shipment status...`);
-          const client = new MagentoClient(
-            credentials.magento.url,
-            credentials.magento.token,
-            credentials.general.proxyUrl
-          );
+          try {
+            console.log(`[OrderDetails] Updating Magento shipment status...`);
+            const client = new MagentoClient(
+              credentials.magento.url,
+              credentials.magento.token,
+              credentials.general.proxyUrl
+            );
 
-          const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
-          const carrierCode = selectedRate.carrier.toLowerCase();
+            const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
+            const carrierCode = selectedRate.carrier.toLowerCase();
 
-          await client.createShipment(order.entity_id, [{
-            track_number: tracking,
-            title: carrierTitle,
-            carrier_code: carrierCode
-          }]);
-          console.log(`[OrderDetails] Magento updated successfully`);
+            await client.createShipment(order.entity_id, [{
+              track_number: tracking,
+              title: carrierTitle,
+              carrier_code: carrierCode
+            }]);
+            console.log(`[OrderDetails] Magento updated successfully`);
+          } catch (magentoError: any) {
+            console.error(`[OrderDetails] Magento update failed:`, magentoError);
+            toast.warning("Label created, but failed to update Magento status. You may need to mark it as shipped manually.", {
+              description: magentoError.message,
+              duration: 8000
+            });
+          }
         }
         
         toast.success(`Label created! Tracking: ${tracking}`);
