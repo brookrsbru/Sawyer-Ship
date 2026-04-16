@@ -142,32 +142,34 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   }, [weightKg, weightG]);
 
   const handleWeightKgChange = (val: string) => {
+    setWeightKg(val);
+  };
+
+  const handleWeightKgBlur = () => {
     const mode = credentials.general.weightDisplayMode || 'both';
-    const num = parseFloat(val);
+    const num = parseFloat(weightKg);
     if (!isNaN(num) && mode === 'both') {
       const kg = Math.floor(num);
       const remainder = num - kg;
       if (remainder > 0) {
         setWeightKg(kg.toString());
         setWeightG((Math.round(remainder * 1000)).toString());
-      } else {
-        setWeightKg(val);
       }
-    } else {
-      setWeightKg(val);
     }
   };
 
   const handleWeightGChange = (val: string) => {
+    setWeightG(val);
+  };
+
+  const handleWeightGBlur = () => {
     const mode = credentials.general.weightDisplayMode || 'both';
-    const num = parseFloat(val);
+    const num = parseFloat(weightG);
     if (!isNaN(num) && num >= 1000 && mode === 'both') {
       const extraKg = Math.floor(num / 1000);
       const remainingG = num % 1000;
-      setWeightKg((parseInt(weightKg || '0') + extraKg).toString());
-      setWeightG(remainingG.toString());
-    } else {
-      setWeightG(val);
+      setWeightKg((parseFloat(weightKg || '0') + extraKg).toString());
+      setWeightG(isNaN(remainingG) ? '0' : Math.round(remainingG).toString());
     }
   };
 
@@ -1743,6 +1745,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           placeholder="0"
                           value={weightKg} 
                           onChange={(e) => handleWeightKgChange(e.target.value)}
+                          onBlur={handleWeightKgBlur}
                         />
                       </div>
                     )}
@@ -1755,6 +1758,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           placeholder="0"
                           value={weightG} 
                           onChange={(e) => handleWeightGChange(e.target.value)}
+                          onBlur={handleWeightGBlur}
                         />
                       </div>
                     )}
