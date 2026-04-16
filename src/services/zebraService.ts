@@ -11,16 +11,32 @@ export interface ZebraPrinter {
 export class ZebraService {
   private static getBaseUrls(): string[] {
     const isHttps = window.location.protocol === 'https:';
-    if (isHttps) {
-      // Try HTTPS first, but fallback to HTTP as many browsers allow http://localhost from https
-      return [
-        'https://localhost:9100', 
-        'https://127.0.0.1:9100',
-        'http://localhost:9101',
-        'http://127.0.0.1:9101'
-      ];
+    // Always include both, as localhost fetch behavior varies by browser/OS
+    return [
+      'https://localhost:9100', 
+      'https://127.0.0.1:9100',
+      'http://localhost:9101',
+      'http://127.0.0.1:9101'
+    ];
+  }
+
+  /**
+   * Triggers the Zebra Browser Print "Allow this site?" popup on the user's desktop.
+   * Uses no-cors POST to bypass most browser mixed-content/PNA blocks for the initial handshake.
+   */
+  static async triggerHandshake() {
+    const urls = this.getBaseUrls();
+    for (const baseUrl of urls) {
+      try {
+        await fetch(`${baseUrl}/available`, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify({})
+        });
+      } catch (e) {
+        // Expected failures for some protocols
+      }
     }
-    return ['http://localhost:9101', 'http://127.0.0.1:9101'];
   }
 
   private static async tryFetch(path: string, options: RequestInit = {}): Promise<Response | null> {
@@ -33,13 +49,13 @@ export class ZebraService {
             'Accept': 'application/json',
             ...(options.headers || {})
           },
-          // Private Network Access (PNA) flags for Chrome
+          // Chrome PNA flags
           // @ts-ignore
           targetAddressSpace: 'local',
         });
         if (response.ok) return response;
       } catch (err) {
-        // Silent unless debugging
+        // Silent
       }
     }
     return null;

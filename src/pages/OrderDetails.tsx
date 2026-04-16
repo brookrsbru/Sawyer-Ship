@@ -1935,15 +1935,29 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                     </p>
                                     <ol className="text-xs list-decimal pl-4 space-y-2">
                                       <li>
+                                        <strong>Trigger Connection Request:</strong><br />
+                                        Click this button, then look for a popup on your computer (desktop/taskbar) asking to "Allow this site":
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm" 
+                                          className="mt-1 w-full border-amber-400 text-amber-900 bg-amber-100 hover:bg-amber-200"
+                                          onClick={() => {
+                                            ZebraService.triggerHandshake();
+                                            toast.info("Handshake request sent. Check your desktop for a Zebra popup.");
+                                          }}
+                                        >
+                                          Send Handshake Request
+                                        </Button>
+                                      </li>
+                                      <li>
+                                        <strong>If no popup appears:</strong><br />
                                         Open one of these links and click <strong>Advanced &#8594; Proceed</strong>:
                                         <div className="flex flex-wrap gap-2 mt-1">
                                           <a href="https://localhost:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTPS Localhost</a>
-                                          <a href="https://127.0.0.1:9100/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTPS 127.0.0.1</a>
                                           <a href="http://localhost:9101/available" target="_blank" className="px-2 py-1 bg-white border border-amber-300 rounded hover:bg-zinc-50 underline font-bold">HTTP Localhost</a>
                                         </div>
                                       </li>
-                                      <li>Refresh this page after you see the JSON response in the other tab.</li>
-                                      <li>Look for the <strong>Allow this site?</strong> popup from the Zebra app on your computer.</li>
+                                      <li>Refresh this page after confirming the setup.</li>
                                     </ol>
                                     <p className="text-[10px] opacity-80 pt-1 border-t border-amber-200">
                                       Ensure Zebra Browser Print is running on your computer.
