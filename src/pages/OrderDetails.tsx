@@ -739,8 +739,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             LabelSpecification: {
               LabelImageFormat: { Code: credentials.general.labelFormat || "PDF" },
               LabelStockSize: {
-                Height: "6",
-                Width: "4"
+                Height: credentials.general.labelSize === '8.5x11' ? "11" : "6",
+                Width: credentials.general.labelSize === '8.5x11' ? "8.5" : "4"
               },
               HTTPUserAgent: "Mozilla/4.5"
             }
@@ -855,7 +855,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             labelSpecification: {
               labelFormatType: "COMMON2D",
               imageType: credentials.general.labelFormat === 'ZPL' ? 'ZPLII' : (credentials.general.labelFormat || "PDF"),
-              labelStockType: "STOCK_4X6",
+              labelStockType: credentials.general.labelSize === '8.5x11' ? "PAPER_LETTER" : "STOCK_4X6",
               labelPrintingOrientation: "TOP_EDGE_OF_TEXT_FIRST",
               labelRotation: "NONE"
             },

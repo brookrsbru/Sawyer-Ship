@@ -304,6 +304,24 @@ export default function Settings({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="label-size">Label Size</Label>
+                      <Select 
+                        value={formData.general.labelSize}
+                        onValueChange={(v: '4x6' | '8.5x11') => setFormData({ ...formData, general: { ...formData.general, labelSize: v } })}
+                      >
+                        <SelectTrigger id="label-size">
+                          <SelectValue placeholder="Select size">
+                            {formData.general.labelSize === '4x6' ? '4" x 6" (Thermal)' : '8.5" x 11" (Letter)'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="4x6">4" x 6" (Thermal)</SelectItem>
+                          <SelectItem value="8.5x11">8.5" x 11" (Letter)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="weight-display">Weight Display Mode</Label>
                       <Select 

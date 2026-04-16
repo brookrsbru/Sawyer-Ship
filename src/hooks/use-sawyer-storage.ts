@@ -63,6 +63,7 @@ export interface SawyerCredentials {
     upsPickupType: string;
     fedexPickupType: string;
     weightDisplayMode: 'both' | 'grams' | 'kg';
+    labelSize: '4x6' | '8.5x11';
   };
   shippingDefaults: ShippingDefaults;
   countryDefaults: Record<string, ShippingDefaults>;
@@ -125,7 +126,8 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     markAsShipped: true,
     upsPickupType: '01',
     fedexPickupType: 'DROPOFF_AT_FEDEX_LOCATION',
-    weightDisplayMode: 'both'
+    weightDisplayMode: 'both',
+    labelSize: '4x6'
   },
   shippingDefaults: DEFAULT_SHIPPING_DEFAULTS,
   countryDefaults: {}
