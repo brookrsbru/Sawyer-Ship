@@ -668,7 +668,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         const ups = new UPSClient(
           credentials.ups.clientId,
           credentials.ups.clientSecret,
-          isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber,
+          (isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
         );
@@ -693,7 +693,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 Name: credentials.general.originContactName,
                 AttentionName: credentials.general.originContactName,
                 Phone: { Number: credentials.general.originPhone },
-                ShipperNumber: isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber,
+                ShipperNumber: (isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber,
                 Address: {
                   AddressLine: [credentials.general.originStreet1, credentials.general.originStreet2].filter(Boolean),
                   City: credentials.general.originCity,
@@ -717,7 +717,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               PaymentInformation: {
                 ShipmentCharge: {
                   Type: "01",
-                  BillShipper: { AccountNumber: isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber }
+                  BillShipper: { AccountNumber: (isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber }
                 }
               },
               Service: { Code: serviceCode },
@@ -1856,14 +1856,16 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               </Button>
 
               <div className="space-y-4">
-                <Button 
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  disabled={!selectedRate || isShipping || !!labelUrl}
-                  onClick={handleCreateLabel}
-                >
-                  {isShipping ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                  Create Label
-                </Button>
+                {selectedRate && !labelUrl && (
+                  <Button 
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    disabled={isShipping}
+                    onClick={handleCreateLabel}
+                  >
+                    {isShipping ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                    Create Label
+                  </Button>
+                )}
 
                 {labelUrl && (
                   <div className="space-y-4">
@@ -1950,7 +1952,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 )}
               </div>
 
-              {rates.length > 0 && (
+              {rates.length > 0 && !labelUrl && !isShipping && (
                 <div className="space-y-3">
                   <Separator />
                   <p className="text-xs font-bold uppercase text-zinc-500 tracking-widest">Available Services</p>

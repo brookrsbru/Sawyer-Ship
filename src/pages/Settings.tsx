@@ -968,24 +968,35 @@ export default function Settings({
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      {formData.ups.isSandbox ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-domestic-account">Domestic Account Number</Label>
+                            <Input 
+                              id="ups-domestic-account" 
+                              value={formData.ups.domesticAccountNumber}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, domesticAccountNumber: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-global-account">Global Account Number</Label>
+                            <Input 
+                              id="ups-global-account" 
+                              value={formData.ups.globalAccountNumber}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, globalAccountNumber: e.target.value } })}
+                            />
+                          </div>
+                        </div>
+                      ) : (
                         <div className="space-y-2">
-                          <Label htmlFor="ups-domestic-account">Domestic Account Number</Label>
+                          <Label htmlFor="ups-account">Account Number</Label>
                           <Input 
-                            id="ups-domestic-account" 
-                            value={formData.ups.domesticAccountNumber}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, domesticAccountNumber: e.target.value } })}
+                            id="ups-account" 
+                            value={formData.ups.accountNumber}
+                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, accountNumber: e.target.value } })}
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-global-account">Global Account Number</Label>
-                          <Input 
-                            id="ups-global-account" 
-                            value={formData.ups.globalAccountNumber}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, globalAccountNumber: e.target.value } })}
-                          />
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
 
@@ -1097,34 +1108,47 @@ export default function Settings({
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      {formData.fedex.isSandbox ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="fedex-domestic-account">Domestic Account Number</Label>
+                              <Input 
+                                id="fedex-domestic-account" 
+                                value={formData.fedex.domesticAccountNumber}
+                                onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, domesticAccountNumber: e.target.value } })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="fedex-global-account">Global Account Number</Label>
+                              <Input 
+                                id="fedex-global-account" 
+                                value={formData.fedex.globalAccountNumber}
+                                onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, globalAccountNumber: e.target.value } })}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-payment-account">Payment Account Number (Payor)</Label>
+                            <Input 
+                              id="fedex-payment-account" 
+                              placeholder="Used for shipping charges payment"
+                              value={formData.fedex.paymentAccountNumber}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, paymentAccountNumber: e.target.value } })}
+                            />
+                            <p className="text-[10px] text-zinc-500">The account number that will be listed as the payor for shipping charges.</p>
+                          </div>
+                        </>
+                      ) : (
                         <div className="space-y-2">
-                          <Label htmlFor="fedex-domestic-account">Domestic Account Number</Label>
+                          <Label htmlFor="fedex-account">Account Number</Label>
                           <Input 
-                            id="fedex-domestic-account" 
-                            value={formData.fedex.domesticAccountNumber}
-                            onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, domesticAccountNumber: e.target.value } })}
+                            id="fedex-account" 
+                            value={formData.fedex.accountNumber}
+                            onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, accountNumber: e.target.value } })}
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="fedex-global-account">Global Account Number</Label>
-                          <Input 
-                            id="fedex-global-account" 
-                            value={formData.fedex.globalAccountNumber}
-                            onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, globalAccountNumber: e.target.value } })}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="fedex-payment-account">Payment Account Number (Payor)</Label>
-                        <Input 
-                          id="fedex-payment-account" 
-                          placeholder="Used for shipping charges payment"
-                          value={formData.fedex.paymentAccountNumber}
-                          onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, paymentAccountNumber: e.target.value } })}
-                        />
-                        <p className="text-[10px] text-zinc-500">The account number that will be listed as the payor for shipping charges.</p>
-                      </div>
+                      )}
                     </div>
                   </div>
 
