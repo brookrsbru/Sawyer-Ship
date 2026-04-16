@@ -854,7 +854,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             },
             labelSpecification: {
               labelFormatType: "COMMON2D",
-              imageType: credentials.general.labelFormat || "PDF",
+              imageType: credentials.general.labelFormat === 'ZPL' ? 'ZPLII' : (credentials.general.labelFormat || "PDF"),
               labelStockType: "STOCK_4X6",
               labelPrintingOrientation: "TOP_EDGE_OF_TEXT_FIRST",
               labelRotation: "NONE"
@@ -1920,7 +1920,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         </Button>
                       }
                     />
-                    <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
+                    <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
                       <DialogHeader className="p-4 border-b">
                         <DialogTitle className="flex items-center gap-2">
                           <Printer className="w-5 h-5" /> Shipping Label Viewer
