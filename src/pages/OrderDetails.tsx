@@ -1718,7 +1718,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                                 </Button>
                               }
                             />
-                            <DialogContent>
+                            <DialogContent className="max-w-[630px]">
                               <DialogHeader>
                                 <DialogTitle>Edit Item: {item.name}</DialogTitle>
                               </DialogHeader>
@@ -2075,7 +2075,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           </Button>
                         }
                       />
-                      <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] flex flex-col p-0 overflow-hidden">
+                      <DialogContent className="max-w-[630px] w-full h-[95vh] flex flex-col p-0 overflow-hidden">
                         <DialogHeader className="p-4 border-b">
                           <DialogTitle className="flex items-center gap-2">
                             <Printer className="w-5 h-5" /> Shipping Label Viewer
