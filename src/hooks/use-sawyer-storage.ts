@@ -19,6 +19,23 @@ export interface ShippingDefaults {
   overwriteBillDutiesTo: boolean;
 }
 
+export interface AddressBookCustomer {
+  id: string;
+  reference: string;
+  fullname?: string;
+  company?: string;
+  email?: string;
+  telephone?: string;
+  street1: string;
+  street2?: string;
+  street3?: string;
+  city: string;
+  region?: string;
+  postcode: string;
+  country: string;
+  residential: boolean;
+}
+
 export interface SawyerCredentials {
   magento: {
     url: string;
@@ -69,6 +86,7 @@ export interface SawyerCredentials {
   };
   shippingDefaults: ShippingDefaults;
   countryDefaults: Record<string, ShippingDefaults>;
+  addressBook: AddressBookCustomer[];
 }
 
 const DEFAULT_SHIPPING_DEFAULTS: ShippingDefaults = {
@@ -134,7 +152,8 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     labelSize: '4x6'
   },
   shippingDefaults: DEFAULT_SHIPPING_DEFAULTS,
-  countryDefaults: {}
+  countryDefaults: {},
+  addressBook: []
 };
 
 export function useSawyerStorage() {
@@ -162,7 +181,8 @@ export function useSawyerStorage() {
         ups: { ...DEFAULT_CREDENTIALS.ups, ...(parsed.ups || {}) },
         fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
         general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) },
-        shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) }
+        shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) },
+        addressBook: parsed.addressBook || []
       };
       
       setCredentials(merged);

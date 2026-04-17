@@ -20,6 +20,7 @@ import {
 import Dashboard from '@/src/pages/Dashboard';
 import Settings from '@/src/pages/Settings';
 import OrderDetails from '@/src/pages/OrderDetails';
+import AddressBook from '@/src/pages/AddressBook';
 
 function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: string) => Promise<boolean>, onReset: () => void, hasStoredData: boolean }) {
   const [password, setPassword] = useState('');
@@ -115,6 +116,10 @@ function Layout({ onLogout }: { onLogout: () => void }) {
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
           </Link>
+          <Link to="/address-book" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
+            <Package size={20} />
+            <span>Address Book</span>
+          </Link>
           <Link to="/settings" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
             <SettingsIcon size={20} />
             <span>Settings</span>
@@ -178,6 +183,10 @@ export default function App() {
         {
           index: true,
           element: <Dashboard credentials={credentials} />,
+        },
+        {
+          path: "address-book",
+          element: <AddressBook credentials={credentials} onSave={save} />,
         },
         {
           path: "order/:id",
