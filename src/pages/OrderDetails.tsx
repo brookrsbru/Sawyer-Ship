@@ -1121,6 +1121,11 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         }
         
         toast.success(`Label created! Tracking: ${tracking}`);
+
+        // Auto-open label viewer if enabled
+        if (credentials.general.autoOpenLabel) {
+          setIsLabelViewerOpen(true);
+        }
       }
     } catch (error: any) {
       console.error(`[OrderDetails] Error in handleCreateLabel:`, error);
@@ -1361,14 +1366,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               </div>
               <Separator orientation="vertical" className="h-6" />
               <div className="flex-1 flex items-center justify-between">
-                <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
+                <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
                 <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                   <ValidationIcon status={isFedExValid} />
                 </div>
               </div>
               <Separator orientation="vertical" className="h-6" />
               <div className="flex-1 flex items-center justify-between">
-                <span className="text-xs font-bold text-zinc-600">UPS Valid</span>
+                <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
                 <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                   <ValidationIcon status={isUPSValid} />
                 </div>
@@ -2180,6 +2185,18 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                               src={`${labelUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`} 
                               className="w-full h-full border-none"
                               title="Shipping Label"
+                              onLoad={(e) => {
+                                if (credentials.general.autoPrintLabel) {
+                                  const iframe = e.currentTarget;
+                                  if (iframe && iframe.contentWindow) {
+                                    try {
+                                      iframe.contentWindow.print();
+                                    } catch (err) {
+                                      console.error("[OrderDetails] Auto-print failed:", err);
+                                    }
+                                  }
+                                }
+                              }}
                             />
                           ) : (
                             <div className="p-8 flex items-center justify-center h-full">

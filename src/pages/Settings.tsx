@@ -283,6 +283,57 @@ export default function Settings({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Auto-Open Shipping Label</Label>
+                        <p className="text-[10px] text-zinc-500">Automatically open the label viewer after generation.</p>
+                      </div>
+                      <Select 
+                        value={formData.general.autoOpenLabel ? "yes" : "no"}
+                        onValueChange={(v) => setFormData({ 
+                          ...formData, 
+                          general: { 
+                            ...formData.general, 
+                            autoOpenLabel: v === "yes",
+                            autoPrintLabel: v === "yes" ? formData.general.autoPrintLabel : false 
+                          } 
+                        })}
+                      >
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue placeholder="Select">
+                            {formData.general.autoOpenLabel ? "Yes" : "No"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {formData.general.autoOpenLabel && (
+                      <div className="flex items-center justify-between animate-in fade-in slide-in-from-left-2 duration-300">
+                        <div className="space-y-0.5">
+                          <Label>Auto-Trigger Print Menu</Label>
+                          <p className="text-[10px] text-zinc-500">Automatically open the system print dialog when the label opens.</p>
+                        </div>
+                        <Select 
+                          value={formData.general.autoPrintLabel ? "yes" : "no"}
+                          onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, autoPrintLabel: v === "yes" } })}
+                        >
+                          <SelectTrigger className="w-[100px]">
+                            <SelectValue placeholder="Select">
+                              {formData.general.autoPrintLabel ? "Yes" : "No"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="yes">Yes</SelectItem>
+                            <SelectItem value="no">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 </div>
 

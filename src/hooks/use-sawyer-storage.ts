@@ -60,6 +60,8 @@ export interface SawyerCredentials {
     originEmail: string;
     alwaysShowDuties: boolean;
     markAsShipped: boolean;
+    autoOpenLabel: boolean;
+    autoPrintLabel: boolean;
     upsPickupType: string;
     fedexPickupType: string;
     weightDisplayMode: 'both' | 'grams' | 'kg';
@@ -124,6 +126,8 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     originEmail: '',
     alwaysShowDuties: false,
     markAsShipped: true,
+    autoOpenLabel: false,
+    autoPrintLabel: false,
     upsPickupType: '01',
     fedexPickupType: 'DROPOFF_AT_FEDEX_LOCATION',
     weightDisplayMode: 'both',
