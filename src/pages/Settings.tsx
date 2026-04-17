@@ -253,6 +253,14 @@ export default function Settings({
                         </Button>
                       </div>
                       <p className="text-xs text-zinc-500">Required for browser-based API calls. Click the button to request temporary access if using Heroku CORS Anywhere.</p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="h-auto p-0 text-xs text-zinc-500 hover:text-zinc-900"
+                        onClick={() => setFormData({ ...formData, general: { ...formData.general, proxyUrl: 'https://cors-anywhere.herokuapp.com/' } })}
+                      >
+                        Reset to demo server (Heroku)
+                      </Button>
                     </div>
 
                     <div className="flex items-center justify-between">
