@@ -2214,9 +2214,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                             </div>
                           )}
                         </div>
-                        <DialogFooter className="p-8 border-t bg-zinc-50 flex justify-center sm:justify-center items-center">
+                        <DialogFooter className="py-6 px-8 border-t bg-zinc-50 flex justify-center sm:justify-center items-center">
                           {credentials.general.labelFormat === 'PDF' && (
-                            <Button size="lg" className="px-8" onClick={() => {
+                            <Button size="lg" className="px-8 shadow-sm" onClick={() => {
                               const iframe = document.querySelector('iframe[title="Shipping Label"]') as HTMLIFrameElement;
                               if (iframe && iframe.contentWindow) {
                                 iframe.contentWindow.print();
