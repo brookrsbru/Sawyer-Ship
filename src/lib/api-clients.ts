@@ -438,4 +438,21 @@ export class FedExClient {
     console.log(`[FedExClient] Shipment response:`, data);
     return data;
   }
+
+  async validateAddress(params: any): Promise<any> {
+    console.log(`[FedExClient] Validating address`, params);
+    const token = await this.getAccessToken();
+    const url = `${this.getProxyUrl()}${this.baseUrl}/address/v1/addresses/resolve`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    const data = await response.json();
+    console.log(`[FedExClient] Address validation response:`, data);
+    return data;
+  }
 }

@@ -67,6 +67,11 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLabelViewerOpen, setIsLabelViewerOpen] = useState(false);
 
+  // Address Validation State
+  const [isFedExValid, setIsFedExValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
+  const [isValidatingFedEx, setIsValidatingFedEx] = useState(false);
+  const [isUPSValid, setIsUPSValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
+
   // Weight fields
   const [weightKg, setWeightKg] = useState('');
   const [weightG, setWeightG] = useState('');
@@ -171,6 +176,95 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       setWeightKg(extraKg.toString());
       setWeightG(isNaN(remainingG) ? '0' : Math.round(remainingG).toString());
     }
+  };
+
+  const handleValidateAddress = async () => {
+    if (!order?.shipping_address || !credentials.fedex.enabled) return;
+    
+    setIsValidatingFedEx(true);
+    setIsFedExValid('loading');
+    
+    try {
+      const isDomestic = order.shipping_address.country_id === credentials.general.originCountry;
+      const accountNumber = isDomestic 
+        ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
+        : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
+
+      const fedex = new FedExClient(
+        credentials.fedex.apiKey,
+        credentials.fedex.secretKey,
+        accountNumber,
+        credentials.fedex.isSandbox,
+        credentials.general.proxyUrl
+      );
+
+      const params = {
+        addressesToValidate: [
+          {
+            address: {
+              streetLines: order.shipping_address.street.filter(Boolean),
+              city: order.shipping_address.city,
+              stateOrProvinceCode: order.shipping_address.region,
+              postalCode: order.shipping_address.postcode,
+              countryCode: getCarrierCountryCode(order.shipping_address.country_id)
+            }
+          }
+        ]
+      };
+
+      const result = await fedex.validateAddress(params);
+      const addressResult = result?.output?.resolvedAddresses?.[0];
+      
+      if (addressResult && addressResult.classification !== 'UNDETERMINED' && !addressResult.attributes?.Resolved) {
+         // Some rudimentary check or based on state
+      }
+
+      // FedEx resolve API returns results. If it found a match, it's usually valid.
+      // Typical check is addressResult.attributes.Resolved === "true" or similar.
+      // Let's check status.
+      const isValid = addressResult && (addressResult.customerMessage?.toLowerCase().includes('success') || (addressResult.attributes && Object.keys(addressResult.attributes).length > 0));
+      
+      // More specifically, if addressResult.attributes.Resolved is true or similar.
+      // For now, let's look at alerts.
+      const hasAlerts = addressResult?.alerts?.some((a: any) => a.alertType === 'FAILURE' || a.alertType === 'ERROR');
+      
+      if (addressResult && !hasAlerts) {
+        setIsFedExValid('valid');
+      } else {
+        setIsFedExValid('invalid');
+      }
+    } catch (e) {
+      console.error("[FedEx Address Validation] Error:", e);
+      setIsFedExValid('invalid');
+    } finally {
+      setIsValidatingFedEx(false);
+    }
+  };
+
+  // Trigger validation when relevant address fields change in manual mode
+  useEffect(() => {
+    if (id === 'manual' && order?.shipping_address) {
+      const addr = order.shipping_address;
+      if (addr.street.some(s => s.length > 5) && addr.city && addr.postcode && addr.country_id) {
+        const timer = setTimeout(() => {
+          handleValidateAddress();
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [
+    order?.shipping_address?.street,
+    order?.shipping_address?.city,
+    order?.shipping_address?.region,
+    order?.shipping_address?.postcode,
+    order?.shipping_address?.country_id
+  ]);
+
+  const ValidationIcon = ({ status }: { status: 'none' | 'loading' | 'valid' | 'invalid' }) => {
+    if (status === 'loading') return <Loader2 className="animate-spin w-4 h-4 text-zinc-400" />;
+    if (status === 'valid') return <CheckCircle2 className="w-4 h-4 text-green-600" />;
+    if (status === 'invalid') return <X className="w-4 h-4 text-red-600" />;
+    return <span className="text-zinc-400 font-bold">-</span>;
   };
 
   const clearPackageDetails = () => {
@@ -1197,6 +1291,23 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 </Select>
               </div>
             </div>
+
+            <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg">
+              <div className="flex-1 flex items-center justify-between">
+                <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
+                <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                  <ValidationIcon status={isFedExValid} />
+                </div>
+              </div>
+              <Separator orientation="vertical" className="h-6" />
+              <div className="flex-1 flex items-center justify-between">
+                <span className="text-xs font-bold text-zinc-600">UPS Valid</span>
+                <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                  <ValidationIcon status={isUPSValid} />
+                </div>
+              </div>
+            </div>
+
             <Button 
               className="w-full bg-zinc-900 hover:bg-zinc-800" 
               disabled={!isComplete}
