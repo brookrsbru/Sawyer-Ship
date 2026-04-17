@@ -2214,22 +2214,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                             </div>
                           )}
                         </div>
-                        <DialogFooter className="p-4 border-t bg-zinc-50 flex justify-between items-center">
-                          <div className="flex gap-2">
-                            <Button variant="ghost" onClick={() => setIsLabelViewerOpen(false)}>Close</Button>
-                            {labelUrl && (
-                              <Button variant="outline" onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = labelUrl;
-                                link.download = `label-${trackingNumber || 'shipment'}.pdf`;
-                                link.click();
-                              }}>
-                                Download PDF
-                              </Button>
-                            )}
-                          </div>
+                        <DialogFooter className="p-8 border-t bg-zinc-50 flex justify-center sm:justify-center items-center">
                           {credentials.general.labelFormat === 'PDF' && (
-                            <Button onClick={() => {
+                            <Button size="lg" className="px-8" onClick={() => {
                               const iframe = document.querySelector('iframe[title="Shipping Label"]') as HTMLIFrameElement;
                               if (iframe && iframe.contentWindow) {
                                 iframe.contentWindow.print();
