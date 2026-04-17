@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Package, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Lock, Book, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink, Package } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -117,7 +117,7 @@ function Layout({ onLogout }: { onLogout: () => void }) {
             <span>Dashboard</span>
           </Link>
           <Link to="/address-book" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
-            <Package size={20} />
+            <Book size={20} />
             <span>Address Book</span>
           </Link>
           <Link to="/settings" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">

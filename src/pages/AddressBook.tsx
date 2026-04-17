@@ -251,7 +251,44 @@ export default function AddressBook({
           <h1 className="text-3xl font-bold text-zinc-900">Address Book</h1>
           <p className="text-zinc-500">Manage customers and shipping contacts.</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <div className="flex items-center gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger 
+              render={
+                <Button 
+                  variant="outline" 
+                  disabled={credentials.addressBook.length === 0}
+                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-2"
+                >
+                  <Trash2 size={18} />
+                  Clear Book
+                </Button>
+              }
+            />
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear Address Book?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will PERMANENTLY delete all {credentials.addressBook.length} contacts in your address book. 
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel variant="outline" size="default">Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={async () => {
+                    await onSave({ ...credentials, addressBook: [] });
+                    toast.success("Address book cleared.");
+                  }} 
+                  className="bg-red-600 hover:bg-red-700 text-white border-none"
+                >
+                  Yes, Clear All Contacts
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger 
             render={
               <Button className="bg-zinc-900 hover:bg-zinc-800 gap-2 shadow-lg">
@@ -397,7 +434,8 @@ export default function AddressBook({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </header>
+      </div>
+    </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Results */}
