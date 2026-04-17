@@ -1130,15 +1130,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const isManual = id === 'manual';
   if (isManual && !isManualReady) {
     const isComplete = !!(
-      order.customer_firstname && 
-      order.customer_lastname && 
+      (order.customer_firstname || order.customer_lastname) && 
       order.shipping_address?.street?.[0] && 
       order.shipping_address?.city && 
       order.shipping_address?.postcode
     );
 
     return (
-      <div className="max-w-2xl mx-auto space-y-8">
+      <div className="max-w-[630px] mx-auto space-y-8">
         <header className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft size={20} />
@@ -1373,7 +1372,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     </Button>
                   }
                 />
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-[630px]">
                   <DialogHeader>
                     <DialogTitle>Edit Customer & Shipping Info</DialogTitle>
                   </DialogHeader>
@@ -1409,22 +1408,24 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input 
-                        value={order.customer_email} 
-                        onChange={(e) => setOrder({...order, customer_email: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Telephone</Label>
-                      <Input 
-                        value={order.shipping_address?.telephone || ''} 
-                        onChange={(e) => setOrder({
-                          ...order, 
-                          shipping_address: { ...order.shipping_address!, telephone: e.target.value }
-                        })}
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <Input 
+                          value={order.customer_email} 
+                          onChange={(e) => setOrder({...order, customer_email: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Telephone</Label>
+                        <Input 
+                          value={order.shipping_address?.telephone || ''} 
+                          onChange={(e) => setOrder({
+                            ...order, 
+                            shipping_address: { ...order.shipping_address!, telephone: e.target.value }
+                          })}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="flex justify-between">
@@ -1442,37 +1443,39 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         }}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label className="flex justify-between">
-                        Address Line 2
-                        {(order.shipping_address?.street?.[1]?.length || 0) > 35 && (
-                          <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
-                        )}
-                      </Label>
-                      <Input 
-                        value={order.shipping_address?.street?.[1] || ''} 
-                        onChange={(e) => {
-                          const street = [...(order.shipping_address?.street || [])];
-                          street[1] = e.target.value;
-                          setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex justify-between">
-                        Address Line 3
-                        {(order.shipping_address?.street?.[2]?.length || 0) > 35 && (
-                          <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
-                        )}
-                      </Label>
-                      <Input 
-                        value={order.shipping_address?.street?.[2] || ''} 
-                        onChange={(e) => {
-                          const street = [...(order.shipping_address?.street || [])];
-                          street[2] = e.target.value;
-                          setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
-                        }}
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex justify-between">
+                          Address Line 2
+                          {(order.shipping_address?.street?.[1]?.length || 0) > 35 && (
+                            <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                          )}
+                        </Label>
+                        <Input 
+                          value={order.shipping_address?.street?.[1] || ''} 
+                          onChange={(e) => {
+                            const street = [...(order.shipping_address?.street || [])];
+                            street[1] = e.target.value;
+                            setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex justify-between">
+                          Address Line 3
+                          {(order.shipping_address?.street?.[2]?.length || 0) > 35 && (
+                            <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                          )}
+                        </Label>
+                        <Input 
+                          value={order.shipping_address?.street?.[2] || ''} 
+                          onChange={(e) => {
+                            const street = [...(order.shipping_address?.street || [])];
+                            street[2] = e.target.value;
+                            setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                          }}
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">

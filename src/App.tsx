@@ -131,7 +131,7 @@ function Layout({ onLogout }: { onLogout: () => void }) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto p-8">
+        <div className="max-w-7xl mx-auto p-8">
           <Outlet />
         </div>
       </main>
