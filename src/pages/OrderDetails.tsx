@@ -1289,8 +1289,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 />
               </div>
             </div>
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-5 space-y-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>Postcode <span className="text-red-500">*</span></Label>
                 <Input 
                   value={order.shipping_address?.postcode || ''} 
@@ -1300,33 +1300,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   })}
                 />
               </div>
-              <div className="col-span-2 space-y-2 relative">
-                <Label className="invisible select-none pointer-events-none">Status</Label>
-                <Button
-                  type="button"
-                  variant={order.shipping_address?.is_residential ? "default" : "outline"}
-                  size="sm"
-                  className={`h-8 w-full text-[10px] font-bold uppercase tracking-wider transition-all rounded-lg ${
-                    order.shipping_address?.is_residential 
-                      ? "bg-zinc-900 text-white shadow-inner" 
-                      : "bg-zinc-100 text-zinc-500 border-zinc-200"
-                  }`}
-                  onClick={() => setOrder({
-                    ...order,
-                    shipping_address: { ...order.shipping_address!, is_residential: !order.shipping_address?.is_residential }
-                  })}
-                >
-                  {order.shipping_address?.is_residential ? 'Residential' : 'Business'}
-                </Button>
-                {recommendedResidential !== null && order.shipping_address?.is_residential !== recommendedResidential && (
-                  <div className="absolute top-full mt-1 left-0 right-0 flex justify-center">
-                    <p className="text-[9px] text-zinc-400 whitespace-nowrap italic leading-none">
-                      Re-eval suggested
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="col-span-5 space-y-2">
+              <div className="space-y-2">
                 <Label>Country <span className="text-red-500">*</span></Label>
                 <Select 
                   value={order.shipping_address?.country_id}
@@ -1349,7 +1323,33 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               </div>
             </div>
 
-            <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg">
+            <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg items-center h-[58px]">
+              <div className="flex-1 flex items-center relative">
+                <Button
+                  type="button"
+                  variant={order.shipping_address?.is_residential ? "default" : "outline"}
+                  size="sm"
+                  className={`h-7 w-full text-[9px] font-bold uppercase tracking-wider transition-all rounded-md ${
+                    order.shipping_address?.is_residential 
+                      ? "bg-zinc-900 text-white shadow-inner" 
+                      : "bg-white text-zinc-500 border-zinc-200"
+                  }`}
+                  onClick={() => setOrder({
+                    ...order,
+                    shipping_address: { ...order.shipping_address!, is_residential: !order.shipping_address?.is_residential }
+                  })}
+                >
+                  {order.shipping_address?.is_residential ? 'Residential' : 'Business'}
+                </Button>
+                {recommendedResidential !== null && order.shipping_address?.is_residential !== recommendedResidential && (
+                  <div className="absolute top-[110%] left-0 right-0 flex justify-center">
+                    <p className="text-[9px] text-zinc-400 whitespace-nowrap italic leading-none">
+                      Changed From Suggested
+                    </p>
+                  </div>
+                )}
+              </div>
+              <Separator orientation="vertical" className="h-6" />
               <div className="flex-1 flex items-center justify-between">
                 <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
                 <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
@@ -1576,7 +1576,26 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       </div>
                     </div>
 
-                    <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg mt-4">
+                    <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg mt-4 items-center h-[58px]">
+                      <div className="flex-1 flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant={order.shipping_address?.is_residential ? "default" : "outline"}
+                          size="sm"
+                          className={`h-7 w-full text-[9px] font-bold uppercase tracking-wider transition-all rounded-md ${
+                            order.shipping_address?.is_residential 
+                              ? "bg-zinc-900 text-white shadow-inner" 
+                              : "bg-white text-zinc-500 border-zinc-200"
+                          }`}
+                          onClick={() => setOrder({
+                            ...order,
+                            shipping_address: { ...order.shipping_address!, is_residential: !order.shipping_address?.is_residential }
+                          })}
+                        >
+                          {order.shipping_address?.is_residential ? 'Residential' : 'Business'}
+                        </Button>
+                      </div>
+                      <Separator orientation="vertical" className="h-6" />
                       <div className="flex-1 flex items-center justify-between">
                         <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
                         <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
@@ -1617,7 +1636,26 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 </p>
               </div>
 
-              <div className="col-span-2 flex gap-4 p-4 bg-zinc-50 border rounded-lg">
+              <div className="col-span-2 flex gap-4 p-4 bg-zinc-50 border rounded-lg items-center h-[58px]">
+                <div className="flex-1 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={order.shipping_address?.is_residential ? "default" : "outline"}
+                    size="sm"
+                    className={`h-7 w-full text-[9px] font-bold uppercase tracking-wider transition-all rounded-md ${
+                      order.shipping_address?.is_residential 
+                        ? "bg-zinc-900 text-white shadow-inner" 
+                        : "bg-white text-zinc-500 border-zinc-200"
+                    }`}
+                    onClick={() => setOrder({
+                      ...order,
+                      shipping_address: { ...order.shipping_address!, is_residential: !order.shipping_address?.is_residential }
+                    })}
+                  >
+                    {order.shipping_address?.is_residential ? 'Residential' : 'Business'}
+                  </Button>
+                </div>
+                <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
                   <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
