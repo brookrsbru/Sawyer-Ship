@@ -1300,24 +1300,30 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   })}
                 />
               </div>
-              <div className="col-span-2 flex flex-col justify-end pb-2 relative">
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    id="is_residential"
-                    className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
-                    checked={order.shipping_address?.is_residential || false}
-                    onChange={(e) => setOrder({
-                      ...order,
-                      shipping_address: { ...order.shipping_address!, is_residential: e.target.checked }
-                    })}
-                  />
-                  <Label htmlFor="is_residential" className="text-xs cursor-pointer">Residential</Label>
-                </div>
+              <div className="col-span-2 space-y-2 relative">
+                <Label className="invisible select-none pointer-events-none">Status</Label>
+                <Button
+                  type="button"
+                  variant={order.shipping_address?.is_residential ? "default" : "outline"}
+                  size="sm"
+                  className={`h-8 w-full text-[10px] font-bold uppercase tracking-wider transition-all rounded-lg ${
+                    order.shipping_address?.is_residential 
+                      ? "bg-zinc-900 text-white shadow-inner" 
+                      : "bg-zinc-100 text-zinc-500 border-zinc-200"
+                  }`}
+                  onClick={() => setOrder({
+                    ...order,
+                    shipping_address: { ...order.shipping_address!, is_residential: !order.shipping_address?.is_residential }
+                  })}
+                >
+                  {order.shipping_address?.is_residential ? 'Residential' : 'Business'}
+                </Button>
                 {recommendedResidential !== null && order.shipping_address?.is_residential !== recommendedResidential && (
-                  <p className="text-[9px] text-zinc-400 absolute top-full mt-1 left-0 whitespace-nowrap italic">
-                    Note: Changed from recommended
-                  </p>
+                  <div className="absolute top-full mt-1 left-0 right-0 flex justify-center">
+                    <p className="text-[9px] text-zinc-400 whitespace-nowrap italic leading-none">
+                      Re-eval suggested
+                    </p>
+                  </div>
                 )}
               </div>
               <div className="col-span-5 space-y-2">
