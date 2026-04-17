@@ -90,16 +90,6 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
               Search Magento
             </Button>
             <Button 
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowHelp(true)}
-              className="text-zinc-400 hover:text-zinc-600"
-              title="How to search"
-            >
-              <Info size={20} />
-            </Button>
-            <Button 
               type="button" 
               variant="outline" 
               onClick={() => navigate('/order/manual')}

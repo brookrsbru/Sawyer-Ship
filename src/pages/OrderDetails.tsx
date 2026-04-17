@@ -38,7 +38,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       region: '',
       postcode: '',
       country_id: 'GB',
-      telephone: ''
+      telephone: '',
+      is_residential: false
     },
     items: []
   });
@@ -70,6 +71,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   // Address Validation State
   const [isFedExValid, setIsFedExValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
   const [isValidatingFedEx, setIsValidatingFedEx] = useState(false);
+  const [recommendedResidential, setRecommendedResidential] = useState<boolean | null>(null);
   const [isUPSValid, setIsUPSValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
 
   // Weight fields
@@ -230,6 +232,17 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       
       if (addressResult && !hasAlerts) {
         setIsFedExValid('valid');
+        const isResidential = addressResult.classification === 'RESIDENTIAL';
+        setRecommendedResidential(isResidential);
+        if (order) {
+          setOrder({
+            ...order,
+            shipping_address: {
+              ...order.shipping_address,
+              is_residential: isResidential
+            }
+          });
+        }
       } else {
         setIsFedExValid('invalid');
       }
@@ -420,7 +433,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 ShipTo: {
                   Address: {
                     PostalCode: order.shipping_address.postcode,
-                    CountryCode: getCarrierCountryCode(order.shipping_address.country_id)
+                    CountryCode: getCarrierCountryCode(order.shipping_address.country_id),
+                    ResidentialAddressIndicator: order.shipping_address.is_residential ? "" : undefined
                   }
                 },
                 PickupType: { Code: credentials.general.upsPickupType || "01" },
@@ -548,7 +562,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   city: order.shipping_address.city,
                   stateOrProvinceCode: (order.shipping_address.country_id === 'US' || order.shipping_address.country_id === 'CA') ? order.shipping_address.region : undefined,
                   postalCode: order.shipping_address.postcode,
-                  countryCode: getCarrierCountryCode(order.shipping_address.country_id)
+                  countryCode: getCarrierCountryCode(order.shipping_address.country_id),
+                  residential: !!order.shipping_address.is_residential
                 },
                 contact: {
                   personName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`,
@@ -807,7 +822,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   City: order.shipping_address?.city,
                   StateProvinceCode: order.shipping_address?.region,
                   PostalCode: order.shipping_address?.postcode,
-                  CountryCode: order.shipping_address?.country_id
+                  CountryCode: order.shipping_address?.country_id,
+                  ResidentialAddressIndicator: order.shipping_address?.is_residential ? "" : undefined
                 }
               },
               PaymentInformation: {
@@ -933,7 +949,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 city: order.shipping_address?.city,
                 stateOrProvinceCode: order.shipping_address?.region,
                 postalCode: order.shipping_address?.postcode,
-                countryCode: getCarrierCountryCode(order.shipping_address?.country_id)
+                countryCode: getCarrierCountryCode(order.shipping_address?.country_id),
+                residential: !!order.shipping_address?.is_residential
               }
             }],
             shipDatestamp: new Date().toISOString().split('T')[0],
@@ -1272,8 +1289,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-5 space-y-2">
                 <Label>Postcode <span className="text-red-500">*</span></Label>
                 <Input 
                   value={order.shipping_address?.postcode || ''} 
@@ -1283,7 +1300,27 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="col-span-2 flex flex-col justify-end pb-2 relative">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="is_residential"
+                    className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
+                    checked={order.shipping_address?.is_residential || false}
+                    onChange={(e) => setOrder({
+                      ...order,
+                      shipping_address: { ...order.shipping_address!, is_residential: e.target.checked }
+                    })}
+                  />
+                  <Label htmlFor="is_residential" className="text-xs cursor-pointer">Residential</Label>
+                </div>
+                {recommendedResidential !== null && order.shipping_address?.is_residential !== recommendedResidential && (
+                  <p className="text-[9px] text-zinc-400 absolute top-full mt-1 left-0 whitespace-nowrap italic">
+                    Note: Changed from recommended
+                  </p>
+                )}
+              </div>
+              <div className="col-span-5 space-y-2">
                 <Label>Country <span className="text-red-500">*</span></Label>
                 <Select 
                   value={order.shipping_address?.country_id}

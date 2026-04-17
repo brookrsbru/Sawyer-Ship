@@ -23,6 +23,7 @@ export interface MagentoOrder {
     postcode: string;
     country_id: string;
     telephone: string;
+    is_residential?: boolean;
   };
   items: Array<{
     name: string;
