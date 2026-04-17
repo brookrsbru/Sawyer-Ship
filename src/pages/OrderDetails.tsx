@@ -241,9 +241,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     }
   };
 
-  // Trigger validation when relevant address fields change in manual mode
+  // Trigger validation when relevant address fields change
   useEffect(() => {
-    if (id === 'manual' && order?.shipping_address) {
+    if (order?.shipping_address) {
       const addr = order.shipping_address;
       if (addr.street.some(s => s.length > 5) && addr.city && addr.postcode && addr.country_id) {
         const timer = setTimeout(() => {
@@ -1202,7 +1202,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               />
             </div>
             <div className="space-y-2">
-              <Label>Address Line 1 <span className="text-red-500">*</span></Label>
+              <Label className="flex justify-between">
+                Address Line 1 <span className="text-red-500">*</span>
+                {(order.shipping_address?.street?.[0]?.length || 0) > 35 && (
+                  <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                )}
+              </Label>
               <Input 
                 value={order.shipping_address?.street?.[0] || ''} 
                 onChange={(e) => {
@@ -1214,7 +1219,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Address Line 2</Label>
+                <Label className="flex justify-between">
+                  Address Line 2
+                  {(order.shipping_address?.street?.[1]?.length || 0) > 35 && (
+                    <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                  )}
+                </Label>
                 <Input 
                   value={order.shipping_address?.street?.[1] || ''} 
                   onChange={(e) => {
@@ -1225,7 +1235,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 />
               </div>
               <div className="space-y-2">
-                <Label>Address Line 3</Label>
+                <Label className="flex justify-between">
+                  Address Line 3
+                  {(order.shipping_address?.street?.[2]?.length || 0) > 35 && (
+                    <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                  )}
+                </Label>
                 <Input 
                   value={order.shipping_address?.street?.[2] || ''} 
                   onChange={(e) => {
@@ -1514,6 +1529,22 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         </Select>
                       </div>
                     </div>
+
+                    <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg mt-4">
+                      <div className="flex-1 flex items-center justify-between">
+                        <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
+                        <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                          <ValidationIcon status={isFedExValid} />
+                        </div>
+                      </div>
+                      <Separator orientation="vertical" className="h-6" />
+                      <div className="flex-1 flex items-center justify-between">
+                        <span className="text-xs font-bold text-zinc-600">UPS Valid</span>
+                        <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                          <ValidationIcon status={isUPSValid} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button onClick={() => setIsEditingCustomer(false)}>Done</Button>
@@ -1538,6 +1569,22 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 <p className="text-zinc-600">
                   {COUNTRY_NAMES[order.shipping_address?.country_id || ''] || order.shipping_address?.country_id}
                 </p>
+              </div>
+
+              <div className="col-span-2 flex gap-4 p-4 bg-zinc-50 border rounded-lg">
+                <div className="flex-1 flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                    <ValidationIcon status={isFedExValid} />
+                  </div>
+                </div>
+                <Separator orientation="vertical" className="h-6" />
+                <div className="flex-1 flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-600">UPS Valid</span>
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                    <ValidationIcon status={isUPSValid} />
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
