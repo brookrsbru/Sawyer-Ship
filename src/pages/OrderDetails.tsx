@@ -1018,6 +1018,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           };
         }
 
+        console.log("[FedExClient] Creating shipment", fedexParams);
         const fedexData = await fedex.createShipment(fedexParams);
         labelType = credentials.general.labelFormat === 'ZPL' ? 'text/plain' : 'application/pdf';
         
