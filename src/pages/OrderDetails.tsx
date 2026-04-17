@@ -1626,8 +1626,15 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(order.items || []).map((item, idx) => {
-                    const product = productDetails[item.sku];
+                  {(() => {
+                    const currencySymbol = credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$';
+                    const items = order.items || [];
+                    const orderTotal = items.reduce((sum, item) => sum + (item.price * item.qty_ordered), 0);
+                    
+                    return (
+                      <>
+                        {items.map((item, idx) => {
+                          const product = productDetails[item.sku];
                     
                     // Helper to get attribute value or label
                     const getAttr = (code: string) => {
@@ -1672,8 +1679,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     const htsCode = getAttr('commodity_code');
                     const hscCode = getAttr('harmonized_system_code');
                     const coo = getAttr('country_of_manufacture');
-                    const currencySymbol = credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$';
-                    const total = item.price * item.qty_ordered;
+                    const itemTotal = item.price * item.qty_ordered;
 
                     const truncatedName = item.name.length > 25 ? item.name.substring(0, 25) + '...' : item.name;
 
@@ -1698,7 +1704,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                           {currencySymbol}{item.price.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right font-bold">
-                          {currencySymbol}{total.toFixed(2)}
+                          {currencySymbol}{itemTotal.toFixed(2)}
                         </TableCell>
                         <TableCell className="flex gap-1">
                           <Dialog open={editingItem?.sku === item.sku} onOpenChange={(open) => !open && setEditingItem(null)}>
@@ -1860,7 +1866,19 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       </TableRow>
                     );
                   })}
-                </TableBody>
+                  <TableRow className="bg-zinc-50/50">
+                    <TableCell colSpan={4} className="text-right font-medium text-zinc-500 py-4">
+                      Order Total
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-lg text-zinc-900 py-4">
+                      {credentials.general.currency === 'GBP' ? '£' : credentials.general.currency === 'EUR' ? '€' : '$'}{(order.items || []).reduce((sum, item) => sum + (item.price * item.qty_ordered), 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                </>
+              );
+            })()}
+          </TableBody>
               </Table>
               {isFetchingProducts && (
                 <div className="flex items-center justify-center py-4 text-zinc-500 text-sm gap-2">
