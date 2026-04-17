@@ -1614,14 +1614,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                       </div>
                       <Separator orientation="vertical" className="h-6" />
                       <div className="flex-1 flex items-center justify-between">
-                        <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
+                        <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
                         <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                           <ValidationIcon status={isFedExValid} />
                         </div>
                       </div>
                       <Separator orientation="vertical" className="h-6" />
                       <div className="flex-1 flex items-center justify-between">
-                        <span className="text-xs font-bold text-zinc-600">UPS Valid</span>
+                        <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
                         <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                           <ValidationIcon status={isUPSValid} />
                         </div>
@@ -1674,14 +1674,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 </div>
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-600">FedEx Valid</span>
+                  <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
                   <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                     <ValidationIcon status={isFedExValid} />
                   </div>
                 </div>
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-600">UPS Valid</span>
+                  <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
                   <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                     <ValidationIcon status={isUPSValid} />
                   </div>
