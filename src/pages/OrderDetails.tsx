@@ -67,6 +67,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLabelViewerOpen, setIsLabelViewerOpen] = useState(false);
+  const [fullNameInput, setFullNameInput] = useState("");
 
   // Address Validation State
   const [isFedExValid, setIsFedExValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
@@ -81,6 +82,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [billDutiesTo, setBillDutiesTo] = useState('shipper');
 
   const getCarrierCountryCode = (code: string) => code === 'XI' ? 'GB' : code;
+
+  useEffect(() => {
+    if (order && !fullNameInput) {
+      setFullNameInput(`${order.customer_firstname} ${order.customer_lastname}`.trim());
+    }
+  }, [order, fullNameInput]);
 
   useEffect(() => {
     if (order && order.items && order.items.length > 0) {
@@ -1175,9 +1182,11 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             <div className="space-y-2">
               <Label>Full Name <span className="text-red-500">*</span></Label>
               <Input 
-                value={`${order.customer_firstname} ${order.customer_lastname}`.trim()} 
+                value={fullNameInput} 
                 onChange={(e) => {
-                  const parts = e.target.value.split(' ');
+                  const val = e.target.value;
+                  setFullNameInput(val);
+                  const parts = val.trim().split(' ');
                   const first = parts[0] || '';
                   const last = parts.slice(1).join(' ') || '';
                   setOrder({
@@ -1424,9 +1433,11 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     <div className="space-y-2">
                       <Label>Full Name <span className="text-red-500">*</span></Label>
                       <Input 
-                        value={`${order.customer_firstname} ${order.customer_lastname}`.trim()} 
+                        value={fullNameInput} 
                         onChange={(e) => {
-                          const parts = e.target.value.split(' ');
+                          const val = e.target.value;
+                          setFullNameInput(val);
+                          const parts = val.trim().split(' ');
                           const first = parts[0] || '';
                           const last = parts.slice(1).join(' ') || '';
                           setOrder({
