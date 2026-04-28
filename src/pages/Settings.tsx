@@ -1030,7 +1030,7 @@ export default function Settings({
                       {formData.ups.isSandbox ? (
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="ups-domestic-account">Domestic Account Number</Label>
+                            <Label htmlFor="ups-domestic-account">Sandbox Domestic Account Number</Label>
                             <Input 
                               id="ups-domestic-account" 
                               value={formData.ups.domesticAccountNumber}
@@ -1038,7 +1038,7 @@ export default function Settings({
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="ups-global-account">Global Account Number</Label>
+                            <Label htmlFor="ups-global-account">Sandbox Global Account Number</Label>
                             <Input 
                               id="ups-global-account" 
                               value={formData.ups.globalAccountNumber}
@@ -1048,11 +1048,11 @@ export default function Settings({
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <Label htmlFor="ups-account">Account Number</Label>
+                          <Label htmlFor="ups-prod-account">Production Account Number</Label>
                           <Input 
-                            id="ups-account" 
-                            value={formData.ups.accountNumber}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, accountNumber: e.target.value } })}
+                            id="ups-prod-account" 
+                            value={formData.ups.productionAccountNumber}
+                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionAccountNumber: e.target.value } })}
                           />
                         </div>
                       )}
@@ -1171,7 +1171,7 @@ export default function Settings({
                         <>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="fedex-domestic-account">Domestic Account Number</Label>
+                              <Label htmlFor="fedex-domestic-account">Sandbox Domestic Account Number</Label>
                               <Input 
                                 id="fedex-domestic-account" 
                                 value={formData.fedex.domesticAccountNumber}
@@ -1179,7 +1179,7 @@ export default function Settings({
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="fedex-global-account">Global Account Number</Label>
+                              <Label htmlFor="fedex-global-account">Sandbox Global Account Number</Label>
                               <Input 
                                 id="fedex-global-account" 
                                 value={formData.fedex.globalAccountNumber}
@@ -1188,7 +1188,7 @@ export default function Settings({
                             </div>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="fedex-payment-account">Payment Account Number (Payor)</Label>
+                            <Label htmlFor="fedex-payment-account">Sandbox Payment Account Number (Payor)</Label>
                             <Input 
                               id="fedex-payment-account" 
                               placeholder="Used for shipping charges payment"
@@ -1200,12 +1200,13 @@ export default function Settings({
                         </>
                       ) : (
                         <div className="space-y-2">
-                          <Label htmlFor="fedex-account">Account Number</Label>
+                          <Label htmlFor="fedex-prod-account">Production Account Number</Label>
                           <Input 
-                            id="fedex-account" 
-                            value={formData.fedex.accountNumber}
-                            onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, accountNumber: e.target.value } })}
+                            id="fedex-prod-account" 
+                            value={formData.fedex.productionAccountNumber}
+                            onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionAccountNumber: e.target.value } })}
                           />
+                          <p className="text-[10px] text-zinc-500">The account number that will be used for both shipping and payor identification.</p>
                         </div>
                       )}
                     </div>

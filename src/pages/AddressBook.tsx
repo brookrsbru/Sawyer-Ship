@@ -457,6 +457,36 @@ export default function AddressBook({
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              {filteredCustomers.length > 50 && (
+                <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+                  <div className="text-xs text-zinc-500">
+                    Showing <span className="font-medium text-zinc-900">{((currentPage - 1) * 50) + 1}</span> to <span className="font-medium text-zinc-900">{Math.min(currentPage * 50, filteredCustomers.length)}</span> of <span className="font-medium text-zinc-900">{filteredCustomers.length}</span> results
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-8 w-8" 
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                    >
+                      <ChevronLeft size={16} />
+                    </Button>
+                    <div className="flex items-center px-4 text-xs font-medium">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-8 w-8" 
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                    >
+                      <ChevronRight size={16} />
+                    </Button>
+                  </div>
+                </div>
+              )}
               {filteredCustomers.length === 0 ? (
                 <div className="p-12 text-center space-y-3">
                   <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center mx-auto text-zinc-400">

@@ -48,6 +48,7 @@ export interface SawyerCredentials {
     accountNumber: string; // Legacy, kept for migration
     domesticAccountNumber: string;
     globalAccountNumber: string;
+    productionAccountNumber: string;
     isSandbox: boolean;
   };
   fedex: {
@@ -58,6 +59,7 @@ export interface SawyerCredentials {
     domesticAccountNumber: string;
     globalAccountNumber: string;
     paymentAccountNumber: string;
+    productionAccountNumber: string;
     isSandbox: boolean;
   };
   general: {
@@ -115,6 +117,7 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     accountNumber: '', 
     domesticAccountNumber: '', 
     globalAccountNumber: '', 
+    productionAccountNumber: '',
     isSandbox: true 
   },
   fedex: { 
@@ -125,6 +128,7 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     domesticAccountNumber: '', 
     globalAccountNumber: '', 
     paymentAccountNumber: '',
+    productionAccountNumber: '',
     isSandbox: true 
   },
   general: { 

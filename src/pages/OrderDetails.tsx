@@ -195,9 +195,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     
     try {
       const isDomestic = order.shipping_address.country_id === credentials.general.originCountry;
-      const accountNumber = isDomestic 
-        ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
-        : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
+        const accountNumber = credentials.fedex.isSandbox
+        ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
+        : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
       const fedex = new FedExClient(
         credentials.fedex.apiKey,
@@ -410,9 +410,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         try {
           const destCountry = order.shipping_address?.country_id;
           const isDomestic = destCountry === credentials.general.originCountry;
-          const accountNumber = isDomestic 
-            ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber)
-            : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber);
+          const accountNumber = credentials.ups.isSandbox
+            ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
+            : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
 
           console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const ups = new UPSClient(
@@ -527,9 +527,13 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           const isDomestic = destCountry === credentials.general.originCountry || 
                             (credentials.general.originCountry === 'GB' && destCountry === 'XI') ||
                             (credentials.general.originCountry === 'XI' && destCountry === 'GB');
-          const accountNumber = isDomestic 
-            ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
-            : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
+          const accountNumber = credentials.fedex.isSandbox
+            ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
+            : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
+          
+          const payorAccountNumber = credentials.fedex.isSandbox
+            ? (credentials.fedex.paymentAccountNumber || accountNumber)
+            : (credentials.fedex.productionAccountNumber || accountNumber);
           
           console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const fedex = new FedExClient(
@@ -543,7 +547,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
 
           const fedexParams: any = {
-            accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber },
+            accountNumber: { value: payorAccountNumber },
             requestedShipment: {
               shipper: {
                 address: {
@@ -586,7 +590,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 paymentType: "SENDER",
                 payor: {
                   responsibleParty: {
-                    accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
+                    accountNumber: { value: payorAccountNumber }
                   }
                 }
               },
@@ -647,7 +651,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 paymentType: "SENDER",
                 payor: {
                   responsibleParty: {
-                    accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
+                    accountNumber: { value: payorAccountNumber }
                   }
                 }
               },
@@ -783,10 +787,14 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         (credentials.general.originCountry === 'XI' && order.shipping_address?.country_id === 'GB');
 
       if (selectedRate.carrier === 'UPS') {
+        const accountNumber = credentials.ups.isSandbox
+          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
+          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
+
         const ups = new UPSClient(
           credentials.ups.clientId,
           credentials.ups.clientSecret,
-          (isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber,
+          accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
         );
@@ -811,7 +819,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 Name: credentials.general.originContactName,
                 AttentionName: credentials.general.originContactName,
                 Phone: { Number: credentials.general.originPhone },
-                ShipperNumber: (isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber,
+                ShipperNumber: credentials.ups.isSandbox 
+                  ? ((isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber)
+                  : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber),
                 Address: {
                   AddressLine: [credentials.general.originStreet1, credentials.general.originStreet2].filter(Boolean),
                   City: credentials.general.originCity,
@@ -836,7 +846,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               PaymentInformation: {
                 ShipmentCharge: {
                   Type: "01",
-                  BillShipper: { AccountNumber: (isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber }
+                  BillShipper: { AccountNumber: credentials.ups.isSandbox 
+                    ? ((isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber)
+                    : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber) }
                 }
               },
               Service: { Code: serviceCode },
@@ -915,9 +927,13 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           throw new Error(error.Description || error.message || "UPS Shipment Failed");
         }
       } else if (selectedRate.carrier === 'FedEx') {
-        const accountNumber = isDomestic 
-          ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
-          : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber);
+        const accountNumber = credentials.fedex.isSandbox
+          ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
+          : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
+        
+        const payorAccountNumber = credentials.fedex.isSandbox
+          ? (credentials.fedex.paymentAccountNumber || accountNumber)
+          : (credentials.fedex.productionAccountNumber || accountNumber);
 
         const fedex = new FedExClient(
           credentials.fedex.apiKey,
@@ -929,7 +945,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
         const fedexParams: any = {
           labelResponseOptions: "LABEL",
-          accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber },
+          accountNumber: { value: payorAccountNumber },
           requestedShipment: {
             shipper: {
               contact: {
@@ -968,7 +984,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
+                  accountNumber: { value: payorAccountNumber }
                 }
               }
             },
@@ -993,7 +1009,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               paymentType: billDutiesTo === 'recipient' ? "RECIPIENT" : "SENDER",
               payor: {
                 responsibleParty: {
-                  accountNumber: { value: credentials.fedex.paymentAccountNumber || accountNumber }
+                  accountNumber: { value: payorAccountNumber }
                 }
               }
             },
