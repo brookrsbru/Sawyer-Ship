@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight } from 'lucide-react';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
@@ -70,6 +70,8 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [isLabelViewerOpen, setIsLabelViewerOpen] = useState(false);
   const [fullNameInput, setFullNameInput] = useState("");
   const [addressSearch, setAddressSearch] = useState("");
+  const [addressPage, setAddressPage] = useState(1);
+  const ADDRESSES_PER_PAGE = 10;
 
   // Address Validation State
   const [isFedExValid, setIsFedExValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
@@ -204,7 +206,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         is_residential: !!customer.residential
       }
     });
-    toast.success(`Loaded address for ${customer.fullname}`);
+    toast.success(`Loaded address`);
   };
 
   const handleWeightGBlur = () => {
@@ -1222,6 +1224,12 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       (c.reference && c.reference.toLowerCase().includes(addressSearch.toLowerCase()))
     );
 
+    const addressTotalPages = Math.ceil(filteredAddressBook.length / ADDRESSES_PER_PAGE);
+    const paginatedAddresses = filteredAddressBook.slice(
+      (addressPage - 1) * ADDRESSES_PER_PAGE,
+      addressPage * ADDRESSES_PER_PAGE
+    );
+
     return (
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex items-center gap-4">
@@ -1234,7 +1242,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start">
           {/* Left Column: Manual Form */}
           <Card>
             <CardHeader>
@@ -1450,67 +1458,113 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           </Card>
 
           {/* Right Column: Address Book Autofill */}
-          <Card className="flex flex-col max-h-[calc(100vh-280px)] min-h-[600px]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="flex flex-col shadow-sm border-zinc-200 h-fit">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Book className="w-5 h-5 text-zinc-400" />
                 Address Book
               </CardTitle>
-              <CardDescription>Search and select from your saved addresses.</CardDescription>
+              <CardDescription>Click to fill form.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 flex-1 flex flex-col min-h-0">
+            <CardContent className="space-y-4">
                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
                   <Input 
-                     placeholder="Search name, company, email..." 
-                     className="pl-10 h-10 border-zinc-200 focus:ring-zinc-900"
+                     placeholder="Search name, code..." 
+                     className="pl-10 h-10 border-zinc-200 focus:ring-zinc-900 bg-zinc-50/50"
                      value={addressSearch}
-                     onChange={(e) => setAddressSearch(e.target.value)}
+                     onChange={(e) => {
+                        setAddressSearch(e.target.value);
+                        setAddressPage(1);
+                     }}
                   />
                </div>
                
-               <div className="flex-1 overflow-auto border rounded-xl divide-y bg-zinc-50/30">
-                  {filteredAddressBook.length > 0 ? (
-                    filteredAddressBook.map(customer => (
+               <div className="border rounded-xl divide-y overflow-hidden bg-white">
+                  {paginatedAddresses.length > 0 ? (
+                    paginatedAddresses.map(customer => (
                       <button
                         key={customer.id}
                         onClick={() => handleSelectAddress(customer)}
-                        className="w-full text-left p-4 hover:bg-white transition-all flex items-center justify-between group"
+                        className="w-full text-left p-4 hover:bg-zinc-50 transition-all flex items-center justify-between group relative"
                       >
-                        <div className="space-y-1 pr-4">
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-zinc-900 group-hover:text-zinc-600 transition-colors uppercase text-xs tracking-tight">
-                              {customer.fullname}
-                            </p>
+                        <div className="space-y-2 pr-4 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              {customer.company && (
+                                <p className="font-black text-zinc-900 text-sm leading-none truncate mb-1">
+                                  {customer.company}
+                                </p>
+                              )}
+                              <p className="font-bold text-zinc-500 text-xs leading-none truncate">
+                                {customer.fullname}
+                              </p>
+                            </div>
                             {customer.reference && (
-                              <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4 border-zinc-200 text-zinc-400 bg-white">
+                              <div className="px-2 py-1 bg-zinc-900 text-white rounded text-[10px] font-black tracking-tighter shrink-0 border border-zinc-800 shadow-sm leading-none">
                                 {customer.reference}
-                              </Badge>
+                              </div>
                             )}
                           </div>
-                          {customer.company && <p className="text-[11px] text-zinc-500 font-medium leading-none">{customer.company}</p>}
-                          <div className="flex items-start gap-1 text-[11px] text-zinc-400 leading-tight">
-                             <MapPin size={10} className="mt-0.5 shrink-0" />
-                             <span>{customer.street1}, {customer.city}, {customer.postcode}</span>
+                          
+                          <div className="space-y-1 bg-zinc-50/50 p-2 rounded-lg border border-zinc-100">
+                            <div className="flex items-start gap-2">
+                               <MapPin size={14} className="mt-0.5 text-zinc-400 shrink-0" />
+                               <div className="min-w-0 flex-1 space-y-0.5">
+                                  <p className="text-[12px] text-zinc-600 font-bold truncate leading-tight font-mono">{customer.street1}</p>
+                                  {customer.street2 && <p className="text-[11px] text-zinc-500 truncate leading-tight">{customer.street2}</p>}
+                                  {customer.street3 && <p className="text-[11px] text-zinc-500 truncate leading-tight">{customer.street3}</p>}
+                                  <p className="text-[11px] text-zinc-400 font-bold truncate leading-tight mt-1 uppercase tracking-tight">
+                                     {customer.city}{customer.region ? `, ${customer.region}` : ''} {customer.postcode}
+                                  </p>
+                               </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all shadow-sm">
-                          <ArrowRight size={14} className="text-zinc-900" />
+                        <div className="w-7 h-7 rounded-full bg-zinc-100 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 group-hover:bg-zinc-900 transition-all">
+                          <ArrowRight size={12} className="text-zinc-400 group-hover:text-white" />
                         </div>
                       </button>
                     ))
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full p-8 text-center text-zinc-400 space-y-3">
-                      <div className="p-4 rounded-full bg-zinc-50 border border-zinc-100">
-                        <Search className="w-6 h-6 opacity-40" />
+                    <div className="flex flex-col items-center justify-center p-8 text-center text-zinc-400 space-y-3">
+                      <div className="p-3 rounded-full bg-zinc-50 border border-zinc-100">
+                        <Search className="w-5 h-5 opacity-40" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-sm font-medium">No matches found</p>
-                        <p className="text-[11px] max-w-[200px]">Try searching for something else or add a contact to the Address Book.</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-300">No matches</p>
                       </div>
                     </div>
                   )}
                </div>
+
+               {addressTotalPages > 1 && (
+                 <div className="flex items-center justify-between pt-2">
+                   <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                     Page {addressPage} / {addressTotalPages}
+                   </div>
+                   <div className="flex items-center gap-1">
+                     <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-7 w-7" 
+                        disabled={addressPage === 1}
+                        onClick={() => setAddressPage(p => p - 1)}
+                     >
+                       <ChevronLeft size={14} />
+                     </Button>
+                     <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-7 w-7" 
+                        disabled={addressPage === addressTotalPages}
+                        onClick={() => setAddressPage(p => p + 1)}
+                     >
+                       <ChevronRight size={14} />
+                     </Button>
+                   </div>
+                 </div>
+               )}
             </CardContent>
           </Card>
         </div>
