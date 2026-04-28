@@ -370,8 +370,19 @@ export class UPSClient {
         'transactionSrc': 'sawyer-ship'
       }
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.response?.errors?.[0]?.message || `UPS Error: ${response.status} ${response.statusText}`);
+    }
+
     const data = await response.json();
     console.log(`[UPSClient] Tracking response:`, data);
+
+    if (data?.trackResponse?.shipment?.[0]?.warnings) {
+      console.warn(`[UPSClient] Tracking warnings:`, data.trackResponse.shipment[0].warnings);
+    }
+
     return data;
   }
 }
@@ -490,8 +501,20 @@ export class FedExClient {
         includeDetailedScans: false
       }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.errors?.[0]?.message || `FedEx Error: ${response.status} ${response.statusText}`);
+    }
+
     const data = await response.json();
     console.log(`[FedExClient] Tracking response:`, data);
+
+    const trackResult = data?.output?.completeTrackResults?.[0]?.trackResults?.[0];
+    if (trackResult?.error) {
+      throw new Error(trackResult.error.message || 'FedEx Tracking Error');
+    }
+
     return data;
   }
 }

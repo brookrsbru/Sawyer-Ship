@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar } from 'lucide-react';
+import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { UPSClient, FedExClient } from '@/src/lib/api-clients';
 import { toast } from 'sonner';
@@ -49,16 +49,20 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     
     try {
       let newStatus = shipment.status || 'Unknown';
-      const isDomestic = credentials.general.originCountry === 'GB' || credentials.general.originCountry === 'XI'; // Rudimentary check for now or based on shipment record if saved
-
+      
       if (shipment.carrier === 'UPS') {
         const accountNumber = credentials.ups.isSandbox
           ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber)
           : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
 
+        const clientId = credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId;
+        const clientSecret = credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret;
+
+        if (!clientId || !clientSecret) throw new Error('Missing UPS credentials');
+
         const client = new UPSClient(
-          credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
-          credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
+          clientId,
+          clientSecret,
           accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
@@ -70,9 +74,14 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
           ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
           : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
+        const apiKey = credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey;
+        const secretKey = credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey;
+
+        if (!apiKey || !secretKey) throw new Error('Missing FedEx credentials');
+
         const client = new FedExClient(
-          credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
-          credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
+          apiKey,
+          secretKey,
           accountNumber,
           credentials.fedex.isSandbox,
           credentials.general.proxyUrl
@@ -81,9 +90,9 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         newStatus = data?.output?.completeTrackResults?.[0]?.trackResults?.[0]?.latestStatusDetail?.description || 'Active';
       }
 
-      // Update local storage
+      // Update local storage on SUCCESS
       const updatedShipments = credentials.shipments.map(s => 
-        s.id === shipment.id ? { ...s, status: newStatus, lastUpdated: new Date().toISOString() } : s
+        s.id === shipment.id ? { ...s, status: newStatus, hasError: false, lastUpdated: new Date().toISOString() } : s
       );
 
       await onSave({
@@ -93,6 +102,21 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
       
     } catch (e) {
       console.error(`Failed to refresh tracking for ${shipment.trackingNumber}:`, e);
+      
+      // Update local storage on FAILURE - mark as error but preserve old status
+      const updatedShipments = credentials.shipments.map(s => 
+        s.id === shipment.id ? { ...s, hasError: true, lastUpdated: new Date().toISOString() } : s
+      );
+
+      await onSave({
+        ...credentials,
+        shipments: updatedShipments
+      });
+      
+      // Only show error toast for manual refreshes of one item
+      if (refreshingIds.size === 1) {
+        toast.error(`Could not refresh tracking for ${shipment.trackingNumber}`);
+      }
     } finally {
       setRefreshingIds(prev => {
         const next = new Set(prev);
@@ -261,13 +285,18 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
                             ) : null}
                             {shipment.status || 'Active'}
                           </Badge>
+                          
+                          {shipment.hasError && !refreshingIds.has(shipment.id) && (
+                            <AlertCircle size={14} className="text-red-500" title="Last update attempt failed" />
+                          )}
+
                           {shipment.lastUpdated && !refreshingIds.has(shipment.id) && (
                             <button 
                               onClick={() => updateShipmentStatus(shipment)}
-                              className="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-zinc-900 transition-colors"
-                              title={`Last updated: ${new Date(shipment.lastUpdated).toLocaleTimeString()}`}
+                              className={`w-5 h-5 flex items-center justify-center transition-colors ${shipment.hasError ? 'text-red-400 hover:text-red-600' : 'text-zinc-400 hover:text-zinc-900'}`}
+                              title={shipment.hasError ? `Update failed. Last checked: ${new Date(shipment.lastUpdated).toLocaleTimeString()}` : `Last updated: ${new Date(shipment.lastUpdated).toLocaleTimeString()}`}
                             >
-                              <RotateCcw size={10} />
+                              <RotateCcw size={10} className={shipment.hasError ? "animate-pulse" : ""} />
                             </button>
                           )}
                         </div>
