@@ -555,10 +555,9 @@ export default function Settings({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="origin-state">State/Province</Label>
+                        <Label htmlFor="origin-state">Region</Label>
                         <Input 
                           id="origin-state"
-                          placeholder="e.g. CA or NY"
                           value={formData.general.originState}
                           onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originState: e.target.value } })}
                         />

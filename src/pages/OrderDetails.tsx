@@ -90,6 +90,20 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
     return isoCode === 'XI' ? 'GB' : isoCode;
   };
 
+  const getCarrierRegion = (region: string | undefined, countryCode: string | undefined) => {
+    const isoCountry = getCarrierCountryCode(countryCode);
+    if (isoCountry === 'GB' || isoCountry === 'XI') return undefined;
+    return normalizeRegion(region || '', isoCountry);
+  };
+
+  const getCarrierStreetLines = (street: (string | undefined)[] | undefined, region: string | undefined): string[] => {
+    const lines = [...(street || ['', '', ''])];
+    if (!lines[2] && region) {
+      lines[2] = region;
+    }
+    return lines.filter(Boolean);
+  };
+
   useEffect(() => {
     if (order && !fullNameInput) {
       setFullNameInput(`${order.customer_firstname} ${order.customer_lastname}`.trim());
@@ -247,9 +261,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         addressesToValidate: [
           {
             address: {
-              streetLines: order.shipping_address.street.filter(Boolean),
+              streetLines: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region),
               city: order.shipping_address.city,
-              stateOrProvinceCode: normalizeRegion(order.shipping_address.region, getCarrierCountryCode(order.shipping_address.country_id)),
+              stateOrProvinceCode: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
               postalCode: order.shipping_address.postcode,
               countryCode: getCarrierCountryCode(order.shipping_address.country_id)
             }
@@ -477,7 +491,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   Address: {
                     PostalCode: order.shipping_address.postcode,
                     CountryCode: getCarrierCountryCode(order.shipping_address.country_id),
-                    StateProvinceCode: normalizeRegion(order.shipping_address.region, getCarrierCountryCode(order.shipping_address.country_id)),
+                    StateProvinceCode: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
                     ResidentialAddressIndicator: order.shipping_address.is_residential ? "" : undefined
                   }
                 },
@@ -588,12 +602,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             requestedShipment: {
               shipper: {
                 address: {
-                  streetLines: [
-                    credentials.general.originStreet1,
-                    credentials.general.originStreet2
-                  ].filter(Boolean),
+                  streetLines: getCarrierStreetLines([credentials.general.originStreet1, credentials.general.originStreet2], credentials.general.originState),
                   city: credentials.general.originCity,
-                  stateOrProvinceCode: (getCarrierCountryCode(credentials.general.originCountry) === 'US' || getCarrierCountryCode(credentials.general.originCountry) === 'CA') ? normalizeRegion(credentials.general.originState, getCarrierCountryCode(credentials.general.originCountry)) : undefined,
+                  stateOrProvinceCode: getCarrierRegion(credentials.general.originState, credentials.general.originCountry),
                   postalCode: credentials.general.originPostalCode,
                   countryCode: getCarrierCountryCode(credentials.general.originCountry)
                 },
@@ -606,9 +617,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               },
               recipient: {
                 address: {
-                  streetLines: order.shipping_address.street,
+                  streetLines: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region),
                   city: order.shipping_address.city,
-                  stateOrProvinceCode: (getCarrierCountryCode(order.shipping_address.country_id) === 'US' || getCarrierCountryCode(order.shipping_address.country_id) === 'CA') ? normalizeRegion(order.shipping_address.region, getCarrierCountryCode(order.shipping_address.country_id)) : undefined,
+                  stateOrProvinceCode: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
                   postalCode: order.shipping_address.postcode,
                   countryCode: getCarrierCountryCode(order.shipping_address.country_id),
                   residential: !!order.shipping_address.is_residential
@@ -860,9 +871,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   ? ((isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber)
                   : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber),
                 Address: {
-                  AddressLine: [credentials.general.originStreet1, credentials.general.originStreet2].filter(Boolean),
+                  AddressLine: getCarrierStreetLines([credentials.general.originStreet1, credentials.general.originStreet2], credentials.general.originState),
                   City: credentials.general.originCity,
-                  StateProvinceCode: normalizeRegion(credentials.general.originState, getCarrierCountryCode(credentials.general.originCountry)),
+                  StateProvinceCode: getCarrierRegion(credentials.general.originState, credentials.general.originCountry),
                   PostalCode: credentials.general.originPostalCode,
                   CountryCode: getCarrierCountryCode(credentials.general.originCountry)
                 }
@@ -872,9 +883,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 AttentionName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
                 Phone: { Number: order.shipping_address?.telephone },
                 Address: {
-                  AddressLine: order.shipping_address?.street,
+                  AddressLine: getCarrierStreetLines(order.shipping_address?.street, order.shipping_address?.region),
                   City: order.shipping_address?.city,
-                  StateProvinceCode: normalizeRegion(order.shipping_address?.region, getCarrierCountryCode(order.shipping_address?.country_id)),
+                  StateProvinceCode: getCarrierRegion(order.shipping_address?.region, order.shipping_address?.country_id),
                   PostalCode: order.shipping_address?.postcode,
                   CountryCode: getCarrierCountryCode(order.shipping_address?.country_id),
                   ResidentialAddressIndicator: order.shipping_address?.is_residential ? "" : undefined
@@ -991,9 +1002,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 companyName: credentials.general.originCompanyName
               },
               address: {
-                streetLines: [credentials.general.originStreet1, credentials.general.originStreet2].filter(Boolean),
+                streetLines: getCarrierStreetLines([credentials.general.originStreet1, credentials.general.originStreet2], credentials.general.originState),
                 city: credentials.general.originCity,
-                stateOrProvinceCode: normalizeRegion(credentials.general.originState, getCarrierCountryCode(credentials.general.originCountry)),
+                stateOrProvinceCode: getCarrierRegion(credentials.general.originState, credentials.general.originCountry),
                 postalCode: credentials.general.originPostalCode,
                 countryCode: getCarrierCountryCode(credentials.general.originCountry)
               }
@@ -1005,9 +1016,9 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 companyName: order.shipping_address?.company
               },
               address: {
-                streetLines: order.shipping_address?.street,
+                streetLines: getCarrierStreetLines(order.shipping_address?.street, order.shipping_address?.region),
                 city: order.shipping_address?.city,
-                stateOrProvinceCode: normalizeRegion(order.shipping_address?.region, getCarrierCountryCode(order.shipping_address?.country_id)),
+                stateOrProvinceCode: getCarrierRegion(order.shipping_address?.region, order.shipping_address?.country_id),
                 postalCode: order.shipping_address?.postcode,
                 countryCode: getCarrierCountryCode(order.shipping_address?.country_id),
                 residential: !!order.shipping_address?.is_residential
@@ -1363,7 +1374,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Region / State</Label>
+                  <Label>Region</Label>
                   <Input 
                     placeholder="e.g. California or CA"
                     value={order!.shipping_address?.region || ''} 
@@ -1731,7 +1742,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Region / State</Label>
+                        <Label>Region</Label>
                         <Input 
                           placeholder="e.g. California or CA"
                           value={order.shipping_address?.region || ''} 

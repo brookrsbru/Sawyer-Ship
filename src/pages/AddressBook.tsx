@@ -375,14 +375,12 @@ export default function AddressBook({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="reg">Region / State</Label>
+                <Label htmlFor="reg">Region</Label>
                 <Input 
                   id="reg" 
-                  placeholder="e.g. California or CA"
                   value={newCustomer.region}
                   onChange={(e) => setNewCustomer({ ...newCustomer, region: e.target.value })}
                 />
-                <p className="text-[10px] text-zinc-500 italic">Full names (e.g. California) are automatically converted to codes for carriers.</p>
               </div>
 
               <div className="space-y-2">
@@ -811,10 +809,9 @@ export default function AddressBook({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-reg">Region / State</Label>
+              <Label htmlFor="edit-reg">Region</Label>
               <Input 
                 id="edit-reg" 
-                placeholder="e.g. California or CA"
                 value={editingCustomer?.region || ''}
                 onChange={(e) => setEditingCustomer(prev => prev ? { ...prev, region: e.target.value } : null)}
               />
