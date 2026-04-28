@@ -95,7 +95,7 @@ function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: strin
           )}
         </CardContent>
       </Card>
-      <footer className="fixed bottom-4 right-4 text-xs text-zinc-400">
+      <footer className="fixed bottom-4 right-4 text-sm font-mono text-zinc-400">
         v{APP_VERSION}
       </footer>
     </div>

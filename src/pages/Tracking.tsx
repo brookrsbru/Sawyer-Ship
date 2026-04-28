@@ -133,6 +133,27 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     }
   }, [currentPage]);
 
+  // Cleanup old shipments ( > 100 days)
+  useEffect(() => {
+    if (!credentials.shipments || credentials.shipments.length === 0) return;
+
+    const hundredDaysAgo = new Date();
+    hundredDaysAgo.setDate(hundredDaysAgo.getDate() - 100);
+
+    const validShipments = credentials.shipments.filter(s => {
+      const shipDate = new Date(s.shipDate);
+      return shipDate >= hundredDaysAgo;
+    });
+
+    if (validShipments.length !== credentials.shipments.length) {
+      console.log(`[Tracking] Cleaning up ${credentials.shipments.length - validShipments.length} old shipments (>100 days)`);
+      onSave({
+        ...credentials,
+        shipments: validShipments
+      });
+    }
+  }, []);
+
   return (
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
