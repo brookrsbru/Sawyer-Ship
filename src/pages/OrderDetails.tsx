@@ -250,8 +250,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
       const fedex = new FedExClient(
-        credentials.fedex.apiKey,
-        credentials.fedex.secretKey,
+        credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+        credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
         accountNumber,
         credentials.fedex.isSandbox,
         credentials.general.proxyUrl
@@ -456,7 +456,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       console.log(`[OrderDetails] Package: ${weightVal}kg, ${l}x${w}x${h}cm`);
 
       // 1. Fetch UPS Rates if credentials exist and enabled
-      if (credentials.ups.enabled && credentials.ups.clientId && credentials.ups.clientSecret) {
+      const hasUpsCreds = credentials.ups.isSandbox 
+        ? (credentials.ups.sandboxClientId && credentials.ups.sandboxClientSecret) 
+        : (credentials.ups.productionClientId && credentials.ups.productionClientSecret);
+
+      if (credentials.ups.enabled && hasUpsCreds) {
         try {
           const destCountry = order.shipping_address?.country_id;
           const isDomestic = destCountry === credentials.general.originCountry;
@@ -466,8 +470,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
           console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const ups = new UPSClient(
-            credentials.ups.clientId,
-            credentials.ups.clientSecret,
+            credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
+            credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
             accountNumber,
             credentials.ups.isSandbox,
             credentials.general.proxyUrl
@@ -572,7 +576,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       }
 
       // 2. Fetch FedEx Rates if credentials exist and enabled
-      if (credentials.fedex.enabled && credentials.fedex.apiKey && credentials.fedex.secretKey) {
+      const hasFedexCreds = credentials.fedex.isSandbox 
+        ? (credentials.fedex.sandboxApiKey && credentials.fedex.sandboxSecretKey) 
+        : (credentials.fedex.productionApiKey && credentials.fedex.productionSecretKey);
+
+      if (credentials.fedex.enabled && hasFedexCreds) {
         try {
           const destCountry = order.shipping_address.country_id;
           const isDomestic = destCountry === credentials.general.originCountry || 
@@ -588,8 +596,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           
           console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const fedex = new FedExClient(
-            credentials.fedex.apiKey,
-            credentials.fedex.secretKey,
+            credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+            credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
             accountNumber,
             credentials.fedex.isSandbox,
             credentials.general.proxyUrl
@@ -840,8 +848,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
 
         const ups = new UPSClient(
-          credentials.ups.clientId,
-          credentials.ups.clientSecret,
+          credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
+          credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
           accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
@@ -984,8 +992,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           : (credentials.fedex.productionAccountNumber || accountNumber);
 
         const fedex = new FedExClient(
-          credentials.fedex.apiKey,
-          credentials.fedex.secretKey,
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
           accountNumber,
           credentials.fedex.isSandbox,
           credentials.general.proxyUrl

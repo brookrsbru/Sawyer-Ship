@@ -43,8 +43,12 @@ export interface SawyerCredentials {
   };
   ups: {
     enabled: boolean;
-    clientId: string;
-    clientSecret: string;
+    clientId: string; // Legacy
+    clientSecret: string; // Legacy
+    sandboxClientId: string;
+    sandboxClientSecret: string;
+    productionClientId: string;
+    productionClientSecret: string;
     accountNumber: string; // Legacy, kept for migration
     domesticAccountNumber: string;
     globalAccountNumber: string;
@@ -53,8 +57,12 @@ export interface SawyerCredentials {
   };
   fedex: {
     enabled: boolean;
-    apiKey: string;
-    secretKey: string;
+    apiKey: string; // Legacy
+    secretKey: string; // Legacy
+    sandboxApiKey: string;
+    sandboxSecretKey: string;
+    productionApiKey: string;
+    productionSecretKey: string;
     accountNumber: string; // Legacy, kept for migration
     domesticAccountNumber: string;
     globalAccountNumber: string;
@@ -128,6 +136,10 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     enabled: true, 
     clientId: '', 
     clientSecret: '', 
+    sandboxClientId: '',
+    sandboxClientSecret: '',
+    productionClientId: '',
+    productionClientSecret: '',
     accountNumber: '', 
     domesticAccountNumber: '', 
     globalAccountNumber: '', 
@@ -138,6 +150,10 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     enabled: true, 
     apiKey: '', 
     secretKey: '', 
+    sandboxApiKey: '',
+    sandboxSecretKey: '',
+    productionApiKey: '',
+    productionSecretKey: '',
     accountNumber: '', 
     domesticAccountNumber: '', 
     globalAccountNumber: '', 

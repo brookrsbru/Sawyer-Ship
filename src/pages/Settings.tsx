@@ -1008,22 +1008,45 @@ export default function Settings({
                     </h3>
                     <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-client-id">Client ID</Label>
-                          <Input 
-                            id="ups-client-id" 
-                            value={formData.ups.clientId}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, clientId: e.target.value } })}
-                          />
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Sandbox Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-sandbox-client-id">Client ID</Label>
+                            <Input 
+                              id="ups-sandbox-client-id" 
+                              value={formData.ups.sandboxClientId}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientId: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-sandbox-client-secret">Client Secret</Label>
+                            <Input 
+                              id="ups-sandbox-client-secret" 
+                              autoComplete="off"
+                              value={formData.ups.sandboxClientSecret}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientSecret: e.target.value } })}
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-client-secret">Client Secret</Label>
-                          <Input 
-                            id="ups-client-secret" 
-                            autoComplete="off"
-                            value={formData.ups.clientSecret}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, clientSecret: e.target.value } })}
-                          />
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Production Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-production-client-id">Client ID</Label>
+                            <Input 
+                              id="ups-production-client-id" 
+                              value={formData.ups.productionClientId}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientId: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-production-client-secret">Client Secret</Label>
+                            <Input 
+                              id="ups-production-client-secret" 
+                              autoComplete="off"
+                              value={formData.ups.productionClientSecret}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientSecret: e.target.value } })}
+                            />
+                          </div>
                         </div>
                       </div>
                       {formData.ups.isSandbox ? (
@@ -1148,22 +1171,45 @@ export default function Settings({
                     </h3>
                     <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="fedex-key">API Key</Label>
-                          <Input 
-                            id="fedex-key" 
-                            value={formData.fedex.apiKey}
-                            onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, apiKey: e.target.value } })}
-                          />
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Sandbox Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-sandbox-key">API Key</Label>
+                            <Input 
+                              id="fedex-sandbox-key" 
+                              value={formData.fedex.sandboxApiKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxApiKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-sandbox-secret">Secret Key</Label>
+                            <Input 
+                              id="fedex-sandbox-secret" 
+                              autoComplete="off"
+                              value={formData.fedex.sandboxSecretKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxSecretKey: e.target.value } })}
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="fedex-secret">Secret Key</Label>
-                          <Input 
-                            id="fedex-secret" 
-                            autoComplete="off"
-                            value={formData.fedex.secretKey}
-                            onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, secretKey: e.target.value } })}
-                          />
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Production Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-production-key">API Key</Label>
+                            <Input 
+                              id="fedex-production-key" 
+                              value={formData.fedex.productionApiKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionApiKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-production-secret">Secret Key</Label>
+                            <Input 
+                              id="fedex-production-secret" 
+                              autoComplete="off"
+                              value={formData.fedex.productionSecretKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionSecretKey: e.target.value } })}
+                            />
+                          </div>
                         </div>
                       </div>
                       {formData.fedex.isSandbox ? (

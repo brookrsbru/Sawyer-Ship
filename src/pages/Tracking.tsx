@@ -57,8 +57,8 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
           : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
 
         const client = new UPSClient(
-          credentials.ups.clientId,
-          credentials.ups.clientSecret,
+          credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
+          credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
           accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
@@ -71,8 +71,8 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
           : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
         const client = new FedExClient(
-          credentials.fedex.apiKey,
-          credentials.fedex.secretKey,
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
           accountNumber,
           credentials.fedex.isSandbox,
           credentials.general.proxyUrl

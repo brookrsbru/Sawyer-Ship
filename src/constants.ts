@@ -1,1 +1,2 @@
-export const APP_VERSION = '1.1.0';
+// MajorVersion.Version.MinorVersion
+export const APP_VERSION = '1.1.1';
