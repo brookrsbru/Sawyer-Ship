@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw } from 'lucide-react';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
@@ -69,6 +69,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLabelViewerOpen, setIsLabelViewerOpen] = useState(false);
   const [fullNameInput, setFullNameInput] = useState("");
+  const [addressSearch, setAddressSearch] = useState("");
 
   // Address Validation State
   const [isFedExValid, setIsFedExValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
@@ -175,6 +176,35 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
 
   const handleWeightGChange = (val: string) => {
     setWeightG(val);
+  };
+
+  const handleSelectAddress = (customer: any) => {
+    if (!order) return;
+    const parts = customer.fullname.trim().split(' ');
+    const first = parts[0] || '';
+    const last = parts.slice(1).join(' ') || '';
+    
+    setFullNameInput(customer.fullname);
+    setOrder({
+      ...order,
+      customer_email: customer.email || '',
+      customer_firstname: first,
+      customer_lastname: last,
+      shipping_address: {
+        ...order.shipping_address!,
+        firstname: first,
+        lastname: last,
+        company: customer.company || '',
+        street: [customer.street1 || '', customer.street2 || '', customer.street3 || ''],
+        city: customer.city || '',
+        region: customer.region || '',
+        postcode: customer.postcode || '',
+        country_id: customer.country || 'GB',
+        telephone: customer.telephone || '',
+        is_residential: !!customer.residential
+      }
+    });
+    toast.success(`Loaded address for ${customer.fullname}`);
   };
 
   const handleWeightGBlur = () => {
@@ -1184,8 +1214,16 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
       order.shipping_address?.postcode
     );
 
+    const filteredAddressBook = (credentials.addressBook || []).filter(c => 
+      c.fullname.toLowerCase().includes(addressSearch.toLowerCase()) ||
+      (c.company && c.company.toLowerCase().includes(addressSearch.toLowerCase())) ||
+      (c.email && c.email.toLowerCase().includes(addressSearch.toLowerCase())) ||
+      (c.postcode && c.postcode.toLowerCase().includes(addressSearch.toLowerCase())) ||
+      (c.reference && c.reference.toLowerCase().includes(addressSearch.toLowerCase()))
+    );
+
     return (
-      <div className="max-w-[630px] mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft size={20} />
@@ -1196,218 +1234,286 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
           </div>
         </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Customer & Shipping Information</CardTitle>
-            <CardDescription>All fields marked with * are required.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Full Name <span className="text-red-500">*</span></Label>
-              <Input 
-                value={fullNameInput} 
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFullNameInput(val);
-                  const parts = val.trim().split(' ');
-                  const first = parts[0] || '';
-                  const last = parts.slice(1).join(' ') || '';
-                  setOrder({
-                    ...order, 
-                    customer_firstname: first,
-                    customer_lastname: last,
-                    shipping_address: { ...order.shipping_address!, firstname: first, lastname: last }
-                  });
-                }}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Left Column: Manual Form */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer & Shipping Information</CardTitle>
+              <CardDescription>All fields marked with * are required.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>Full Name <span className="text-red-500">*</span></Label>
                 <Input 
-                  value={order.customer_email} 
-                  onChange={(e) => setOrder({...order, customer_email: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Telephone</Label>
-                <Input 
-                  value={order.shipping_address?.telephone || ''} 
-                  onChange={(e) => setOrder({
-                    ...order, 
-                    shipping_address: { ...order.shipping_address!, telephone: e.target.value }
-                  })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Company</Label>
-              <Input 
-                value={order.shipping_address?.company || ''} 
-                onChange={(e) => setOrder({
-                  ...order, 
-                  shipping_address: { ...order.shipping_address!, company: e.target.value }
-                })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="flex justify-between">
-                Address Line 1 <span className="text-red-500">*</span>
-                {(order.shipping_address?.street?.[0]?.length || 0) > 35 && (
-                  <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
-                )}
-              </Label>
-              <Input 
-                value={order.shipping_address?.street?.[0] || ''} 
-                onChange={(e) => {
-                  const street = [...(order.shipping_address?.street || [])];
-                  street[0] = e.target.value;
-                  setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
-                }}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex justify-between">
-                  Address Line 2
-                  {(order.shipping_address?.street?.[1]?.length || 0) > 35 && (
-                    <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
-                  )}
-                </Label>
-                <Input 
-                  value={order.shipping_address?.street?.[1] || ''} 
+                  value={fullNameInput || ''} 
                   onChange={(e) => {
-                    const street = [...(order.shipping_address?.street || [])];
-                    street[1] = e.target.value;
-                    setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                    const val = e.target.value;
+                    setFullNameInput(val);
+                    const parts = val.trim().split(' ');
+                    const first = parts[0] || '';
+                    const last = parts.slice(1).join(' ') || '';
+                    setOrder({
+                      ...order!, 
+                      customer_firstname: first,
+                      customer_lastname: last,
+                      shipping_address: { ...order!.shipping_address!, firstname: first, lastname: last }
+                    });
                   }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input 
+                    value={order!.customer_email || ''} 
+                    onChange={(e) => setOrder({...order!, customer_email: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telephone</Label>
+                  <Input 
+                    value={order!.shipping_address?.telephone || ''} 
+                    onChange={(e) => setOrder({
+                      ...order!, 
+                      shipping_address: { ...order!.shipping_address!, telephone: e.target.value }
+                    })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Company</Label>
+                <Input 
+                  value={order!.shipping_address?.company || ''} 
+                  onChange={(e) => setOrder({
+                    ...order!, 
+                    shipping_address: { ...order!.shipping_address!, company: e.target.value }
+                  })}
                 />
               </div>
               <div className="space-y-2">
                 <Label className="flex justify-between">
-                  Address Line 3
-                  {(order.shipping_address?.street?.[2]?.length || 0) > 35 && (
+                  Address Line 1 <span className="text-red-500">*</span>
+                  {(order!.shipping_address?.street?.[0]?.length || 0) > 35 && (
                     <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
                   )}
                 </Label>
                 <Input 
-                  value={order.shipping_address?.street?.[2] || ''} 
+                  value={order!.shipping_address?.street?.[0] || ''} 
                   onChange={(e) => {
-                    const street = [...(order.shipping_address?.street || [])];
-                    street[2] = e.target.value;
-                    setOrder({ ...order, shipping_address: { ...order.shipping_address!, street } });
+                    const street = [...(order!.shipping_address?.street || [])];
+                    street[0] = e.target.value;
+                    setOrder({ ...order!, shipping_address: { ...order!.shipping_address!, street } });
                   }}
                 />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>City <span className="text-red-500">*</span></Label>
-                <Input 
-                  value={order.shipping_address?.city || ''} 
-                  onChange={(e) => setOrder({
-                    ...order, 
-                    shipping_address: { ...order.shipping_address!, city: e.target.value }
-                  })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex justify-between">
+                    Address Line 2
+                    {(order!.shipping_address?.street?.[1]?.length || 0) > 35 && (
+                      <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                    )}
+                  </Label>
+                  <Input 
+                    value={order!.shipping_address?.street?.[1] || ''} 
+                    onChange={(e) => {
+                      const street = [...(order!.shipping_address?.street || [])];
+                      street[1] = e.target.value;
+                      setOrder({ ...order!, shipping_address: { ...order!.shipping_address!, street } });
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex justify-between">
+                    Address Line 3
+                    {(order!.shipping_address?.street?.[2]?.length || 0) > 35 && (
+                      <span className="text-[10px] text-red-500 font-bold">EXCEEDS 35 CHARS</span>
+                    )}
+                  </Label>
+                  <Input 
+                    value={order!.shipping_address?.street?.[2] || ''} 
+                    onChange={(e) => {
+                      const street = [...(order!.shipping_address?.street || [])];
+                      street[2] = e.target.value;
+                      setOrder({ ...order!, shipping_address: { ...order!.shipping_address!, street } });
+                    }}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Region / State</Label>
-                <Input 
-                  placeholder="e.g. California or CA"
-                  value={order.shipping_address?.region || ''} 
-                  onChange={(e) => setOrder({
-                    ...order, 
-                    shipping_address: { ...order.shipping_address!, region: e.target.value }
-                  })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>City <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={order!.shipping_address?.city || ''} 
+                    onChange={(e) => setOrder({
+                      ...order!, 
+                      shipping_address: { ...order!.shipping_address!, city: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Region / State</Label>
+                  <Input 
+                    placeholder="e.g. California or CA"
+                    value={order!.shipping_address?.region || ''} 
+                    onChange={(e) => setOrder({
+                      ...order!, 
+                      shipping_address: { ...order!.shipping_address!, region: e.target.value }
+                    })}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Postcode <span className="text-red-500">*</span></Label>
-                <Input 
-                  value={order.shipping_address?.postcode || ''} 
-                  onChange={(e) => setOrder({
-                    ...order, 
-                    shipping_address: { ...order.shipping_address!, postcode: e.target.value }
-                  })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Postcode <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={order!.shipping_address?.postcode || ''} 
+                    onChange={(e) => setOrder({
+                      ...order!, 
+                      shipping_address: { ...order!.shipping_address!, postcode: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Country <span className="text-red-500">*</span></Label>
+                  <Select 
+                    value={order!.shipping_address?.country_id}
+                    onValueChange={(v) => setOrder({
+                      ...order!,
+                      shipping_address: { ...order!.shipping_address!, country_id: v }
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country">
+                        {COUNTRY_NAMES[order!.shipping_address?.country_id || ''] || order!.shipping_address?.country_id}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
+                        <SelectItem key={code} value={code}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Country <span className="text-red-500">*</span></Label>
-                <Select 
-                  value={order.shipping_address?.country_id}
-                  onValueChange={(v) => setOrder({
-                    ...order,
-                    shipping_address: { ...order.shipping_address!, country_id: v }
-                  })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select country">
-                      {COUNTRY_NAMES[order.shipping_address?.country_id || ''] || order.shipping_address?.country_id}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
-                      <SelectItem key={code} value={code}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
-            <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg items-center h-[58px]">
-              <div className="flex-1 flex items-center relative">
-                <Button
-                  type="button"
-                  variant={order.shipping_address?.is_residential ? "default" : "outline"}
-                  size="sm"
-                  className={`h-7 w-full text-[9px] font-bold uppercase tracking-wider transition-all rounded-md ${
-                    order.shipping_address?.is_residential 
-                      ? "bg-zinc-900 text-white shadow-inner" 
-                      : "bg-white text-zinc-500 border-zinc-200"
-                  }`}
-                  onClick={() => setOrder({
-                    ...order,
-                    shipping_address: { ...order.shipping_address!, is_residential: !order.shipping_address?.is_residential }
-                  })}
-                >
-                  {order.shipping_address?.is_residential ? 'Residential' : 'Business'}
-                </Button>
-                {recommendedResidential !== null && order.shipping_address?.is_residential !== recommendedResidential && (
-                  <div className="absolute top-[110%] left-0 right-0 flex justify-center">
-                    <p className="text-[9px] text-zinc-400 whitespace-nowrap italic leading-none">
-                      Changed From Suggested
-                    </p>
+              <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg items-center h-[58px]">
+                <div className="flex-1 flex items-center relative">
+                  <Button
+                    type="button"
+                    variant={order!.shipping_address?.is_residential ? "default" : "outline"}
+                    size="sm"
+                    className={`h-7 w-full text-[9px] font-bold uppercase tracking-wider transition-all rounded-md ${
+                      order!.shipping_address?.is_residential 
+                        ? "bg-zinc-900 text-white shadow-inner" 
+                        : "bg-white text-zinc-500 border-zinc-200"
+                    }`}
+                    onClick={() => setOrder({
+                      ...order!,
+                      shipping_address: { ...order!.shipping_address!, is_residential: !order!.shipping_address?.is_residential }
+                    })}
+                  >
+                    {order!.shipping_address?.is_residential ? 'Residential' : 'Business'}
+                  </Button>
+                  {recommendedResidential !== null && order!.shipping_address?.is_residential !== recommendedResidential && (
+                    <div className="absolute top-[110%] left-0 right-0 flex justify-center">
+                      <p className="text-[9px] text-zinc-400 whitespace-nowrap italic leading-none">
+                        Changed From Suggested
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <Separator orientation="vertical" className="h-6" />
+                <div className="flex-1 flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-600">FedEx</span>
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                    <ValidationIcon status={isFedExValid} />
                   </div>
-                )}
-              </div>
-              <Separator orientation="vertical" className="h-6" />
-              <div className="flex-1 flex items-center justify-between">
-                <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
-                <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
-                  <ValidationIcon status={isFedExValid} />
+                </div>
+                <Separator orientation="vertical" className="h-6" />
+                <div className="flex-1 flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-600">UPS</span>
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                    <ValidationIcon status={isUPSValid} />
+                  </div>
                 </div>
               </div>
-              <Separator orientation="vertical" className="h-6" />
-              <div className="flex-1 flex items-center justify-between">
-                <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
-                <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
-                  <ValidationIcon status={isUPSValid} />
-                </div>
-              </div>
-            </div>
 
-            <Button 
-              className="w-full bg-zinc-900 hover:bg-zinc-800" 
-              disabled={!isComplete}
-              onClick={() => setIsManualReady(true)}
-            >
-              Continue to Shipping
-            </Button>
-          </CardContent>
-        </Card>
+              <Button 
+                className="w-full bg-zinc-900 hover:bg-zinc-800" 
+                disabled={!isComplete}
+                onClick={() => setIsManualReady(true)}
+              >
+                Continue to Shipping
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Right Column: Address Book Autofill */}
+          <Card className="flex flex-col max-h-[calc(100vh-280px)] min-h-[600px]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Book className="w-5 h-5 text-zinc-400" />
+                Address Book
+              </CardTitle>
+              <CardDescription>Search and select from your saved addresses.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 flex-1 flex flex-col min-h-0">
+               <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
+                  <Input 
+                     placeholder="Search name, company, email..." 
+                     className="pl-10 h-10 border-zinc-200 focus:ring-zinc-900"
+                     value={addressSearch}
+                     onChange={(e) => setAddressSearch(e.target.value)}
+                  />
+               </div>
+               
+               <div className="flex-1 overflow-auto border rounded-xl divide-y bg-zinc-50/30">
+                  {filteredAddressBook.length > 0 ? (
+                    filteredAddressBook.map(customer => (
+                      <button
+                        key={customer.id}
+                        onClick={() => handleSelectAddress(customer)}
+                        className="w-full text-left p-4 hover:bg-white transition-all flex items-center justify-between group"
+                      >
+                        <div className="space-y-1 pr-4">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-zinc-900 group-hover:text-zinc-600 transition-colors uppercase text-xs tracking-tight">
+                              {customer.fullname}
+                            </p>
+                            {customer.reference && (
+                              <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4 border-zinc-200 text-zinc-400 bg-white">
+                                {customer.reference}
+                              </Badge>
+                            )}
+                          </div>
+                          {customer.company && <p className="text-[11px] text-zinc-500 font-medium leading-none">{customer.company}</p>}
+                          <div className="flex items-start gap-1 text-[11px] text-zinc-400 leading-tight">
+                             <MapPin size={10} className="mt-0.5 shrink-0" />
+                             <span>{customer.street1}, {customer.city}, {customer.postcode}</span>
+                          </div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all shadow-sm">
+                          <ArrowRight size={14} className="text-zinc-900" />
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full p-8 text-center text-zinc-400 space-y-3">
+                      <div className="p-4 rounded-full bg-zinc-50 border border-zinc-100">
+                        <Search className="w-6 h-6 opacity-40" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">No matches found</p>
+                        <p className="text-[11px] max-w-[200px]">Try searching for something else or add a contact to the Address Book.</p>
+                      </div>
+                    </div>
+                  )}
+               </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
