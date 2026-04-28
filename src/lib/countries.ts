@@ -250,3 +250,22 @@ export const COUNTRY_NAMES: Record<string, string> = {
   "ZM": "Zambia",
   "ZW": "Zimbabwe"
 };
+
+/**
+ * Gets the ISO 2-letter country code from a name or code.
+ */
+export function getCountryCode(nameOrCode: string | undefined): string {
+  if (!nameOrCode) return 'GB';
+  const clean = nameOrCode.trim();
+  if (clean.length === 2) return clean.toUpperCase();
+  
+  // Search in values (case insensitive)
+  const entry = Object.entries(COUNTRY_NAMES).find(([code, name]) => 
+    name.toLowerCase() === clean.toLowerCase()
+  );
+  if (entry) return entry[0];
+
+  // Try partial match or return original if length is 2/3 (maybe just return first 2)
+  return clean.length === 2 ? clean.toUpperCase() : 'GB';
+}
+
