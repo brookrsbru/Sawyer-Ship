@@ -249,7 +249,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
             address: {
               streetLines: order.shipping_address.street.filter(Boolean),
               city: order.shipping_address.city,
-              stateOrProvinceCode: normalizeRegion(order.shipping_address.region, getCarrierCountryCode(order.shipping_address.country_id)),
+              stateOrProvinceCode: (['US', 'CA', 'GB'].includes(getCarrierCountryCode(order.shipping_address.country_id))) ? normalizeRegion(order.shipping_address.region, getCarrierCountryCode(order.shipping_address.country_id)) : undefined,
               postalCode: order.shipping_address.postcode,
               countryCode: getCarrierCountryCode(order.shipping_address.country_id)
             }
@@ -593,7 +593,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                     credentials.general.originStreet2
                   ].filter(Boolean),
                   city: credentials.general.originCity,
-                  stateOrProvinceCode: (getCarrierCountryCode(credentials.general.originCountry) === 'US' || getCarrierCountryCode(credentials.general.originCountry) === 'CA') ? normalizeRegion(credentials.general.originState, getCarrierCountryCode(credentials.general.originCountry)) : undefined,
+                  stateOrProvinceCode: (['US', 'CA', 'GB'].includes(getCarrierCountryCode(credentials.general.originCountry))) ? normalizeRegion(credentials.general.originState, getCarrierCountryCode(credentials.general.originCountry)) : undefined,
                   postalCode: credentials.general.originPostalCode,
                   countryCode: getCarrierCountryCode(credentials.general.originCountry)
                 },
@@ -608,7 +608,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
                 address: {
                   streetLines: order.shipping_address.street,
                   city: order.shipping_address.city,
-                  stateOrProvinceCode: (getCarrierCountryCode(order.shipping_address.country_id) === 'US' || getCarrierCountryCode(order.shipping_address.country_id) === 'CA') ? normalizeRegion(order.shipping_address.region, getCarrierCountryCode(order.shipping_address.country_id)) : undefined,
+                  stateOrProvinceCode: (['US', 'CA', 'GB'].includes(getCarrierCountryCode(order.shipping_address.country_id))) ? normalizeRegion(order.shipping_address.region, getCarrierCountryCode(order.shipping_address.country_id)) : undefined,
                   postalCode: order.shipping_address.postcode,
                   countryCode: getCarrierCountryCode(order.shipping_address.country_id),
                   residential: !!order.shipping_address.is_residential
@@ -993,7 +993,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               address: {
                 streetLines: [credentials.general.originStreet1, credentials.general.originStreet2].filter(Boolean),
                 city: credentials.general.originCity,
-                stateOrProvinceCode: normalizeRegion(credentials.general.originState, getCarrierCountryCode(credentials.general.originCountry)),
+                stateOrProvinceCode: (['US', 'CA', 'GB'].includes(getCarrierCountryCode(credentials.general.originCountry))) ? normalizeRegion(credentials.general.originState, getCarrierCountryCode(credentials.general.originCountry)) : undefined,
                 postalCode: credentials.general.originPostalCode,
                 countryCode: getCarrierCountryCode(credentials.general.originCountry)
               }
@@ -1007,7 +1007,7 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
               address: {
                 streetLines: order.shipping_address?.street,
                 city: order.shipping_address?.city,
-                stateOrProvinceCode: normalizeRegion(order.shipping_address?.region, getCarrierCountryCode(order.shipping_address?.country_id)),
+                stateOrProvinceCode: (['US', 'CA', 'GB'].includes(getCarrierCountryCode(order.shipping_address?.country_id))) ? normalizeRegion(order.shipping_address?.region, getCarrierCountryCode(order.shipping_address?.country_id)) : undefined,
                 postalCode: order.shipping_address?.postcode,
                 countryCode: getCarrierCountryCode(order.shipping_address?.country_id),
                 residential: !!order.shipping_address?.is_residential
