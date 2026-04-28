@@ -815,7 +815,6 @@ export default function AddressBook({
                 value={editingCustomer?.region || ''}
                 onChange={(e) => setEditingCustomer(prev => prev ? { ...prev, region: e.target.value } : null)}
               />
-              <p className="text-[10px] text-zinc-500 italic">Full names are automatically converted to codes for carriers.</p>
             </div>
 
             <div className="space-y-2">

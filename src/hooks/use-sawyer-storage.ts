@@ -89,6 +89,20 @@ export interface SawyerCredentials {
   shippingDefaults: ShippingDefaults;
   countryDefaults: Record<string, ShippingDefaults>;
   addressBook: AddressBookCustomer[];
+  shipments: SawyerShipment[];
+}
+
+export interface SawyerShipment {
+  id: string;
+  orderIncrementId: string;
+  trackingNumber: string;
+  carrier: 'UPS' | 'FedEx';
+  service: string;
+  customerName: string;
+  company: string;
+  shipDate: string;
+  status?: string;
+  lastUpdated?: string;
 }
 
 const DEFAULT_SHIPPING_DEFAULTS: ShippingDefaults = {
@@ -157,7 +171,8 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   },
   shippingDefaults: DEFAULT_SHIPPING_DEFAULTS,
   countryDefaults: {},
-  addressBook: []
+  addressBook: [],
+  shipments: []
 };
 
 export function useSawyerStorage() {
@@ -186,7 +201,8 @@ export function useSawyerStorage() {
         fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
         general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) },
         shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) },
-        addressBook: parsed.addressBook || []
+        addressBook: parsed.addressBook || [],
+        shipments: parsed.shipments || []
       };
       
       setCredentials(merged);

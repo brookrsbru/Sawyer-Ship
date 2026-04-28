@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Book, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink, Package } from 'lucide-react';
+import { Lock, Book, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink, Package, Truck } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,7 @@ import Dashboard from '@/src/pages/Dashboard';
 import Settings from '@/src/pages/Settings';
 import OrderDetails from '@/src/pages/OrderDetails';
 import AddressBook from '@/src/pages/AddressBook';
+import Tracking from '@/src/pages/Tracking';
 import { APP_VERSION } from '@/src/constants';
 
 function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: string) => Promise<boolean>, onReset: () => void, hasStoredData: boolean }) {
@@ -52,7 +53,7 @@ function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: strin
             <div className="space-y-2">
               <Input
                 type="password"
-                placeholder="Master Password"
+                placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={error ? "border-red-500" : ""}
@@ -124,6 +125,10 @@ function Layout({ onLogout }: { onLogout: () => void }) {
             <Book size={20} />
             <span>Address Book</span>
           </Link>
+          <Link to="/tracking" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
+            <Truck size={20} />
+            <span>Tracking</span>
+          </Link>
           <Link to="/settings" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
             <SettingsIcon size={20} />
             <span>Settings</span>
@@ -194,7 +199,11 @@ export default function App() {
         },
         {
           path: "order/:id",
-          element: <OrderDetails credentials={credentials} />,
+          element: <OrderDetails credentials={credentials} onSave={save} />,
+        },
+        {
+          path: "tracking",
+          element: <Tracking credentials={credentials} onSave={save} />,
         },
         {
           path: "settings",

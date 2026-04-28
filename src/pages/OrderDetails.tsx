@@ -16,7 +16,7 @@ import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
 import { normalizeRegion } from '@/src/lib/regions';
 import { toast } from 'sonner';
 
-export default function OrderDetails({ credentials }: { credentials: SawyerCredentials }) {
+export default function OrderDetails({ credentials, onSave }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void> }) {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -1185,6 +1185,31 @@ export default function OrderDetails({ credentials }: { credentials: SawyerCrede
         }
         
         toast.success(`Label created! Tracking: ${tracking}`);
+
+        // 3. Save to local shipments for Tracking page
+        try {
+          const newShipment = {
+            id: `${tracking}-${Date.now()}`,
+            orderIncrementId: order.increment_id,
+            trackingNumber: tracking,
+            carrier: selectedRate.carrier as 'UPS' | 'FedEx',
+            service: selectedRate.service,
+            customerName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
+            company: order.shipping_address?.company || '',
+            shipDate: new Date().toISOString(),
+            status: 'Label Created',
+            lastUpdated: new Date().toISOString()
+          };
+
+          const updatedShipments = [newShipment, ...(credentials.shipments || [])];
+          await onSave({
+            ...credentials,
+            shipments: updatedShipments
+          });
+          console.log(`[OrderDetails] Shipment saved to local storage`);
+        } catch (saveError) {
+          console.error(`[OrderDetails] Failed to save shipment to local storage:`, saveError);
+        }
 
         // Auto-open label viewer if enabled
         if (credentials.general.autoOpenLabel) {

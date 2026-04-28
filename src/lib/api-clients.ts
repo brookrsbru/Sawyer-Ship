@@ -356,6 +356,24 @@ export class UPSClient {
     console.log(`[UPSClient] Shipment response:`, data);
     return data;
   }
+
+  async trackShipment(trackingNumber: string): Promise<any> {
+    console.log(`[UPSClient] Tracking shipment: ${trackingNumber}`);
+    const token = await this.getAccessToken();
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/track/v1/details/${trackingNumber}?locale=en_US&returnSignature=false&returnMilestones=false`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'transId': `sawyer-${Date.now()}`,
+        'transactionSrc': 'sawyer-ship'
+      }
+    });
+    const data = await response.json();
+    console.log(`[UPSClient] Tracking response:`, data);
+    return data;
+  }
 }
 
 export class FedExClient {
@@ -454,6 +472,26 @@ export class FedExClient {
     });
     const data = await response.json();
     console.log(`[FedExClient] Address validation response:`, data);
+    return data;
+  }
+
+  async trackShipment(trackingNumber: string): Promise<any> {
+    console.log(`[FedExClient] Tracking shipment: ${trackingNumber}`);
+    const token = await this.getAccessToken();
+    const url = `${this.getProxyUrl()}${this.baseUrl}/track/v1/trackingnumbers`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        trackingInfo: [{ trackingNumberInfo: { trackingNumber } }],
+        includeDetailedScans: false
+      }),
+    });
+    const data = await response.json();
+    console.log(`[FedExClient] Tracking response:`, data);
     return data;
   }
 }
