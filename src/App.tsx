@@ -21,6 +21,7 @@ import Dashboard from '@/src/pages/Dashboard';
 import Settings from '@/src/pages/Settings';
 import OrderDetails from '@/src/pages/OrderDetails';
 import AddressBook from '@/src/pages/AddressBook';
+import { APP_VERSION } from '@/src/constants';
 
 function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: string) => Promise<boolean>, onReset: () => void, hasStoredData: boolean }) {
   const [password, setPassword] = useState('');
@@ -93,6 +94,9 @@ function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: strin
           )}
         </CardContent>
       </Card>
+      <footer className="fixed bottom-4 right-4 text-xs text-zinc-400">
+        v{APP_VERSION}
+      </footer>
     </div>
   );
 }
