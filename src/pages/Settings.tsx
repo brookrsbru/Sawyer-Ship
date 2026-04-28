@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
+import { APP_VERSION } from '@/src/constants';
 
 const UPS_PICKUP_LABELS: Record<string, string> = {
   "01": "Daily Pickup",
@@ -56,6 +57,20 @@ export default function Settings({
   const [devOrderId, setDevOrderId] = useState(() => localStorage.getItem('sawyer_last_search') || '');
   const [devOrderData, setDevOrderData] = useState<any>(null);
   const [isDevLoading, setIsDevLoading] = useState(false);
+
+  // Storage usage calculator
+  const storageUsage = useMemo(() => {
+    let total = 0;
+    for (const key in localStorage) {
+      if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
+        total += ((localStorage[key].length + key.length) * 2);
+      }
+    }
+    // Return formatted string
+    if (total < 1024) return `${total} bytes`;
+    if (total < 1048576) return `${(total / 1024).toFixed(2)} KB`;
+    return `${(total / 1048576).toFixed(2)} MB`;
+  }, [formData, credentials]);
 
   // Check for unsaved changes
   const hasChanges = useMemo(() => {
@@ -155,7 +170,10 @@ export default function Settings({
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 bg-zinc-50/80 backdrop-blur-md z-10 py-4 -mt-4 border-b border-zinc-200 mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-900">Settings</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-zinc-900">Settings</h1>
+            <span className="text-[10px] font-mono bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded border border-zinc-200 mt-2">v{APP_VERSION}</span>
+          </div>
           <p className="text-zinc-500">Manage your API credentials and application preferences.</p>
         </div>
         <Button 
@@ -1415,44 +1433,73 @@ export default function Settings({
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Dev Menu</h2>
                 <div className="h-px flex-1 bg-zinc-200" />
               </div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileJson size={20} /> Magento Order Inspector
-                  </CardTitle>
-                  <CardDescription>Pull raw order data from Magento to inspect all attributes and structures.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input 
-                      placeholder="Enter Order ID (e.g. 000000123)" 
-                      value={devOrderId}
-                      onChange={(e) => setDevOrderId(e.target.value)}
-                    />
-                    <Button onClick={handleDevFetch} disabled={isDevLoading || !devOrderId}>
-                      {isDevLoading ? <Loader2 className="animate-spin" size={18} /> : 'Fetch Raw Data'}
-                    </Button>
-                  </div>
-                  
-                  {devOrderData && (
-                    <div className="space-y-4">
-                      <div className="bg-zinc-950 rounded-lg p-4 overflow-auto max-h-[500px]">
-                        <pre className="text-[10px] text-zinc-300 font-mono">
-                          {JSON.stringify(devOrderData, null, 2)}
-                        </pre>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => {
-                        const blob = new Blob([JSON.stringify(devOrderData, null, 2)], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `order-${devOrderId}-raw.json`;
-                        link.click();
-                      }}>Download JSON</Button>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileJson size={20} /> Magento Order Inspector
+                    </CardTitle>
+                    <CardDescription>Pull raw order data from Magento to inspect all attributes and structures.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="Enter Order ID (e.g. 000000123)" 
+                        value={devOrderId}
+                        onChange={(e) => setDevOrderId(e.target.value)}
+                      />
+                      <Button onClick={handleDevFetch} disabled={isDevLoading || !devOrderId}>
+                        {isDevLoading ? <Loader2 className="animate-spin" size={18} /> : 'Fetch Raw Data'}
+                      </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    
+                    {devOrderData && (
+                      <div className="space-y-4">
+                        <div className="bg-zinc-950 rounded-lg p-4 overflow-auto max-h-[500px]">
+                          <pre className="text-[10px] text-zinc-300 font-mono">
+                            {JSON.stringify(devOrderData, null, 2)}
+                          </pre>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => {
+                          const blob = new Blob([JSON.stringify(devOrderData, null, 2)], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `order-${devOrderId}-raw.json`;
+                          link.click();
+                          link.click();
+                        }}>Download JSON</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <HardDrive size={20} /> Storage Overview
+                    </CardTitle>
+                    <CardDescription>View the total size of data saved in your browser's local storage.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 bg-zinc-50 rounded-lg border border-zinc-200 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-900">Calculated Usage</p>
+                        <p className="text-xs text-zinc-500">Credentials, tracking history, and logs</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-mono font-bold text-zinc-900">{storageUsage}</p>
+                        <p className="text-[10px] text-zinc-400 capitalize">Total bytes processed</p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-[10px] text-zinc-400 italic">
+                      Note: This is an approximation of the memory footprint in your browser.
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </section>
 
             {/* Help Section */}
