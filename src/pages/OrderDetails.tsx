@@ -1165,7 +1165,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         }
 
         // 2. Update Magento Shipment Status (if enabled)
-        if (credentials.general.markAsShipped && id !== 'manual') {
+        const isSandbox = selectedRate.carrier === 'UPS' ? credentials.ups.isSandbox : credentials.fedex.isSandbox;
+
+        if (credentials.general.markAsShipped && id !== 'manual' && !isSandbox) {
           try {
             console.log(`[OrderDetails] Updating Magento shipment status...`);
             const client = new MagentoClient(
@@ -1192,31 +1194,35 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           }
         }
         
-        toast.success(`Label created! Tracking: ${tracking}`);
+        toast.success(`Label created! Tracking: ${tracking}${isSandbox ? ' (SANDBOX)' : ''}`);
 
         // 3. Save to local shipments for Tracking page
-        try {
-          const newShipment = {
-            id: `${tracking}-${Date.now()}`,
-            orderIncrementId: order.increment_id,
-            trackingNumber: tracking,
-            carrier: selectedRate.carrier as 'UPS' | 'FedEx',
-            service: selectedRate.service,
-            customerName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
-            company: order.shipping_address?.company || '',
-            shipDate: new Date().toISOString(),
-            status: 'Label Created',
-            lastUpdated: new Date().toISOString()
-          };
+        if (!isSandbox) {
+          try {
+            const newShipment = {
+              id: `${tracking}-${Date.now()}`,
+              orderIncrementId: order.increment_id,
+              trackingNumber: tracking,
+              carrier: selectedRate.carrier as 'UPS' | 'FedEx',
+              service: selectedRate.service,
+              customerName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
+              company: order.shipping_address?.company || '',
+              shipDate: new Date().toISOString(),
+              status: 'Label Created',
+              lastUpdated: new Date().toISOString()
+            };
 
-          const updatedShipments = [newShipment, ...(credentials.shipments || [])];
-          await onSave({
-            ...credentials,
-            shipments: updatedShipments
-          });
-          console.log(`[OrderDetails] Shipment saved to local storage`);
-        } catch (saveError) {
-          console.error(`[OrderDetails] Failed to save shipment to local storage:`, saveError);
+            const updatedShipments = [newShipment, ...(credentials.shipments || [])];
+            await onSave({
+              ...credentials,
+              shipments: updatedShipments
+            });
+            console.log(`[OrderDetails] Shipment saved to local storage`);
+          } catch (saveError) {
+            console.error(`[OrderDetails] Failed to save shipment to local storage:`, saveError);
+          }
+        } else {
+          console.log(`[OrderDetails] Sandbox label created - skipped saving to tracking list`);
         }
 
         // Auto-open label viewer if enabled
