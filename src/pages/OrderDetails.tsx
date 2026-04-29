@@ -1208,6 +1208,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               customerName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
               company: order.shipping_address?.company || '',
               shipDate: new Date().toISOString(),
+              destCountry: order.shipping_address?.country_id,
               status: 'Label Created',
               lastUpdated: new Date().toISOString()
             };

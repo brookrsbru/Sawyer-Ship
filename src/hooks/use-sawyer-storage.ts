@@ -109,6 +109,7 @@ export interface SawyerShipment {
   customerName: string;
   company: string;
   shipDate: string;
+  destCountry?: string;
   status?: string;
   hasError?: boolean;
   lastUpdated?: string;

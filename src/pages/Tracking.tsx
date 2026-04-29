@@ -51,8 +51,9 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
       let newStatus = shipment.status || 'Unknown';
       
       if (shipment.carrier === 'UPS') {
+        const isDomestic = shipment.destCountry === credentials.general.originCountry;
         const accountNumber = credentials.ups.isSandbox
-          ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber)
+          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
           : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
 
         const clientId = credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId;
@@ -70,8 +71,9 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         const data = await client.trackShipment(shipment.trackingNumber);
         newStatus = data?.trackResponse?.shipment?.[0]?.package?.[0]?.activity?.[0]?.status?.description || 'Active';
       } else if (shipment.carrier === 'FedEx') {
+        const isDomestic = shipment.destCountry === credentials.general.originCountry;
         const accountNumber = credentials.fedex.isSandbox
-          ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber)
+          ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
           : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
         const apiKey = credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey;

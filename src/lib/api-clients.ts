@@ -487,14 +487,19 @@ export class FedExClient {
   }
 
   async trackShipment(trackingNumber: string): Promise<any> {
-    console.log(`[FedExClient] Tracking shipment: ${trackingNumber}`);
+    console.log(`[FedExClient] Tracking shipment: ${trackingNumber} on ${this.baseUrl}`);
     const token = await this.getAccessToken();
     const url = `${this.getProxyUrl()}${this.baseUrl}/track/v1/trackingnumbers`;
+    
+    const transactionId = `sawyer-${Date.now()}`;
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'x-customer-transaction-id': transactionId,
+        'x-locale': 'en_US'
       },
       body: JSON.stringify({
         trackingInfo: [{ trackingNumberInfo: { trackingNumber } }],
@@ -504,7 +509,15 @@ export class FedExClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData?.errors?.[0]?.message || `FedEx Error: ${response.status} ${response.statusText}`);
+      const msg = errorData?.errors?.[0]?.message || `FedEx Error: ${response.status} ${response.statusText}`;
+      console.error(`[FedExClient] Track Error (${response.status}):`, errorData);
+      
+      // If 403, add more context about potential environment mismatch
+      if (response.status === 403) {
+        throw new Error(`${msg} (Target URL: ${this.baseUrl}. Check if your API Key supports Tracking API and matches the environment)`);
+      }
+      
+      throw new Error(msg);
     }
 
     const data = await response.json();
