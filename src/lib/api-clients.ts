@@ -493,6 +493,20 @@ export class FedExClient {
     
     const transactionId = `sawyer-${Date.now()}`;
     
+    const trackBody: any = {
+      trackingInfo: [{ 
+        trackingNumberInfo: { 
+          trackingNumber 
+        } 
+      }],
+      includeDetailedScans: true
+    };
+
+    // Include account number if provided, as some enterprise keys require it for authorization
+    if (this.accountNumber) {
+      trackBody.trackingInfo[0].accountNumber = this.accountNumber;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -501,20 +515,19 @@ export class FedExClient {
         'x-customer-transaction-id': transactionId,
         'x-locale': 'en_US'
       },
-      body: JSON.stringify({
-        trackingInfo: [{ trackingNumberInfo: { trackingNumber } }],
-        includeDetailedScans: false
-      }),
+      body: JSON.stringify(trackBody),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      const errorCode = errorData?.errors?.[0]?.code;
       const msg = errorData?.errors?.[0]?.message || `FedEx Error: ${response.status} ${response.statusText}`;
-      console.error(`[FedExClient] Track Error (${response.status}):`, errorData);
+      
+      console.error(`[FedExClient] Track Error (${response.status} - ${errorCode}):`, errorData);
       
       // If 403, add more context about potential environment mismatch
-      if (response.status === 403) {
-        throw new Error(`${msg} (Target URL: ${this.baseUrl}. Check if your API Key supports Tracking API and matches the environment)`);
+      if (response.status === 403 || errorCode === 'FORBIDDEN.ERROR') {
+        throw new Error(`${msg}. IMPORTANT: Verify in your FedEx Developer Portal that "Track API" is explicitly added to your project permissions for this API Key.`);
       }
       
       throw new Error(msg);
