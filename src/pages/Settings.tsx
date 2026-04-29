@@ -4,12 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -1272,6 +1273,91 @@ export default function Settings({
                           <p className="text-[10px] text-zinc-500">The account number that will be used for both shipping and payor identification.</p>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Tracking API Credentials */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+                      <Search size={16} className="text-zinc-400" />
+                      Tracking API Credentials
+                    </h3>
+                    <p className="text-[10px] text-zinc-500 pl-6 border-l-2 border-zinc-100 italic">
+                      If your FedEx setup requires a separate project for Tracking, enter those credentials below. 
+                      Leave empty to use main Account Credentials above.
+                    </p>
+                    <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
+                      <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg border border-zinc-200 mb-4">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-medium">Tracking Environment</Label>
+                          <p className="text-[10px] text-zinc-500">Enable sandbox mode specifically for tracking</p>
+                        </div>
+                        <Switch 
+                          checked={formData.fedex.isTrackingSandbox}
+                          onCheckedChange={(v) => setFormData({ ...formData, fedex: { ...formData.fedex, isTrackingSandbox: v } })}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Sandbox Tracking</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-track-sandbox-key">API Key</Label>
+                            <Input 
+                              id="fedex-track-sandbox-key" 
+                              value={formData.fedex.sandboxTrackingApiKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxTrackingApiKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-track-sandbox-secret">Secret Key</Label>
+                            <Input 
+                              id="fedex-track-sandbox-secret" 
+                              autoComplete="off"
+                              value={formData.fedex.sandboxTrackingSecretKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxTrackingSecretKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-track-sandbox-account">Account Number</Label>
+                            <Input 
+                              id="fedex-track-sandbox-account" 
+                              value={formData.fedex.sandboxTrackingAccountNumber}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxTrackingAccountNumber: e.target.value } })}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Production Tracking</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-track-production-key">API Key</Label>
+                            <Input 
+                              id="fedex-track-production-key" 
+                              value={formData.fedex.productionTrackingApiKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionTrackingApiKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-track-production-secret">Secret Key</Label>
+                            <Input 
+                              id="fedex-track-production-secret" 
+                              autoComplete="off"
+                              value={formData.fedex.productionTrackingSecretKey}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionTrackingSecretKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fedex-track-production-account">Account Number</Label>
+                            <Input 
+                              id="fedex-track-production-account" 
+                              value={formData.fedex.productionTrackingAccountNumber}
+                              onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionTrackingAccountNumber: e.target.value } })}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

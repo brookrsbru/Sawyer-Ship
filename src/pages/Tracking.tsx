@@ -71,13 +71,24 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         const data = await client.trackShipment(shipment.trackingNumber);
         newStatus = data?.trackResponse?.shipment?.[0]?.package?.[0]?.activity?.[0]?.status?.description || 'Active';
       } else if (shipment.carrier === 'FedEx') {
-        const isDomestic = shipment.destCountry === credentials.general.originCountry;
-        const accountNumber = credentials.fedex.isSandbox
-          ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
-          : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
+        const isTrackingSandbox = credentials.fedex.isTrackingSandbox;
+        
+        // Use tracking-specific account numbers if provided
+        const accountNumber = isTrackingSandbox
+          ? (credentials.fedex.sandboxTrackingAccountNumber || credentials.fedex.accountNumber)
+          : (credentials.fedex.productionTrackingAccountNumber || credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
-        const apiKey = credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey;
-        const secretKey = credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey;
+        // Use separate tracking credentials if provided, otherwise fall back to shipping credentials
+        const trackingApiKey = isTrackingSandbox 
+          ? (credentials.fedex.sandboxTrackingApiKey || credentials.fedex.sandboxApiKey)
+          : (credentials.fedex.productionTrackingApiKey || credentials.fedex.productionApiKey);
+        
+        const trackingSecretKey = isTrackingSandbox
+          ? (credentials.fedex.sandboxTrackingSecretKey || credentials.fedex.sandboxSecretKey)
+          : (credentials.fedex.productionTrackingSecretKey || credentials.fedex.productionSecretKey);
+
+        const apiKey = trackingApiKey;
+        const secretKey = trackingSecretKey;
 
         if (!apiKey || !secretKey) throw new Error('Missing FedEx credentials');
 
@@ -85,7 +96,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
           apiKey,
           secretKey,
           accountNumber,
-          credentials.fedex.isSandbox,
+          isTrackingSandbox,
           credentials.general.proxyUrl
         );
         const data = await client.trackShipment(shipment.trackingNumber);

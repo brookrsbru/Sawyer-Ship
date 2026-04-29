@@ -63,6 +63,14 @@ export interface SawyerCredentials {
     sandboxSecretKey: string;
     productionApiKey: string;
     productionSecretKey: string;
+    // Separate Tracking Credentials
+    sandboxTrackingApiKey: string;
+    sandboxTrackingSecretKey: string;
+    productionTrackingApiKey: string;
+    productionTrackingSecretKey: string;
+    sandboxTrackingAccountNumber: string;
+    productionTrackingAccountNumber: string;
+    isTrackingSandbox: boolean;
     accountNumber: string; // Legacy, kept for migration
     domesticAccountNumber: string;
     globalAccountNumber: string;
@@ -156,6 +164,13 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     sandboxSecretKey: '',
     productionApiKey: '',
     productionSecretKey: '',
+    sandboxTrackingApiKey: '',
+    sandboxTrackingSecretKey: '',
+    productionTrackingApiKey: '',
+    productionTrackingSecretKey: '',
+    sandboxTrackingAccountNumber: '',
+    productionTrackingAccountNumber: '',
+    isTrackingSandbox: true,
     accountNumber: '', 
     domesticAccountNumber: '', 
     globalAccountNumber: '', 
