@@ -1,2 +1,2 @@
-// MajorVersion.Version.MinorVersion
-export const APP_VERSION = '1.1.8';
+// MajorVersion.MinorVersion.Patch
+export const APP_VERSION = '1.2.0';

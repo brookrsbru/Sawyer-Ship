@@ -44,9 +44,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`;
   };
 
-  const updateShipmentStatus = async (shipment: SawyerShipment) => {
-    setRefreshingIds(prev => new Set(prev).add(shipment.id));
-    
+  const fetchStatus = async (shipment: SawyerShipment): Promise<{ status: string; hasError: boolean }> => {
     try {
       let newStatus = shipment.status || 'Unknown';
       
@@ -72,13 +70,10 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         newStatus = data?.trackResponse?.shipment?.[0]?.package?.[0]?.activity?.[0]?.status?.description || 'Active';
       } else if (shipment.carrier === 'FedEx') {
         const isTrackingSandbox = credentials.fedex.isTrackingSandbox;
-        
-        // Use tracking-specific account numbers if provided
         const accountNumber = isTrackingSandbox
           ? (credentials.fedex.sandboxTrackingAccountNumber || credentials.fedex.accountNumber)
           : (credentials.fedex.productionTrackingAccountNumber || credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
-        // Use separate tracking credentials if provided, otherwise fall back to shipping credentials
         const trackingApiKey = isTrackingSandbox 
           ? (credentials.fedex.sandboxTrackingApiKey || credentials.fedex.sandboxApiKey)
           : (credentials.fedex.productionTrackingApiKey || credentials.fedex.productionApiKey);
@@ -102,34 +97,36 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         const data = await client.trackShipment(shipment.trackingNumber);
         newStatus = data?.output?.completeTrackResults?.[0]?.trackResults?.[0]?.latestStatusDetail?.description || 'Active';
       }
+      return { status: newStatus, hasError: false };
+    } catch (e) {
+      console.error(`Failed to fetch status for ${shipment.trackingNumber}:`, e);
+      return { status: shipment.status || 'Active', hasError: true };
+    }
+  };
 
-      // Update local storage on SUCCESS
+  const updateShipmentStatus = async (shipment: SawyerShipment) => {
+    setRefreshingIds(prev => new Set(prev).add(shipment.id));
+    
+    try {
+      const result = await fetchStatus(shipment);
+      
       const updatedShipments = credentials.shipments.map(s => 
-        s.id === shipment.id ? { ...s, status: newStatus, hasError: false, lastUpdated: new Date().toISOString() } : s
+        s.id === shipment.id 
+          ? { ...s, status: result.status, hasError: result.hasError, lastUpdated: new Date().toISOString() } 
+          : s
       );
 
       await onSave({
         ...credentials,
         shipments: updatedShipments
       });
+
+      if (result.hasError) {
+        toast.error(`Could not refresh tracking for ${shipment.trackingNumber}`);
+      }
       
     } catch (e) {
       console.error(`Failed to refresh tracking for ${shipment.trackingNumber}:`, e);
-      
-      // Update local storage on FAILURE - mark as error but preserve old status
-      const updatedShipments = credentials.shipments.map(s => 
-        s.id === shipment.id ? { ...s, hasError: true, lastUpdated: new Date().toISOString() } : s
-      );
-
-      await onSave({
-        ...credentials,
-        shipments: updatedShipments
-      });
-      
-      // Only show error toast for manual refreshes of one item
-      if (refreshingIds.size === 1) {
-        toast.error(`Could not refresh tracking for ${shipment.trackingNumber}`);
-      }
     } finally {
       setRefreshingIds(prev => {
         const next = new Set(prev);
@@ -140,14 +137,60 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   };
 
   const refreshPageStatuses = async () => {
+    if (isRefreshing) return;
     setIsRefreshing(true);
-    toast.info(`Refreshing statuses for ${paginatedShipments.length} shipments...`);
     
-    const promises = paginatedShipments.map(s => updateShipmentStatus(s));
-    await Promise.all(promises);
+    const shipmentsToRefresh = [...paginatedShipments];
+    toast.info(`Refreshing ${shipmentsToRefresh.length} shipments sequentialy...`);
     
-    setIsRefreshing(false);
-    toast.success("Tracking statuses updated.");
+    // Track which ones are currently refreshing for the UI
+    setRefreshingIds(new Set(shipmentsToRefresh.map(s => s.id)));
+    
+    const results: Record<string, { status: string; hasError: boolean }> = {};
+    
+    try {
+      // Process sequentially to be safe with rate limits and state
+      for (const shipment of shipmentsToRefresh) {
+        results[shipment.id] = await fetchStatus(shipment);
+        // Small delay to prevent hammering proxy/APIs
+        await new Promise(r => setTimeout(r, 100));
+        
+        // Update refreshing state as we go
+        setRefreshingIds(prev => {
+          const next = new Set(prev);
+          next.delete(shipment.id);
+          return next;
+        });
+      }
+
+      // One big update at the end to prevent clobbering
+      const now = new Date().toISOString();
+      const updatedShipments = credentials.shipments.map(s => {
+        const result = results[s.id];
+        if (result) {
+          return { 
+            ...s, 
+            status: result.status, 
+            hasError: result.hasError, 
+            lastUpdated: now 
+          };
+        }
+        return s;
+      });
+
+      await onSave({
+        ...credentials,
+        shipments: updatedShipments
+      });
+      
+      toast.success("Tracking statuses updated.");
+    } catch (error) {
+      console.error("[Tracking] Bulk refresh failed:", error);
+      toast.error("An error occurred during bulk refresh.");
+    } finally {
+      setIsRefreshing(false);
+      setRefreshingIds(new Set());
+    }
   };
 
   // Initial refresh of current page on mount? Maybe not auto-refresh all to avoid rate limits
