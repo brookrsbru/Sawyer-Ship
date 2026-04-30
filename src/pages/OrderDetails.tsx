@@ -18,6 +18,8 @@ import { toast } from 'sonner';
 
 interface Parcel {
   id: string;
+  weightKg: string;
+  weightG: string;
   weight: string;
   length: string;
   width: string;
@@ -435,6 +437,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     if (parcels.length === 0) {
       setParcels([{
         id: crypto.randomUUID(),
+        weightKg: weightKg,
+        weightG: weightG,
         weight: weight,
         length: length,
         width: width,
@@ -447,6 +451,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const handleAddParcel = () => {
     setParcels(prev => [...prev, {
       id: crypto.randomUUID(),
+      weightKg: '1',
+      weightG: '0',
       weight: '1.0',
       length: '',
       width: '',
@@ -469,7 +475,56 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   };
 
   const updateParcel = (id: string, field: keyof Parcel, value: string) => {
-    setParcels(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+    setParcels(prev => prev.map(p => {
+      if (p.id === id) {
+        const updated = { ...p, [field]: value };
+        // Recalculate total weight if Kg or G changed
+        if (field === 'weightKg' || field === 'weightG') {
+          const kg = parseFloat(updated.weightKg) || 0;
+          const g = parseFloat(updated.weightG) || 0;
+          updated.weight = (kg + (g / 1000)).toFixed(3);
+        }
+        return updated;
+      }
+      return p;
+    }));
+  };
+
+  const handleParcelWeightBlur = (id: string, field: 'weightKg' | 'weightG') => {
+    setParcels(prev => prev.map(p => {
+      if (p.id === id) {
+        const updated = { ...p };
+        const mode = credentials.general.weightDisplayMode || 'both';
+        
+        if (field === 'weightKg') {
+          const num = parseFloat(updated.weightKg);
+          if (!isNaN(num) && mode === 'both') {
+            const kg = Math.floor(num);
+            const remainder = num - kg;
+            if (remainder > 0) {
+              updated.weightKg = kg.toString();
+              updated.weightG = (Math.round(remainder * 1000)).toString();
+            }
+          }
+        } else if (field === 'weightG') {
+          const num = parseFloat(updated.weightG);
+          if (!isNaN(num) && num >= 1000 && mode === 'both') {
+            const extraKg = Math.floor(num / 1000);
+            const remainingG = num % 1000;
+            updated.weightKg = ( (parseFloat(updated.weightKg) || 0) + extraKg ).toString();
+            updated.weightG = isNaN(remainingG) ? '0' : Math.round(remainingG).toString();
+          }
+        }
+        
+        // Final recalculate total weight
+        const kgVal = parseFloat(updated.weightKg) || 0;
+        const gVal = parseFloat(updated.weightG) || 0;
+        updated.weight = (kgVal + (gVal / 1000)).toFixed(3);
+        
+        return updated;
+      }
+      return p;
+    }));
   };
 
   const handleParcelModalClose = (open: boolean) => {
@@ -485,9 +540,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       } else if (parcels.length === 1) {
         const p = parcels[0];
         setWeight(p.weight);
-        const wNum = parseFloat(p.weight) || 0;
-        setWeightKg(Math.floor(wNum).toString());
-        setWeightG(Math.round((wNum % 1) * 1000).toString());
+        setWeightKg(p.weightKg);
+        setWeightG(p.weightG);
         setLength(p.length);
         setWidth(p.width);
         setHeight(p.height);
@@ -2482,8 +2536,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       <div className="flex-1 overflow-y-auto p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {parcels.map((parcel, index) => (
-                            <Card key={parcel.id} className="relative overflow-hidden border-zinc-200">
-                              <CardHeader className="p-3 bg-zinc-50 border-b flex flex-row items-center justify-between space-y-0">
+                            <div key={parcel.id} className="relative overflow-hidden border border-zinc-200 rounded-xl bg-white flex flex-col">
+                              <div className="p-3 bg-zinc-50 border-b flex flex-row items-center justify-between space-y-0">
                                 <span className="text-xs font-black uppercase tracking-widest text-zinc-400">Parcel {index + 1}</span>
                                 <div className="flex items-center gap-1">
                                   <Button 
@@ -2505,49 +2559,75 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                                     <Trash2 size={12} />
                                   </Button>
                                 </div>
-                              </CardHeader>
-                              <CardContent className="p-4 space-y-3">
+                              </div>
+                              <div className="p-4 space-y-4">
                                 <div className="space-y-1.5">
-                                  <Label className="text-[10px] font-bold uppercase text-zinc-500">Weight (kg)</Label>
-                                  <Input 
-                                    type="number" 
-                                    step="0.001"
-                                    value={parcel.weight} 
-                                    onChange={(e) => updateParcel(parcel.id, 'weight', e.target.value)}
-                                    className="h-8 text-xs font-bold"
-                                  />
+                                  <Label className="text-[10px] font-bold uppercase text-zinc-500">Weight</Label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {(credentials.general.weightDisplayMode === 'both' || credentials.general.weightDisplayMode === 'kg') && (
+                                      <div className="space-y-1">
+                                        <Label className="text-[9px] text-zinc-400">Kilograms</Label>
+                                        <Input 
+                                          type="number" 
+                                          step="0.1"
+                                          placeholder="0"
+                                          value={parcel.weightKg} 
+                                          onChange={(e) => updateParcel(parcel.id, 'weightKg', e.target.value)}
+                                          onBlur={() => handleParcelWeightBlur(parcel.id, 'weightKg')}
+                                          className="h-8 text-xs font-bold"
+                                        />
+                                      </div>
+                                    )}
+                                    {(credentials.general.weightDisplayMode === 'both' || credentials.general.weightDisplayMode === 'grams') && (
+                                      <div className="space-y-1">
+                                        <Label className="text-[9px] text-zinc-400">Grams</Label>
+                                        <Input 
+                                          type="number" 
+                                          placeholder="0"
+                                          value={parcel.weightG} 
+                                          onChange={(e) => updateParcel(parcel.id, 'weightG', e.target.value)}
+                                          onBlur={() => handleParcelWeightBlur(parcel.id, 'weightG')}
+                                          className="h-8 text-xs font-bold"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="text-[9px] text-zinc-400 italic">Total: {parcel.weight}kg</p>
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                  <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-bold uppercase text-zinc-500">Length</Label>
-                                    <Input 
-                                      type="number" 
-                                      value={parcel.length} 
-                                      onChange={(e) => updateParcel(parcel.id, 'length', e.target.value)}
-                                      className="h-8 text-xs"
-                                    />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-bold uppercase text-zinc-500">Width</Label>
-                                    <Input 
-                                      type="number" 
-                                      value={parcel.width} 
-                                      onChange={(e) => updateParcel(parcel.id, 'width', e.target.value)}
-                                      className="h-8 text-xs"
-                                    />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-bold uppercase text-zinc-500">Height</Label>
-                                    <Input 
-                                      type="number" 
-                                      value={parcel.height} 
-                                      onChange={(e) => updateParcel(parcel.id, 'height', e.target.value)}
-                                      className="h-8 text-xs"
-                                    />
+                                <div className="space-y-1.5">
+                                  <Label className="text-[10px] font-bold uppercase text-zinc-500">Dimensions (cm)</Label>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div className="space-y-1">
+                                      <Label className="text-[9px] text-zinc-400">Length</Label>
+                                      <Input 
+                                        type="number" 
+                                        value={parcel.length} 
+                                        onChange={(e) => updateParcel(parcel.id, 'length', e.target.value)}
+                                        className="h-8 text-xs"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[9px] text-zinc-400">Width</Label>
+                                      <Input 
+                                        type="number" 
+                                        value={parcel.width} 
+                                        onChange={(e) => updateParcel(parcel.id, 'width', e.target.value)}
+                                        className="h-8 text-xs"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[9px] text-zinc-400">Height</Label>
+                                      <Input 
+                                        type="number" 
+                                        value={parcel.height} 
+                                        onChange={(e) => updateParcel(parcel.id, 'height', e.target.value)}
+                                        className="h-8 text-xs"
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                              </CardContent>
-                            </Card>
+                              </div>
+                            </div>
                           ))}
                           
                           <Button 
@@ -2566,7 +2646,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                         </div>
                       </div>
                       
-                      <DialogFooter className="p-6 border-t bg-zinc-50 space-x-2">
+                      <DialogFooter className="p-6 border-t bg-zinc-50 space-x-2 m-0">
                         <Button 
                           variant="ghost" 
                           onClick={() => {
