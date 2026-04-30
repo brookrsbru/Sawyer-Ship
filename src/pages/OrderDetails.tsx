@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
+import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
 import { normalizeRegion } from '@/src/lib/regions';
 import { toast } from 'sonner';
@@ -1127,9 +1128,37 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
         const upsData = await ups.createShipment(upsParams);
         if (upsData.ShipmentResponse?.Response?.ResponseStatus?.Code === "1") {
-          tracking = upsData.ShipmentResponse.ShipmentResults.ShipmentIdentificationNumber;
-          labelBase64 = upsData.ShipmentResponse.ShipmentResults.PackageResults[0].ShippingLabel.GraphicImage;
+          tracking = upsData.ShipmentResponse.ShipmentResults.ShipIdentificationNumber || upsData.ShipmentResponse.ShipmentResults.ShipmentIdentificationNumber;
+          
+          const packageResults = upsData.ShipmentResponse.ShipmentResults.PackageResults;
+          const packageLabels = Array.isArray(packageResults) ? packageResults : [packageResults];
+          
           labelType = credentials.general.labelFormat === 'ZPL' ? 'text/plain' : 'application/pdf';
+          
+          if (packageLabels.length > 1 && credentials.general.labelFormat === 'PDF') {
+            console.log(`[OrderDetails] Merging ${packageLabels.length} UPS labels...`);
+            const mergedPdf = await PDFDocument.create();
+            for (const p of packageLabels) {
+              const b64 = p.ShippingLabel.GraphicImage;
+              const pdfBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+              const doc = await PDFDocument.load(pdfBytes);
+              const copiedPages = await mergedPdf.copyPages(doc, doc.getPageIndices());
+              copiedPages.forEach((page) => mergedPdf.addPage(page));
+            }
+            const mergedPdfBytes = await mergedPdf.save();
+            const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+            labelUrl = URL.createObjectURL(blob);
+            setLabelUrl(labelUrl);
+          } else if (packageLabels.length > 0) {
+            if (credentials.general.labelFormat === 'ZPL') {
+              const decoded = packageLabels.map((p: any) => atob(p.ShippingLabel.GraphicImage)).join('\n');
+              const blob = new Blob([decoded], { type: 'text/plain' });
+              labelUrl = URL.createObjectURL(blob);
+              setLabelUrl(labelUrl);
+            } else {
+              labelBase64 = packageLabels[0].ShippingLabel.GraphicImage;
+            }
+          }
         } else {
           const error = upsData.response?.errors?.[0] || upsData.ShipmentResponse?.Response?.Error || { Description: "Unknown UPS Error" };
           throw new Error(error.Description || error.message || "UPS Shipment Failed");
@@ -1262,14 +1291,52 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           const ship = fedexData.output.transactionShipments[0];
           tracking = ship.masterTrackingNumber;
           
-          // Check multiple locations for the label
-          const doc = ship.pieceResponses?.[0]?.packageDocuments?.[0] || ship.shipmentDocuments?.[0];
+          const pieceLabels: string[] = [];
+          const pieceUrls: string[] = [];
           
-          if (doc?.encodedLabel) {
-            labelBase64 = doc.encodedLabel;
-          } else if (doc?.url) {
-            labelUrl = doc.url;
-            setLabelUrl(doc.url);
+          if (ship.pieceResponses) {
+            ship.pieceResponses.forEach((pr: any) => {
+              if (pr.packageDocuments) {
+                pr.packageDocuments.forEach((doc: any) => {
+                  if (doc.encodedLabel) pieceLabels.push(doc.encodedLabel);
+                  else if (doc.url) pieceUrls.push(doc.url);
+                });
+              }
+            });
+          }
+
+          if (pieceLabels.length === 0 && pieceUrls.length === 0 && ship.shipmentDocuments) {
+             ship.shipmentDocuments.forEach((doc: any) => {
+               if (doc.encodedLabel) pieceLabels.push(doc.encodedLabel);
+               else if (doc.url) pieceUrls.push(doc.url);
+             });
+          }
+
+          if (pieceLabels.length > 0) {
+            if (pieceLabels.length > 1 && credentials.general.labelFormat !== 'ZPL') {
+              console.log(`[OrderDetails] Merging ${pieceLabels.length} FedEx labels...`);
+              const mergedPdf = await PDFDocument.create();
+              for (const b64 of pieceLabels) {
+                const pdfBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                const doc = await PDFDocument.load(pdfBytes);
+                const copiedPages = await mergedPdf.copyPages(doc, doc.getPageIndices());
+                copiedPages.forEach((page) => mergedPdf.addPage(page));
+              }
+              const mergedPdfBytes = await mergedPdf.save();
+              const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+              labelUrl = URL.createObjectURL(blob);
+              setLabelUrl(labelUrl);
+            } else if (credentials.general.labelFormat === 'ZPL') {
+              const decoded = pieceLabels.map((l: any) => atob(l)).join('\n');
+              const blob = new Blob([decoded], { type: 'text/plain' });
+              labelUrl = URL.createObjectURL(blob);
+              setLabelUrl(labelUrl);
+            } else {
+              labelBase64 = pieceLabels[0];
+            }
+          } else if (pieceUrls.length > 0) {
+            labelUrl = pieceUrls[0]; // For now still take first if URL, but we should ideally fetch all
+            setLabelUrl(labelUrl);
           }
         } else {
           const error = fedexData.errors?.[0] || { message: "FedEx Shipment Failed" };

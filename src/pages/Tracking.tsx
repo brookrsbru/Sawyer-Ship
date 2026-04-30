@@ -186,8 +186,11 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
       } else if (shipment.carrier === 'FedEx') {
         // Use SHIPPING credentials, not tracking ones
         const isSandbox = credentials.fedex.isSandbox;
+        // Correctly determine which account number to use for voiding
+        // Since Tracking doesn't always know if it was domestic/global easily without the order, 
+        // we fallback to common names or legacy accountNumber
         const accountNumber = isSandbox
-          ? (credentials.fedex.sandboxAccountNumber || credentials.fedex.accountNumber)
+          ? (credentials.fedex.domesticAccountNumber || credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber)
           : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
         const apiKey = isSandbox 
