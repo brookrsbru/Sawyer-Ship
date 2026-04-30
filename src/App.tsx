@@ -51,8 +51,7 @@ function BackdoorRecovery({ onBackdoorUnlock, onCancel }: { onBackdoorUnlock: (k
               <ShieldAlert size={28} />
             </div>
             <div>
-              <CardTitle className="text-xl font-black uppercase tracking-tight">System Recovery Backdoor</CardTitle>
-              <CardDescription className="text-zinc-500 text-xs">Developer level access restricted</CardDescription>
+              <CardTitle className="text-xl font-black uppercase tracking-tight">Recovery Backdoor</CardTitle>
             </div>
           </div>
           <p className="text-sm text-zinc-400 leading-relaxed">
@@ -63,8 +62,7 @@ function BackdoorRecovery({ onBackdoorUnlock, onCancel }: { onBackdoorUnlock: (k
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="text-[10px] uppercase font-black text-zinc-500 tracking-widest">Backdoor Key (64 Chars)</label>
-              <span className="text-[10px] text-zinc-600 font-mono">{backdoorKey.length}/64</span>
+              <label className="text-[10px] uppercase font-black text-zinc-500 tracking-widest">Backdoor Key</label>
             </div>
             <Input 
               type="password" 
@@ -127,7 +125,7 @@ function BackdoorRecovery({ onBackdoorUnlock, onCancel }: { onBackdoorUnlock: (k
         </CardContent>
         <CardFooter className="flex justify-between gap-4 bg-zinc-900/30 p-6 border-zinc-800 rounded-b-xl">
           <Button variant="ghost" onClick={onCancel} className="text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 h-11 px-6">
-            Abort Mission
+            Abort
           </Button>
           <Button 
             onClick={handleAction} 

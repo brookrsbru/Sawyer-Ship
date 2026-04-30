@@ -262,6 +262,11 @@ export function useSawyerStorage() {
     if (!stored) {
       setMasterPassword(password);
       setIsLocked(false);
+
+      // Seed recovery blob during first setup
+      const recovery = await encrypt(JSON.stringify(DEFAULT_CREDENTIALS), RECOVERY_CIPHER_KEY);
+      localStorage.setItem('sawyer_ship_recovery', recovery);
+
       return true;
     }
 
