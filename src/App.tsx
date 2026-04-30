@@ -4,8 +4,8 @@ import { useSawyerStorage } from '@/src/hooks/use-sawyer-storage';
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Book, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink, Package, Truck } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Lock, Book, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink, Package, Truck, ShieldAlert } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,124 @@ import OrderDetails from '@/src/pages/OrderDetails';
 import AddressBook from '@/src/pages/AddressBook';
 import Tracking from '@/src/pages/Tracking';
 import { APP_VERSION } from '@/src/constants';
+
+function BackdoorRecovery({ onBackdoorUnlock, onCancel }: { onBackdoorUnlock: (key: string, reset?: { enabled: boolean, newPassword: string }) => Promise<boolean>, onCancel: () => void }) {
+  const [backdoorKey, setBackdoorKey] = useState('');
+  const [resetPassword, setResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleAction = async () => {
+    if (resetPassword && (!newPassword || newPassword !== confirmPassword)) {
+      setError("Passwords do not match or are empty");
+      return;
+    }
+    const success = await onBackdoorUnlock(backdoorKey, resetPassword ? { enabled: true, newPassword } : undefined);
+    if (!success) {
+      setError("Invalid Backdoor Key or No Recovery Blob Found");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+      <Card className="w-full max-w-lg border-red-900/50 bg-zinc-950 text-zinc-100 shadow-2xl shadow-red-900/20">
+        <CardHeader>
+          <div className="flex items-center gap-3 text-red-500 mb-2">
+            <div className="p-2 bg-red-500/10 rounded-lg">
+              <ShieldAlert size={28} />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-black uppercase tracking-tight">System Recovery Backdoor</CardTitle>
+              <CardDescription className="text-zinc-500 text-xs">Developer level access restricted</CardDescription>
+            </div>
+          </div>
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            This bypass grants access to the encrypted recovery blob. 
+            If "Reset Password" is enabled, the main vault will be re-encrypted with your new credentials.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] uppercase font-black text-zinc-500 tracking-widest">Backdoor Key (64 Chars)</label>
+              <span className="text-[10px] text-zinc-600 font-mono">{backdoorKey.length}/64</span>
+            </div>
+            <Input 
+              type="password" 
+              value={backdoorKey} 
+              onChange={(e) => setBackdoorKey(e.target.value)}
+              className="bg-zinc-900 border-zinc-800 text-zinc-100 font-mono text-[11px] h-10 tracking-widest"
+              placeholder="Paste hexadecimal recovery key..."
+            />
+          </div>
+
+          <div className="flex items-center space-x-3 py-3 px-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
+            <input 
+              type="checkbox" 
+              id="reset-check"
+              checked={resetPassword}
+              onChange={(e) => setResetPassword(e.target.checked)}
+              className="w-5 h-5 rounded border-zinc-800 bg-zinc-950 accent-red-600 cursor-pointer"
+            />
+            <label htmlFor="reset-check" className="text-sm font-bold text-zinc-200 cursor-pointer select-none">
+              Reset Master Password? <span className="text-[10px] text-zinc-500 font-normal">(Re-encrypts all data)</span>
+            </label>
+          </div>
+
+          {resetPassword && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-zinc-500 tracking-widest">New Master Password</label>
+                  <Input 
+                    type="password" 
+                    value={newPassword} 
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="bg-zinc-900 border-zinc-800 text-zinc-100 h-10"
+                    placeholder="Enter new password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-zinc-500 tracking-widest">Confirm New Password</label>
+                  <Input 
+                    type="password" 
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="bg-zinc-900 border-zinc-800 text-zinc-100 h-10"
+                    placeholder="Repeat new password"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-zinc-500 italic text-center">
+                Warning: This will overwrite the previous master password used to lock current data.
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center gap-2 text-xs text-red-400 bg-red-950/30 p-3 rounded-lg border border-red-900/50">
+              <AlertTriangle size={14} className="shrink-0" />
+              {error}
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-between gap-4 bg-zinc-900/30 p-6 border-zinc-800 rounded-b-xl">
+          <Button variant="ghost" onClick={onCancel} className="text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 h-11 px-6">
+            Abort Mission
+          </Button>
+          <Button 
+            onClick={handleAction} 
+            className="bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest h-11 px-8 shadow-lg shadow-red-600/20"
+            disabled={!backdoorKey || (resetPassword && !newPassword)}
+          >
+            Authorize Bypass
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
 
 function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: string) => Promise<boolean>, onReset: () => void, hasStoredData: boolean }) {
   const [password, setPassword] = useState('');
@@ -154,7 +272,20 @@ function Layout({ onLogout }: { onLogout: () => void }) {
 }
 
 export default function App() {
-  const { isLocked, credentials, unlock, logout, hasStoredData, save, exportData, importData, resetData } = useSawyerStorage();
+  const { 
+    isLocked, 
+    isBackdoorVisible,
+    setIsBackdoorVisible,
+    credentials, 
+    unlock, 
+    backdoorUnlock,
+    logout, 
+    hasStoredData, 
+    save, 
+    exportData, 
+    importData, 
+    resetData 
+  } = useSawyerStorage();
 
   // Auto-lock logic
   React.useEffect(() => {
@@ -227,6 +358,12 @@ export default function App() {
   if (isLocked) {
     return (
       <>
+        {isBackdoorVisible && (
+          <BackdoorRecovery 
+            onBackdoorUnlock={backdoorUnlock}
+            onCancel={() => setIsBackdoorVisible(false)}
+          />
+        )}
         <LockScreen onUnlock={unlock} onReset={resetData} hasStoredData={hasStoredData} />
         <Toaster position="top-right" richColors expand={true} />
       </>
