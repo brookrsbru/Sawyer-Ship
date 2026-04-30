@@ -385,6 +385,28 @@ export class UPSClient {
 
     return data;
   }
+
+  async cancelShipment(trackingNumber: string): Promise<any> {
+    console.log(`[UPSClient] Voiding shipment: ${trackingNumber}`);
+    const token = await this.getAccessToken();
+    // UPS Void (Cancel) endpoint: PUT /shipments/v1/void/cancel/{trackingnumber}
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/void/cancel/${trackingNumber}`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'x-merchant-id': this.clientId
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.response?.errors?.[0]?.message || `UPS Void Error: ${response.status}`);
+    }
+    console.log(`[UPSClient] Void response:`, data);
+    return data;
+  }
 }
 
 export class FedExClient {
@@ -541,6 +563,36 @@ export class FedExClient {
       throw new Error(trackResult.error.message || 'FedEx Tracking Error');
     }
 
+    return data;
+  }
+
+  async cancelShipment(trackingNumber: string): Promise<any> {
+    console.log(`[FedExClient] Cancelling shipment: ${trackingNumber}`);
+    const token = await this.getAccessToken();
+    // FedEx Cancel Shipment endpoint: PUT /ship/v1/shipments/cancel
+    const url = `${this.getProxyUrl()}${this.baseUrl}/ship/v1/shipments/cancel`;
+    
+    const body = {
+      accountNumber: {
+        value: this.accountNumber
+      },
+      trackingNumber: trackingNumber
+    };
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.errors?.[0]?.message || `FedEx Cancel Error: ${response.status}`);
+    }
+    console.log(`[FedExClient] Cancel response:`, data);
     return data;
   }
 }

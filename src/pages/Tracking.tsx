@@ -4,16 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle } from 'lucide-react';
+import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { UPSClient, FedExClient } from '@/src/lib/api-clients';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Tracking({ credentials, onSave }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void> }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
   const PAGE_SIZE = 20;
 
   const filteredShipments = useMemo(() => {
@@ -133,6 +141,94 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         next.delete(shipment.id);
         return next;
       });
+    }
+  };
+
+  const deleteShipmentRecord = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this tracking record? This will not cancel the actual shipment.')) return;
+    
+    try {
+      const updatedShipments = credentials.shipments.filter(s => s.id !== id);
+      await onSave({
+        ...credentials,
+        shipments: updatedShipments
+      });
+      toast.success("Record deleted successfully.");
+    } catch (e) {
+      toast.error("Failed to delete record.");
+    }
+  };
+
+  const voidShipment = async (shipment: SawyerShipment) => {
+    if (!confirm(`Are you sure you want to VOID/CANCEL shipment ${shipment.trackingNumber}? This action is permanent.`)) return;
+    
+    setIsProcessing(true);
+    try {
+      if (shipment.carrier === 'UPS') {
+        const isDomestic = shipment.destCountry === credentials.general.originCountry;
+        const accountNumber = credentials.ups.isSandbox
+          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
+          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
+
+        const clientId = credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId;
+        const clientSecret = credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret;
+
+        if (!clientId || !clientSecret) throw new Error('Missing UPS credentials');
+
+        const client = new UPSClient(
+          clientId,
+          clientSecret,
+          accountNumber,
+          credentials.ups.isSandbox,
+          credentials.general.proxyUrl
+        );
+        await client.cancelShipment(shipment.trackingNumber);
+      } else if (shipment.carrier === 'FedEx') {
+        // Use SHIPPING credentials, not tracking ones
+        const isSandbox = credentials.fedex.isSandbox;
+        const accountNumber = isSandbox
+          ? (credentials.fedex.sandboxAccountNumber || credentials.fedex.accountNumber)
+          : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
+
+        const apiKey = isSandbox 
+          ? (credentials.fedex.sandboxApiKey || credentials.fedex.apiKey)
+          : (credentials.fedex.productionApiKey || credentials.fedex.apiKey);
+        
+        const secretKey = isSandbox
+          ? (credentials.fedex.sandboxSecretKey || credentials.fedex.secretKey)
+          : (credentials.fedex.productionSecretKey || credentials.fedex.secretKey);
+
+        if (!apiKey || !secretKey) throw new Error('Missing FedEx shipping credentials');
+
+        const client = new FedExClient(
+          apiKey,
+          secretKey,
+          accountNumber,
+          isSandbox,
+          credentials.general.proxyUrl
+        );
+        await client.cancelShipment(shipment.trackingNumber);
+      }
+
+      // If successful, update the status to Voided
+      const updatedShipments = credentials.shipments.map(s => 
+        s.id === shipment.id 
+          ? { ...s, status: 'VOIDED', lastUpdated: new Date().toISOString() } 
+          : s
+      );
+
+      await onSave({
+        ...credentials,
+        shipments: updatedShipments
+      });
+
+      toast.success(`Shipment ${shipment.trackingNumber} voided successfully.`);
+      
+    } catch (e: any) {
+      console.error(`Failed to void shipment ${shipment.trackingNumber}:`, e);
+      toast.error(`Void failed: ${e.message || 'Unknown error'}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -358,15 +454,52 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs h-8 gap-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
-                          onClick={() => window.open(getTrackingUrl(shipment.carrier, shipment.trackingNumber), '_blank')}
-                        >
-                          Go to tracking
-                          <ExternalLink size={12} />
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-8 gap-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
+                            onClick={() => window.open(getTrackingUrl(shipment.carrier, shipment.trackingNumber), '_blank')}
+                          >
+                            Go to tracking
+                            <ExternalLink size={12} />
+                          </Button>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem 
+                                className="gap-2 cursor-pointer"
+                                onClick={() => updateShipmentStatus(shipment)}
+                                disabled={refreshingIds.has(shipment.id)}
+                              >
+                                <RotateCcw size={14} className={refreshingIds.has(shipment.id) ? "animate-spin" : ""} />
+                                Refresh Status
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="gap-2 text-red-600 focus:text-red-600 cursor-pointer"
+                                onClick={() => voidShipment(shipment)}
+                                disabled={isProcessing || shipment.status === 'VOIDED'}
+                              >
+                                <Ban size={14} />
+                                Void Shipment
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="gap-2 text-red-600 focus:text-red-600 cursor-pointer"
+                                onClick={() => deleteShipmentRecord(shipment.id)}
+                              >
+                                <Trash2 size={14} />
+                                Delete Record
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
