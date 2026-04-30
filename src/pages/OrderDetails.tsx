@@ -2446,10 +2446,10 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className={`w-full flex-col h-auto py-3 gap-2 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 transition-all ${parcels.length > 1 ? "bg-zinc-50 border-zinc-900 border-2" : ""}`}
+                        className={`w-[284px] mx-auto flex flex-col h-auto min-h-[32px] py-1 px-3 gap-1 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 transition-all ${parcels.length > 1 ? "bg-zinc-50 border-zinc-900 border-2" : ""}`}
                         onClick={handleParcelOptionsOpen}
                       >
-                        <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                        <div className="flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider w-full">
                           <Box size={14} className={parcels.length > 1 ? "text-zinc-900" : "text-zinc-400"} />
                           {parcels.length > 1 ? `${parcels.length} Parcels Configured` : "Parcel Options"}
                         </div>
@@ -2457,9 +2457,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                         {parcels.length > 1 && (
                           <div className="w-full space-y-1 mt-1">
                             {parcels.slice(0, 3).map((p, i) => (
-                              <div key={p.id} className="flex justify-between items-center text-[10px] text-zinc-500 bg-white/50 px-2 py-0.5 rounded border border-zinc-100">
-                                <span className="font-bold">Parcel {i + 1}</span>
-                                <span>{p.weight}kg • {p.length}x{p.width}x{p.height}cm</span>
+                              <div key={p.id} className="flex justify-between items-center text-[10px] text-zinc-500 bg-white/50 px-3 py-1 rounded border border-zinc-100 w-full">
+                                <span className="font-bold whitespace-nowrap">Parcel {i + 1}</span>
+                                <span className="whitespace-nowrap">{p.weight}kg • {p.length}x{p.width}x{p.height}cm</span>
                               </div>
                             ))}
                             {parcels.length > 3 && (
