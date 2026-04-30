@@ -70,6 +70,9 @@ function BackdoorRecovery({ onBackdoorUnlock, onCancel }: { onBackdoorUnlock: (k
               onChange={(e) => setBackdoorKey(e.target.value)}
               className="bg-zinc-900 border-zinc-800 text-zinc-100 font-mono text-[11px] h-10 tracking-widest"
               placeholder="Paste hexadecimal recovery key..."
+              autoComplete="off"
+              name="backdoor-recovery-key-bypass"
+              data-lpignore="true"
             />
           </div>
 

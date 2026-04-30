@@ -239,7 +239,7 @@ export function useSawyerStorage() {
   // Dev Bypass
   useEffect(() => {
     (window as any).bypassLogin = () => {
-      console.warn("DEV: Activating recovery backdoor. Use your rolling key generator.");
+      console.warn("DEV: Activating recovery backdoor.");
       setIsBackdoorVisible(true);
     };
 
