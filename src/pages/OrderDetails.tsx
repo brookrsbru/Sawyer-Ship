@@ -2494,13 +2494,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 )}
 
                 {/* Parcel Options Button */}
-                <div className="space-y-3">
+                <div className="w-full space-y-3 flex flex-col items-stretch">
                   <Dialog open={isParcelModalOpen} onOpenChange={handleParcelModalClose}>
                     <DialogTrigger asChild>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className={`w-[284px] mx-auto flex flex-col h-auto min-h-[32px] py-1 px-3 gap-1 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 transition-all ${parcels.length > 1 ? "bg-zinc-50 border-zinc-900 border-2" : ""}`}
+                        className={`w-full flex flex-col h-auto min-h-[32px] py-1 px-3 gap-1 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 transition-all ${parcels.length > 1 ? "bg-zinc-50 border-zinc-900 border-2" : ""}`}
                         onClick={handleParcelOptionsOpen}
                       >
                         <div className="flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider w-full">
