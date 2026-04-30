@@ -752,6 +752,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           const fedexParams: any = {
             accountNumber: { value: payorAccountNumber },
             requestedShipment: {
+              rateRequestType: ["ACCOUNT", "LIST"],
+              carrierCodes: ["FDXE", "FDXG"],
+              preferredCurrency: credentials.general.currency || "GBP",
               shipper: {
                 address: {
                   streetLines: getCarrierStreetLines([credentials.general.originStreet1, credentials.general.originStreet2], credentials.general.originState),
@@ -785,7 +788,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               },
               pickupType: credentials.general.fedexPickupType || "DROPOFF_AT_FEDEX_LOCATION",
               packagingType: "YOUR_PACKAGING",
-              rateRequestType: ["ACCOUNT", "LIST"],
               shippingChargesPayment: {
                 paymentType: "SENDER",
                 payor: {
@@ -801,13 +803,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   width: Math.max(1, parseFloat(p.width) || 1), 
                   height: Math.max(1, parseFloat(p.height) || 1), 
                   units: "CM" 
-                },
-                customerReferences: [
-                  {
-                    customerReferenceType: "CUSTOMER_REFERENCE",
-                    value: order.increment_id
-                  }
-                ]
+                }
               }))
             }
           };
