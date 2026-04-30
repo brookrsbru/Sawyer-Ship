@@ -7,14 +7,22 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight, ChevronLeft, ChevronRight, Box, Trash2, Copy, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
 import { normalizeRegion } from '@/src/lib/regions';
 import { toast } from 'sonner';
+
+interface Parcel {
+  id: string;
+  weight: string;
+  length: string;
+  width: string;
+  height: string;
+}
 
 export default function OrderDetails({ credentials, onSave }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void> }) {
   const { id } = useParams();
@@ -60,6 +68,10 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [length, setLength] = useState('');
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
+  
+  // Multiple parcels state
+  const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [isParcelModalOpen, setIsParcelModalOpen] = useState(false);
   
   const [rates, setRates] = useState<any[]>([]);
   const [isRating, setIsRating] = useState(false);
@@ -417,6 +429,79 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     fetchProductInfo();
   }, [order, id, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl]);
 
+  // Manual Rate Creation Helper
+  const handleParcelOptionsOpen = () => {
+    // If no parcels yet, initialize with current single-package data
+    if (parcels.length === 0) {
+      setParcels([{
+        id: crypto.randomUUID(),
+        weight: weight,
+        length: length,
+        width: width,
+        height: height
+      }]);
+    }
+    setIsParcelModalOpen(true);
+  };
+
+  const handleAddParcel = () => {
+    setParcels(prev => [...prev, {
+      id: crypto.randomUUID(),
+      weight: '1.0',
+      length: '',
+      width: '',
+      height: ''
+    }]);
+  };
+
+  const handleDuplicateParcel = (parcel: Parcel) => {
+    setParcels(prev => {
+      const idx = prev.findIndex(p => p.id === parcel.id);
+      const newParcel = { ...parcel, id: crypto.randomUUID() };
+      const next = [...prev];
+      next.splice(idx + 1, 0, newParcel);
+      return next;
+    });
+  };
+
+  const handleDeleteParcel = (id: string) => {
+    setParcels(prev => prev.filter(p => p.id !== id));
+  };
+
+  const updateParcel = (id: string, field: keyof Parcel, value: string) => {
+    setParcels(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+  };
+
+  const handleParcelModalClose = (open: boolean) => {
+    if (!open) {
+      // Apply synchronization logic when closing
+      if (parcels.length === 0) {
+        setWeightKg('');
+        setWeightG('');
+        setWeight('0');
+        setLength('');
+        setWidth('');
+        setHeight('');
+      } else if (parcels.length === 1) {
+        const p = parcels[0];
+        setWeight(p.weight);
+        const wNum = parseFloat(p.weight) || 0;
+        setWeightKg(Math.floor(wNum).toString());
+        setWeightG(Math.round((wNum % 1) * 1000).toString());
+        setLength(p.length);
+        setWidth(p.width);
+        setHeight(p.height);
+      } else {
+        // Multi-parcel
+        const totalWeight = parcels.reduce((sum, p) => sum + (parseFloat(p.weight) || 0), 0);
+        setWeight(totalWeight.toFixed(3));
+        setWeightKg(Math.floor(totalWeight).toString());
+        setWeightG(Math.round((totalWeight % 1) * 1000).toString());
+      }
+    }
+    setIsParcelModalOpen(open);
+  };
+
   const fetchRates = async () => {
     if (!order) return;
 
@@ -449,11 +534,16 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     try {
       const allRates: any[] = [];
       const weightVal = parseFloat(weight) || 0.1;
-      const l = parseFloat(length) || 1;
-      const w = parseFloat(width) || 1;
-      const h = parseFloat(height) || 1;
+      
+      const pacakgeConfigs = parcels.length > 0 ? parcels : [{
+        id: 'default',
+        weight: weight,
+        length: length,
+        width: width,
+        height: height
+      }];
 
-      console.log(`[OrderDetails] Package: ${weightVal}kg, ${l}x${w}x${h}cm`);
+      console.log(`[OrderDetails] Rating with ${pacakgeConfigs.length} parcels`);
 
       // 1. Fetch UPS Rates if credentials exist and enabled
       const hasUpsCreds = credentials.ups.isSandbox 
@@ -502,19 +592,19 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 PickupType: { Code: credentials.general.upsPickupType || "01" },
                 DeliveryTimeInformation: { PackageBillType: "03" },
                 ShipmentRatingOptions: { UserLevelDiscountIndicator: "TRUE" },
-                Package: {
+                Package: pacakgeConfigs.map(p => ({
                   PackagingType: { Code: "02" },
                   Dimensions: {
                     UnitOfMeasurement: { Code: "CM" },
-                    Length: Math.max(1, l).toString(),
-                    Width: Math.max(1, w).toString(),
-                    Height: Math.max(1, h).toString()
+                    Length: Math.max(1, parseFloat(p.length) || 1).toString(),
+                    Width: Math.max(1, parseFloat(p.width) || 1).toString(),
+                    Height: Math.max(1, parseFloat(p.height) || 1).toString()
                   },
                   PackageWeight: {
                     UnitOfMeasurement: { Code: "KGS" },
-                    Weight: weightVal.toString()
+                    Weight: (parseFloat(p.weight) || 0.1).toString()
                   }
-                }
+                }))
               }
             }
           };
@@ -650,16 +740,21 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   }
                 }
               },
-              requestedPackageLineItems: [{
-                weight: { units: "KG", value: weightVal },
-                dimensions: { length: Math.max(1, l), width: Math.max(1, w), height: Math.max(1, h), units: "CM" },
+              requestedPackageLineItems: pacakgeConfigs.map(p => ({
+                weight: { units: "KG", value: parseFloat(p.weight) || 0.1 },
+                dimensions: { 
+                  length: Math.max(1, parseFloat(p.length) || 1), 
+                  width: Math.max(1, parseFloat(p.width) || 1), 
+                  height: Math.max(1, parseFloat(p.height) || 1), 
+                  units: "CM" 
+                },
                 customerReferences: [
                   {
                     customerReferenceType: "CUSTOMER_REFERENCE",
                     value: order.increment_id
                   }
                 ]
-              }]
+              }))
             }
           };
 
@@ -837,7 +932,14 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       let labelUrl = ""; // Local variable to track URL before state update
       let labelType = "application/pdf";
 
-      const weightVal = parseFloat(weightKg || "0") + (parseFloat(weightG || "0") / 1000);
+      const weightVal = parseFloat(weight) || 0.1;
+      const pacakgeConfigs = parcels.length > 0 ? parcels : [{
+        id: 'default',
+        weight: weight,
+        length: length,
+        width: width,
+        height: height
+      }];
       const isDomestic = order.shipping_address?.country_id === credentials.general.originCountry || 
                         (credentials.general.originCountry === 'GB' && order.shipping_address?.country_id === 'XI') ||
                         (credentials.general.originCountry === 'XI' && order.shipping_address?.country_id === 'GB');
@@ -908,20 +1010,20 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 }
               },
               Service: { Code: serviceCode },
-              Package: [{
+              Package: pacakgeConfigs.map(p => ({
                 Description: "Package",
                 Packaging: { Code: "02" },
                 Dimensions: {
                   UnitOfMeasurement: { Code: "CM" },
-                  Length: length || "10",
-                  Width: width || "10",
-                  Height: height || "10"
+                  Length: p.length || "10",
+                  Width: p.width || "10",
+                  Height: p.height || "10"
                 },
                 PackageWeight: {
                   UnitOfMeasurement: { Code: "KGS" },
-                  Weight: weightVal.toFixed(2)
+                  Weight: (parseFloat(p.weight) || 0.1).toFixed(2)
                 }
-              }]
+              }))
             },
             LabelSpecification: {
               LabelImageFormat: { Code: credentials.general.labelFormat || "PDF" },
@@ -1051,10 +1153,15 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               labelPrintingOrientation: "TOP_EDGE_OF_TEXT_FIRST",
               labelRotation: "NONE"
             },
-            requestedPackageLineItems: [{
-              weight: { units: "KG", value: weightVal },
-              dimensions: { length: length || 10, width: width || 10, height: height || 10, units: "CM" }
-            }]
+            requestedPackageLineItems: pacakgeConfigs.map(p => ({
+              weight: { units: "KG", value: parseFloat(p.weight) || 0.1 },
+              dimensions: { 
+                length: Math.max(1, parseFloat(p.length) || 1), 
+                width: Math.max(1, parseFloat(p.width) || 1), 
+                height: Math.max(1, parseFloat(p.height) || 1), 
+                units: "CM" 
+              }
+            }))
           }
         };
 
@@ -1416,7 +1523,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 <div className="space-y-2">
                   <Label>Region</Label>
                   <Input 
-                    placeholder="e.g. California or CA"
                     value={order!.shipping_address?.region || ''} 
                     onChange={(e) => setOrder({
                       ...order!, 
@@ -1784,7 +1890,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       <div className="space-y-2">
                         <Label>Region</Label>
                         <Input 
-                          placeholder="e.g. California or CA"
                           value={order.shipping_address?.region || ''} 
                           onChange={(e) => setOrder({
                             ...order, 
@@ -2239,7 +2344,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-bold uppercase text-zinc-500">Weight <span className="text-red-500">*</span></Label>
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => { setWeightKg(''); setWeightG(''); }}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-[10px] gap-1" 
+                      disabled={parcels.length > 1}
+                      onClick={() => { setWeightKg(''); setWeightG(''); }}
+                    >
                       <RotateCcw size={10} /> Clear Weight
                     </Button>
                   </div>
@@ -2247,7 +2358,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   <div className="grid grid-cols-2 gap-4">
                     {(credentials.general.weightDisplayMode === 'both' || credentials.general.weightDisplayMode === 'kg') && (
                       <div className="space-y-2">
-
                         <Label htmlFor="weightKg">Kilograms</Label>
                         <Input 
                           id="weightKg" 
@@ -2255,8 +2365,10 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                           step="0.1"
                           placeholder="0"
                           value={weightKg} 
+                          disabled={parcels.length > 1}
                           onChange={(e) => handleWeightKgChange(e.target.value)}
                           onBlur={handleWeightKgBlur}
+                          className={parcels.length > 1 ? "bg-zinc-50 font-bold" : ""}
                         />
                       </div>
                     )}
@@ -2268,8 +2380,10 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                           type="number" 
                           placeholder="0"
                           value={weightG} 
+                          disabled={parcels.length > 1}
                           onChange={(e) => handleWeightGChange(e.target.value)}
                           onBlur={handleWeightGBlur}
+                          className={parcels.length > 1 ? "bg-zinc-50 font-bold" : ""}
                         />
                       </div>
                     )}
@@ -2278,46 +2392,201 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
                 <Separator />
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold uppercase text-zinc-500">Dimensions (cm) <span className="text-red-500">*</span></Label>
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => { setLength(''); setWidth(''); setHeight(''); }}>
-                      <RotateCcw size={10} /> Clear Dims
-                    </Button>
-                  </div>
+                {parcels.length <= 1 && (
+                  <>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold uppercase text-zinc-500">Dimensions (cm) <span className="text-red-500">*</span></Label>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => { setLength(''); setWidth(''); setHeight(''); }}>
+                          <RotateCcw size={10} /> Clear Dims
+                        </Button>
+                      </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="length">Length</Label>
-                      <Input 
-                        id="length" 
-                        type="number" 
-                        placeholder="0"
-                        value={length} 
-                        onChange={(e) => setLength(e.target.value)}
-                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="length">Length</Label>
+                          <Input 
+                            id="length" 
+                            type="number" 
+                            placeholder="0"
+                            value={length} 
+                            onChange={(e) => setLength(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="width">Width</Label>
+                          <Input 
+                            id="width" 
+                            type="number" 
+                            placeholder="0"
+                            value={width} 
+                            onChange={(e) => setWidth(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="height">Height</Label>
+                          <Input 
+                            id="height" 
+                            type="number" 
+                            placeholder="0"
+                            value={height} 
+                            onChange={(e) => setHeight(e.target.value)}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="width">Width</Label>
-                      <Input 
-                        id="width" 
-                        type="number" 
-                        placeholder="0"
-                        value={width} 
-                        onChange={(e) => setWidth(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="height">Height</Label>
-                      <Input 
-                        id="height" 
-                        type="number" 
-                        placeholder="0"
-                        value={height} 
-                        onChange={(e) => setHeight(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                    <Separator />
+                  </>
+                )}
+
+                {/* Parcel Options Button */}
+                <div className="space-y-3">
+                  <Dialog open={isParcelModalOpen} onOpenChange={handleParcelModalClose}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={`w-full flex-col h-auto py-3 gap-2 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 transition-all ${parcels.length > 1 ? "bg-zinc-50 border-zinc-900 border-2" : ""}`}
+                        onClick={handleParcelOptionsOpen}
+                      >
+                        <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                          <Box size={14} className={parcels.length > 1 ? "text-zinc-900" : "text-zinc-400"} />
+                          {parcels.length > 1 ? `${parcels.length} Parcels Configured` : "Parcel Options"}
+                        </div>
+                        
+                        {parcels.length > 1 && (
+                          <div className="w-full space-y-1 mt-1">
+                            {parcels.slice(0, 3).map((p, i) => (
+                              <div key={p.id} className="flex justify-between items-center text-[10px] text-zinc-500 bg-white/50 px-2 py-0.5 rounded border border-zinc-100">
+                                <span className="font-bold">Parcel {i + 1}</span>
+                                <span>{p.weight}kg • {p.length}x{p.width}x{p.height}cm</span>
+                              </div>
+                            ))}
+                            {parcels.length > 3 && (
+                              <p className="text-[9px] text-zinc-400 text-center italic">+{parcels.length - 3} more parcels</p>
+                            )}
+                          </div>
+                        )}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-[800px] max-h-[80vh] flex flex-col p-0">
+                      <DialogHeader className="p-6 border-b">
+                        <DialogTitle className="flex items-center gap-2">
+                          <Box className="w-5 h-5" /> Parcel Manager
+                        </DialogTitle>
+                        <DialogDescription>
+                          Manage dimensions and weight for each parcel in this shipment.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="flex-1 overflow-y-auto p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {parcels.map((parcel, index) => (
+                            <Card key={parcel.id} className="relative overflow-hidden border-zinc-200">
+                              <CardHeader className="p-3 bg-zinc-50 border-b flex flex-row items-center justify-between space-y-0">
+                                <span className="text-xs font-black uppercase tracking-widest text-zinc-400">Parcel {index + 1}</span>
+                                <div className="flex items-center gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-zinc-400 hover:text-zinc-900"
+                                    onClick={() => handleDuplicateParcel(parcel)}
+                                    title="Duplicate"
+                                  >
+                                    <Copy size={12} />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => handleDeleteParcel(parcel.id)}
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={12} />
+                                  </Button>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="p-4 space-y-3">
+                                <div className="space-y-1.5">
+                                  <Label className="text-[10px] font-bold uppercase text-zinc-500">Weight (kg)</Label>
+                                  <Input 
+                                    type="number" 
+                                    step="0.001"
+                                    value={parcel.weight} 
+                                    onChange={(e) => updateParcel(parcel.id, 'weight', e.target.value)}
+                                    className="h-8 text-xs font-bold"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-bold uppercase text-zinc-500">Length</Label>
+                                    <Input 
+                                      type="number" 
+                                      value={parcel.length} 
+                                      onChange={(e) => updateParcel(parcel.id, 'length', e.target.value)}
+                                      className="h-8 text-xs"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-bold uppercase text-zinc-500">Width</Label>
+                                    <Input 
+                                      type="number" 
+                                      value={parcel.width} 
+                                      onChange={(e) => updateParcel(parcel.id, 'width', e.target.value)}
+                                      className="h-8 text-xs"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-bold uppercase text-zinc-500">Height</Label>
+                                    <Input 
+                                      type="number" 
+                                      value={parcel.height} 
+                                      onChange={(e) => updateParcel(parcel.id, 'height', e.target.value)}
+                                      className="h-8 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                          
+                          <Button 
+                            variant="outline" 
+                            className="h-full min-h-[160px] border-dashed border-2 border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 flex flex-col gap-2 rounded-xl group transition-all"
+                            onClick={handleAddParcel}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center group-hover:bg-zinc-900 group-hover:scale-110 transition-all">
+                              <Plus className="w-5 h-5 text-zinc-400 group-hover:text-white" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-zinc-600 group-hover:text-zinc-900 transition-colors">Add Another Parcel</p>
+                              <p className="text-xs text-zinc-400">Expand this shipment</p>
+                            </div>
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <DialogFooter className="p-6 border-t bg-zinc-50 space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => {
+                            // If they clear everything, we handle it on close logic, 
+                            // but maybe they want to cancel? 
+                            // Actually the user wants it to apply on exit.
+                            setIsParcelModalOpen(false);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          className="bg-zinc-900"
+                          onClick={() => handleParcelModalClose(false)}
+                        >
+                          Save Parcels
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
 
                 <Separator />
