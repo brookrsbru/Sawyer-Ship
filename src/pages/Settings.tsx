@@ -1610,6 +1610,42 @@ export default function Settings({
             </section>
           </div>
         </div>
+
+        {hasChanges && (
+          <div className="fixed bottom-0 right-0 left-64 bg-white/95 backdrop-blur-md border-t border-zinc-200 p-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-50 animate-in slide-in-from-bottom duration-300">
+            <div className="max-w-4xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center">
+                  <Info size={20} className="text-amber-500" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-zinc-900">Unsaved Changes</span>
+                  <span className="text-[10px] text-zinc-500">You have modified the application configuration.</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setFormData(credentials);
+                    toast.info("Changes discarded.");
+                  }}
+                  className="text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+                >
+                  Discard
+                </Button>
+                <Button 
+                  onClick={() => handleSave(false)} 
+                  disabled={isSaving}
+                  className="bg-zinc-900 hover:bg-zinc-800 gap-2 px-8 shadow-md shadow-zinc-200"
+                >
+                  {isSaving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save size={18} />}
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
-  }
+}
