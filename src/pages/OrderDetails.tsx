@@ -1232,6 +1232,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           credentials.general.proxyUrl
         );
 
+        const referenceId = order.increment_id?.trim();
+        const shouldSendReference = referenceId && referenceId !== 'MANUAL';
+
         const fedexParams: any = {
           labelResponseOptions: "LABEL",
           accountNumber: { value: payorAccountNumber },
@@ -1284,14 +1287,17 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               labelPrintingOrientation: "TOP_EDGE_OF_TEXT_FIRST",
               labelRotation: "NONE"
             },
-            requestedPackageLineItems: pacakgeConfigs.map(p => ({
+            requestedPackageLineItems: pacakgeConfigs.map((p, idx) => ({
               weight: { units: "KG", value: parseFloat(p.weight) || 0.1 },
               dimensions: { 
                 length: Math.max(1, parseFloat(p.length) || 1), 
                 width: Math.max(1, parseFloat(p.width) || 1), 
                 height: Math.max(1, parseFloat(p.height) || 1), 
                 units: "CM" 
-              }
+              },
+              ...(shouldSendReference && idx === 0 ? {
+                customerReferences: [{ customerReferenceType: "CUSTOMER_REFERENCE", value: referenceId }]
+              } : {})
             }))
           }
         };
@@ -1477,7 +1483,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           try {
             const newShipment = {
               id: `${tracking}-${Date.now()}`,
-              orderIncrementId: order.increment_id,
+              orderIncrementId: order.increment_id || 'MANUAL',
               trackingNumber: tracking,
               carrier: selectedRate.carrier as 'UPS' | 'FedEx',
               service: selectedRate.service,
@@ -1567,7 +1573,15 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Manual Shipment</h1>
+            <div className="flex items-baseline gap-1">
+              <h1 className="text-4xl font-bold text-zinc-900 whitespace-nowrap">Shipment #</h1>
+              <input 
+                value={order?.increment_id === 'MANUAL' ? '' : order?.increment_id} 
+                onChange={(e) => setOrder({...order!, increment_id: e.target.value.toUpperCase()})}
+                className="text-4xl font-bold text-zinc-900 bg-transparent border-none p-0 focus:outline-none w-full max-w-[500px] placeholder:text-zinc-200"
+                placeholder="MANUAL"
+              />
+            </div>
             <p className="text-zinc-500">Please provide the recipient's information to continue.</p>
           </div>
         </header>
@@ -1941,7 +1955,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               </Button>
               <div>
                 <h1 className="text-3xl font-bold text-zinc-900">
-                  {id === 'manual' ? 'Manual Shipment' : `Order #${order.increment_id}`}
+                  {id === 'manual' ? (order.increment_id && order.increment_id !== 'MANUAL' ? `Shipment #${order.increment_id}` : 'Manual Shipment') : `Order #${order.increment_id}`}
                 </h1>
                 <p className="text-zinc-500">
                   {id === 'manual' ? 'Create a shipment manually' : 'Imported from Magento'}
