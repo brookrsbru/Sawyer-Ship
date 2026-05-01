@@ -43,16 +43,9 @@ export interface SawyerCredentials {
   };
   ups: {
     enabled: boolean;
-    clientId: string; // Legacy
-    clientSecret: string; // Legacy
-    sandboxClientId: string;
-    sandboxClientSecret: string;
-    productionClientId: string;
-    productionClientSecret: string;
-    accountNumber: string; // Legacy, kept for migration
-    domesticAccountNumber: string;
-    globalAccountNumber: string;
-    productionAccountNumber: string;
+    apiKey: string;
+    secretKey: string;
+    accountNumber: string;
     isSandbox: boolean;
   };
   fedex: {
@@ -174,16 +167,9 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
   ups: { 
     enabled: true, 
-    clientId: '', 
-    clientSecret: '', 
-    sandboxClientId: '',
-    sandboxClientSecret: '',
-    productionClientId: '',
-    productionClientSecret: '',
+    apiKey: '', 
+    secretKey: '', 
     accountNumber: '', 
-    domesticAccountNumber: '', 
-    globalAccountNumber: '', 
-    productionAccountNumber: '',
     isSandbox: true 
   },
   fedex: { 

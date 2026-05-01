@@ -99,19 +99,16 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
       let newStatus = shipment.status || 'Unknown';
       
       if (shipment.carrier === 'UPS') {
-        const isDomestic = shipment.destCountry === credentials.general.originCountry;
-        const accountNumber = credentials.ups.isSandbox
-          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
-          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
+        const accountNumber = credentials.ups.accountNumber;
 
-        const clientId = credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId;
-        const clientSecret = credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret;
+        const apiKey = credentials.ups.apiKey;
+        const secretKey = credentials.ups.secretKey;
 
-        if (!clientId || !clientSecret) throw new Error('Missing UPS credentials');
+        if (!apiKey || !secretKey) throw new Error('Missing UPS credentials');
 
         const client = new UPSClient(
-          clientId,
-          clientSecret,
+          apiKey,
+          secretKey,
           accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
@@ -207,19 +204,16 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     setIsProcessing(true);
     try {
       if (shipment.carrier === 'UPS') {
-        const isDomestic = shipment.destCountry === credentials.general.originCountry;
-        const accountNumber = credentials.ups.isSandbox
-          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
-          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
+        const accountNumber = credentials.ups.accountNumber;
 
-        const clientId = credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId;
-        const clientSecret = credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret;
+        const apiKey = credentials.ups.apiKey;
+        const secretKey = credentials.ups.secretKey;
 
-        if (!clientId || !clientSecret) throw new Error('Missing UPS credentials');
+        if (!apiKey || !secretKey) throw new Error('Missing UPS credentials');
 
         const client = new UPSClient(
-          clientId,
-          clientSecret,
+          apiKey,
+          secretKey,
           accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl

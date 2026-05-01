@@ -655,22 +655,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       console.log(`[OrderDetails] Rating with ${pacakgeConfigs.length} parcels`);
 
       // 1. Fetch UPS Rates if credentials exist and enabled
-      const hasUpsCreds = credentials.ups.isSandbox 
-        ? (credentials.ups.sandboxClientId && credentials.ups.sandboxClientSecret) 
-        : (credentials.ups.productionClientId && credentials.ups.productionClientSecret);
+      const hasUpsCreds = credentials.ups.apiKey && credentials.ups.secretKey;
 
       if (credentials.ups.enabled && hasUpsCreds) {
         try {
           const destCountry = order.shipping_address?.country_id;
           const isDomestic = destCountry === credentials.general.originCountry;
-          const accountNumber = credentials.ups.isSandbox
-            ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
-            : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
+          const accountNumber = credentials.ups.accountNumber;
 
           console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
           const ups = new UPSClient(
-            credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
-            credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
+            credentials.ups.apiKey,
+            credentials.ups.secretKey,
             accountNumber,
             credentials.ups.isSandbox,
             credentials.general.proxyUrl
@@ -1065,13 +1061,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                         (credentials.general.originCountry === 'XI' && order.shipping_address?.country_id === 'GB');
 
       if (selectedRate.carrier === 'UPS') {
-        const accountNumber = credentials.ups.isSandbox
-          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
-          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
+        const accountNumber = credentials.ups.accountNumber;
 
         const ups = new UPSClient(
-          credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
-          credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
+          credentials.ups.apiKey,
+          credentials.ups.secretKey,
           accountNumber,
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
@@ -1097,9 +1091,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 Name: credentials.general.originContactName,
                 AttentionName: credentials.general.originContactName,
                 Phone: { Number: credentials.general.originPhone },
-                ShipperNumber: credentials.ups.isSandbox 
-                  ? ((isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber)
-                  : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber),
+                ShipperNumber: credentials.ups.accountNumber,
                 Address: {
                   AddressLine: getCarrierStreetLines([credentials.general.originStreet1, credentials.general.originStreet2], credentials.general.originState),
                   City: credentials.general.originCity,
@@ -1124,9 +1116,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               PaymentInformation: {
                 ShipmentCharge: {
                   Type: "01",
-                  BillShipper: { AccountNumber: credentials.ups.isSandbox 
-                    ? ((isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber)
-                    : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber) }
+                  BillShipper: { AccountNumber: credentials.ups.accountNumber }
                 }
               },
               Service: { Code: serviceCode },

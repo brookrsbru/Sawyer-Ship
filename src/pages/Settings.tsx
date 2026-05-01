@@ -1027,76 +1027,32 @@ export default function Settings({
                     </h3>
                     <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Sandbox Credentials</h4>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-sandbox-client-id">Client ID</Label>
-                            <Input 
-                              id="ups-sandbox-client-id" 
-                              value={formData.ups.sandboxClientId}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientId: e.target.value } })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-sandbox-client-secret">Client Secret</Label>
-                            <Input 
-                              id="ups-sandbox-client-secret" 
-                              autoComplete="off"
-                              value={formData.ups.sandboxClientSecret}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientSecret: e.target.value } })}
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Production Credentials</h4>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-production-client-id">Client ID</Label>
-                            <Input 
-                              id="ups-production-client-id" 
-                              value={formData.ups.productionClientId}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientId: e.target.value } })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-production-client-secret">Client Secret</Label>
-                            <Input 
-                              id="ups-production-client-secret" 
-                              autoComplete="off"
-                              value={formData.ups.productionClientSecret}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientSecret: e.target.value } })}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      {formData.ups.isSandbox ? (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-domestic-account">Sandbox Domestic Account Number</Label>
-                            <Input 
-                              id="ups-domestic-account" 
-                              value={formData.ups.domesticAccountNumber}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, domesticAccountNumber: e.target.value } })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-global-account">Sandbox Global Account Number</Label>
-                            <Input 
-                              id="ups-global-account" 
-                              value={formData.ups.globalAccountNumber}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, globalAccountNumber: e.target.value } })}
-                            />
-                          </div>
-                        </div>
-                      ) : (
                         <div className="space-y-2">
-                          <Label htmlFor="ups-prod-account">Production Account Number</Label>
+                          <Label htmlFor="ups-api-key">API Key</Label>
                           <Input 
-                            id="ups-prod-account" 
-                            value={formData.ups.productionAccountNumber}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionAccountNumber: e.target.value } })}
+                            id="ups-api-key" 
+                            value={formData.ups.apiKey}
+                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, apiKey: e.target.value } })}
                           />
                         </div>
-                      )}
+                        <div className="space-y-2">
+                          <Label htmlFor="ups-secret-key">Secret Key</Label>
+                          <Input 
+                            id="ups-secret-key" 
+                            autoComplete="off"
+                            value={formData.ups.secretKey}
+                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, secretKey: e.target.value } })}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ups-account">Account Number</Label>
+                        <Input 
+                          id="ups-account" 
+                          value={formData.ups.accountNumber}
+                          onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, accountNumber: e.target.value } })}
+                        />
+                      </div>
                     </div>
                   </div>
 

@@ -295,7 +295,7 @@ export class MagentoClient {
 }
 
 export class UPSClient {
-  constructor(private clientId: string, private clientSecret: string, private accountNumber: string, private isSandbox: boolean = true, private proxyUrl: string = '') {}
+  constructor(private apiKey: string, private secretKey: string, private accountNumber: string, private isSandbox: boolean = true, private proxyUrl: string = '') {}
 
   private get baseUrl() {
     return this.isSandbox ? 'https://wwwcie.ups.com' : 'https://onlinetools.ups.com';
@@ -307,13 +307,13 @@ export class UPSClient {
 
   async getAccessToken(): Promise<string> {
     const url = `${this.getProxyUrl()}${this.baseUrl}/security/v1/oauth/token`;
-    const auth = btoa(`${this.clientId}:${this.clientSecret}`);
+    const auth = btoa(`${this.apiKey}:${this.secretKey}`);
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/x-www-form-urlencoded',
-        'x-merchant-id': this.clientId
+        'x-merchant-id': this.apiKey
       },
       body: new URLSearchParams({ grant_type: 'client_credentials' }),
     });
@@ -348,7 +348,7 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'x-merchant-id': this.clientId
+        'x-merchant-id': this.apiKey
       },
       body: JSON.stringify(params),
     });
@@ -396,7 +396,7 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'x-merchant-id': this.clientId
+        'x-merchant-id': this.apiKey
       }
     });
 
