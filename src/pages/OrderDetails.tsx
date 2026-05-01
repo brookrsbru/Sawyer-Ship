@@ -865,24 +865,39 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
           if (isInternational) {
             const commodities = order.items.length > 0 
-              ? order.items.map(item => ({
-                  description: item.name,
-                  countryOfManufacture: getCarrierCountryCode(credentials.general.originCountry),
-                  quantity: item.qty_ordered,
-                  quantityUnits: "PCS",
-                  unitPrice: {
-                    amount: item.price,
-                    currency: credentials.general.currency || "GBP"
-                  },
-                  customsValue: {
-                    amount: item.price * item.qty_ordered,
-                    currency: credentials.general.currency || "GBP"
-                  },
-                  weight: {
-                    units: "KG",
-                    value: item.weight || 0.1
-                  }
-                }))
+              ? order.items.map(item => {
+                  const product = productDetails[item.sku];
+                  const getAttr = (code: string) => {
+                    const attr = product?.custom_attributes?.find((a: any) => a.attribute_code === code);
+                    let val = attr?.value;
+                    if (val === undefined && code === 'commodity_code') {
+                      const htsAttr = product?.custom_attributes?.find((a: any) => 
+                        ['hts_code', 'ts_hts_code', 'ts_commodity_code', 'hs_code', 'commodity_code', 'harmonized_system_code', 'hsc'].includes(a.attribute_code)
+                      );
+                      val = htsAttr?.value;
+                    }
+                    return val || '';
+                  };
+                  return {
+                    description: item.name,
+                    countryOfManufacture: getCarrierCountryCode(getAttr('country_of_manufacture') || credentials.general.originCountry),
+                    harmonizedCode: getAttr('commodity_code'),
+                    quantity: item.qty_ordered,
+                    quantityUnits: "PCS",
+                    unitPrice: {
+                      amount: item.price,
+                      currency: credentials.general.currency || "GBP"
+                    },
+                    customsValue: {
+                      amount: item.price * item.qty_ordered,
+                      currency: credentials.general.currency || "GBP"
+                    },
+                    weight: {
+                      units: "KG",
+                      value: item.weight || 0.1
+                    }
+                  };
+                })
               : [{
                   description: "Shipping Package",
                   countryOfManufacture: getCarrierCountryCode(credentials.general.originCountry),
@@ -1322,7 +1337,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 let val = attr?.value;
                 if (val === undefined && code === 'commodity_code') {
                   const htsAttr = product?.custom_attributes?.find((a: any) => 
-                    ['hts_code', 'ts_hts_code', 'ts_commodity_code', 'hs_code', 'commodity_code'].includes(a.attribute_code)
+                    ['hts_code', 'ts_hts_code', 'ts_commodity_code', 'hs_code', 'commodity_code', 'harmonized_system_code', 'hsc'].includes(a.attribute_code)
                   );
                   val = htsAttr?.value;
                 }
