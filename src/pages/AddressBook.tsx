@@ -203,8 +203,8 @@ export default function AddressBook({
                 region: row['Address - Address Line 5'] || '',
                 postcode: row['Address - Post Code'] || '',
                 country: row['Country - Country Name'] || 'GB',
-                residential: false,
-                fullname: ''
+                residential: row['Residential']?.toLowerCase() === 'yes' || row['Residential']?.toLowerCase() === 'true' || row['Is Residential']?.toLowerCase() === 'yes' || row['Is Residential']?.toLowerCase() === 'true' || false,
+                fullname: row['Full Name'] || row['Name'] || ''
               };
             }).filter(c => c.reference && c.street1 && c.city && c.postcode);
 

@@ -1856,8 +1856,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                               </p>
                             </div>
                             {customer.reference && (
-                              <div className="px-2 py-1 bg-zinc-900 text-white rounded text-[10px] font-black tracking-tighter shrink-0 border border-zinc-800 shadow-sm leading-none">
-                                {customer.reference}
+                              <div className="flex items-center gap-2 shrink-0">
+                                {customer.residential && (
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded uppercase tracking-wider border border-blue-100 italic">Resi</span>
+                                )}
+                                <div className="px-2 py-1 bg-zinc-900 text-white rounded text-[10px] font-black tracking-tighter border border-zinc-800 shadow-sm leading-none">
+                                  {customer.reference}
+                                </div>
                               </div>
                             )}
                           </div>
