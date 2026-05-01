@@ -308,16 +308,30 @@ export class UPSClient {
   async getAccessToken(): Promise<string> {
     const url = `${this.getProxyUrl()}${this.baseUrl}/security/v1/oauth/token`;
     const auth = btoa(`${this.apiKey}:${this.secretKey}`);
+    
+    console.log(`[UPSClient] Requesting token from: ${url}`);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/x-www-form-urlencoded',
-        'x-merchant-id': this.apiKey
       },
       body: new URLSearchParams({ grant_type: 'client_credentials' }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[UPSClient] Token request failed (${response.status}):`, errorText);
+      throw new Error(`UPS Auth Error: ${response.status} ${errorText}`);
+    }
+
     const data = await response.json();
+    if (!data.access_token) {
+      console.error(`[UPSClient] No access_token in UPS response:`, data);
+      throw new Error('UPS Auth Error: No access token returned');
+    }
+
     return data.access_token;
   }
 
@@ -331,9 +345,18 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'transId': `sawyer-${Date.now()}`,
+        'transactionSrc': 'sawyer-ship'
       },
       body: JSON.stringify(params),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const msg = errorData?.response?.errors?.[0]?.message || `UPS Rate Error: ${response.status} ${response.statusText}`;
+      throw new Error(msg);
+    }
+
     const data = await response.json();
     console.log(`[UPSClient] Rates response:`, data);
     return data;
@@ -348,10 +371,19 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'x-merchant-id': this.apiKey
+        'x-merchant-id': this.apiKey,
+        'transId': `sawyer-${Date.now()}`,
+        'transactionSrc': 'sawyer-ship'
       },
       body: JSON.stringify(params),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const msg = errorData?.response?.errors?.[0]?.message || `UPS Shipment Error: ${response.status} ${response.statusText}`;
+      throw new Error(msg);
+    }
+
     const data = await response.json();
     console.log(`[UPSClient] Shipment response:`, data);
     return data;
