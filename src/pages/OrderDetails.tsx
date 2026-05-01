@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
-import { SawyerCredentials, AddressBookCustomer } from '@/src/hooks/use-sawyer-storage';
+import { SawyerCredentials, AddressBookCustomer, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
 import { normalizeRegion } from '@/src/lib/regions';
@@ -102,6 +102,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [weightG, setWeightG] = useState('');
   const [billShippingTo, setBillShippingTo] = useState('shipper');
   const [billDutiesTo, setBillDutiesTo] = useState('shipper');
+  const [shipAccountNumber, setShipAccountNumber] = useState('');
+  const [dutyAccountNumber, setDutyAccountNumber] = useState('');
 
   const getCarrierCountryCode = (code: string | undefined) => {
     const isoCode = getCountryCode(code);
@@ -1481,7 +1483,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         // 3. Save to local shipments for Tracking page
         if (!isSandbox) {
           try {
-            const newShipment = {
+            const newShipment: SawyerShipment = {
               id: `${tracking}-${Date.now()}`,
               orderIncrementId: order.increment_id || 'MANUAL',
               trackingNumber: tracking,
@@ -1492,7 +1494,35 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               shipDate: new Date().toISOString(),
               destCountry: order.shipping_address?.country_id,
               status: 'Label Created',
-              lastUpdated: new Date().toISOString()
+              lastUpdated: new Date().toISOString(),
+              address: {
+                street: order.shipping_address?.street || [],
+                city: order.shipping_address?.city || '',
+                region: order.shipping_address?.region || '',
+                postcode: order.shipping_address?.postcode || '',
+                country: order.shipping_address?.country_id || '',
+                telephone: order.shipping_address?.telephone,
+                email: order.customer_email
+              },
+              billing: {
+                shipping: billShippingTo,
+                duties: billDutiesTo,
+                shippingAccountNumber: billShippingTo !== 'shipper' ? shipAccountNumber : undefined,
+                dutiesAccountNumber: billDutiesTo !== 'shipper' ? dutyAccountNumber : undefined
+              },
+              packages: pacakgeConfigs.map(p => ({
+                weight: p.weight,
+                length: p.length,
+                width: p.width,
+                height: p.height
+              })),
+              items: order.items.map(item => ({
+                name: item.name,
+                sku: item.sku,
+                qty: item.qty_ordered,
+                price: item.price
+              })),
+              labelBase64: labelBase64 || undefined
             };
 
             const updatedShipments = [newShipment, ...(credentials.shipments || [])];
@@ -2849,22 +2879,46 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                         </SelectContent>
                       </Select>
                     </div>
-                    {(credentials.general.alwaysShowDuties || credentials.general.originCountry !== order.shipping_address?.country_id) && (
+                    {billShippingTo !== 'shipper' && (
                       <div className="space-y-2">
-                        <Label>Bill Duties/Taxes To</Label>
-                        <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
-                          <SelectTrigger className="text-xs h-8">
-                            <SelectValue placeholder="Select billing">
-                              {billDutiesTo === 'shipper' ? 'Shipper (DDP)' : billDutiesTo === 'recipient' ? 'Recipient (DAP)' : 'Third Party'}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="shipper">Shipper (DDP)</SelectItem>
-                            <SelectItem value="recipient">Recipient (DAP)</SelectItem>
-                            <SelectItem value="third_party">Third Party</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label>Shipping Account Number</Label>
+                        <Input 
+                          value={shipAccountNumber} 
+                          onChange={(e) => setShipAccountNumber(e.target.value)} 
+                          placeholder="Enter account number"
+                          className="text-xs h-8"
+                        />
                       </div>
+                    )}
+                    {(credentials.general.alwaysShowDuties || credentials.general.originCountry !== order.shipping_address?.country_id) && (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Bill Duties/Taxes To</Label>
+                          <Select value={billDutiesTo} onValueChange={setBillDutiesTo}>
+                            <SelectTrigger className="text-xs h-8">
+                              <SelectValue placeholder="Select billing">
+                                {billDutiesTo === 'shipper' ? 'Shipper (DDP)' : billDutiesTo === 'recipient' ? 'Recipient (DAP)' : 'Third Party'}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="shipper">Shipper (DDP)</SelectItem>
+                              <SelectItem value="recipient">Recipient (DAP)</SelectItem>
+                              <SelectItem value="third_party">Third Party</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {billDutiesTo !== 'shipper' && (
+                          <div className="space-y-2">
+                            <Label>Duties Account Number</Label>
+                            <Input 
+                              value={dutyAccountNumber} 
+                              onChange={(e) => setDutyAccountNumber(e.target.value)} 
+                              placeholder="Enter account number"
+                              className="text-xs h-8"
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban } from 'lucide-react';
+import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban, FileText, MapPin, User, Package, CreditCard, Printer, Eye } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { UPSClient, FedExClient } from '@/src/lib/api-clients';
 import { toast } from 'sonner';
@@ -15,6 +15,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Tracking({ credentials, onSave }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void> }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,7 +31,40 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState<SawyerShipment | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const PAGE_SIZE = 20;
+
+  // Cleanup effect: Remove label data for shipments older than 5 days to save storage
+  useEffect(() => {
+    if (!credentials.shipments || credentials.shipments.length === 0) return;
+
+    const fiveDaysAgo = new Date();
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+
+    let hasChanges = false;
+    const cleanedShipments = credentials.shipments.map(s => {
+      if (s.labelBase64 && s.shipDate) {
+        const shipDate = new Date(s.shipDate);
+        if (shipDate < fiveDaysAgo) {
+          hasChanges = true;
+          const { labelBase64, ...rest } = s;
+          return { ...rest };
+        }
+      }
+      return s;
+    });
+
+    if (hasChanges) {
+      onSave({ ...credentials, shipments: cleanedShipments });
+      console.log('Cleaned up old labels to save storage space.');
+    }
+  }, []);
+
+  const handleOpenDetails = (shipment: SawyerShipment) => {
+    setSelectedShipment(shipment);
+    setIsDetailsOpen(true);
+  };
 
   const filteredShipments = useMemo(() => {
     const shipments = credentials.shipments || [];
@@ -477,6 +519,14 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuItem 
+                                className="gap-2 cursor-pointer font-bold"
+                                onClick={() => handleOpenDetails(shipment)}
+                              >
+                                <Eye size={14} />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
                                 className="gap-2 cursor-pointer"
                                 onClick={() => updateShipmentStatus(shipment)}
                                 disabled={refreshingIds.has(shipment.id)}
@@ -556,6 +606,230 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
           )}
         </CardContent>
       </Card>
+      
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 border-b bg-zinc-50/50">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <FileText className="text-zinc-400" />
+                  Order Details
+                </DialogTitle>
+                <p className="text-sm text-zinc-500">
+                  Shipment information for #{selectedShipment?.orderIncrementId}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className={
+                  selectedShipment?.status?.toLowerCase().includes('delivered') ? 'bg-green-100 text-green-700 border-green-200' :
+                  selectedShipment?.status?.toLowerCase().includes('voided') ? 'bg-red-100 text-red-700 border-red-200' :
+                  'bg-blue-100 text-blue-700 border-blue-200'
+                }>
+                  {selectedShipment?.status || 'Active'}
+                </Badge>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-8">
+              {/* Top Banner - Carrier & Tracking */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50 border border-zinc-100 items-center">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${selectedShipment?.carrier === 'UPS' ? 'bg-amber-100' : 'bg-indigo-100'}`}>
+                    <Truck className={selectedShipment?.carrier === 'UPS' ? 'text-amber-700' : 'text-indigo-700'} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Carrier & Tracking</p>
+                    <p className="font-bold text-zinc-900">{selectedShipment?.carrier} - {selectedShipment?.trackingNumber}</p>
+                    <p className="text-xs text-zinc-500">{selectedShipment?.service}</p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 px-2">
+                   <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 gap-2"
+                    onClick={() => window.open(getTrackingUrl(selectedShipment?.carrier || '', selectedShipment?.trackingNumber || ''), '_blank')}
+                   >
+                     <Search size={14} />
+                     Track Live
+                   </Button>
+                   {selectedShipment?.labelBase64 && (
+                     <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="h-9 gap-2 bg-zinc-900"
+                        onClick={() => {
+                          const b64 = selectedShipment.labelBase64!;
+                          const type = credentials.general.labelFormat === 'ZPL' ? 'text/plain' : 'application/pdf';
+                          const binStr = atob(b64);
+                          const len = binStr.length;
+                          const arr = new Uint8Array(len);
+                          for (let i = 0; i < len; i++) arr[i] = binStr.charCodeAt(i);
+                          const blob = new Blob([arr], { type });
+                          const url = URL.createObjectURL(blob);
+                          window.open(url, '_blank');
+                        }}
+                      >
+                       <Printer size={14} />
+                       View Label
+                     </Button>
+                   )}
+                   {!selectedShipment?.labelBase64 && selectedShipment?.shipDate && (
+                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-[10px] font-medium text-zinc-500 italic">
+                       <AlertCircle size={10} />
+                       Label purged (5d limit)
+                     </div>
+                   )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Customer Information */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 uppercase tracking-tight">
+                    <User size={16} className="text-zinc-400" />
+                    Recipient
+                  </div>
+                  <div className="space-y-1.5 pl-6 border-l-2 border-zinc-100">
+                    <p className="font-bold text-zinc-900">{selectedShipment?.customerName}</p>
+                    {selectedShipment?.company && <p className="text-sm text-zinc-600">{selectedShipment.company}</p>}
+                    {selectedShipment?.address && (
+                      <div className="space-y-0.5 pt-1">
+                        {selectedShipment.address.street.map((line, i) => (
+                           <p key={i} className="text-sm text-zinc-500">{line}</p>
+                        ))}
+                        <p className="text-sm text-zinc-500">
+                          {selectedShipment.address.city}, {selectedShipment.address.region} {selectedShipment.address.postcode}
+                        </p>
+                        <p className="text-sm text-zinc-500">{selectedShipment.address.country}</p>
+                      </div>
+                    )}
+                    {(selectedShipment?.address?.telephone || selectedShipment?.address?.email) && (
+                      <div className="pt-2 flex flex-col gap-1">
+                        {selectedShipment.address.telephone && <p className="text-xs text-zinc-400">T: {selectedShipment.address.telephone}</p>}
+                        {selectedShipment.address.email && <p className="text-xs text-zinc-400 font-medium italic underline decoration-zinc-200">E: {selectedShipment.address.email}</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Billing Information */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 uppercase tracking-tight">
+                    <CreditCard size={16} className="text-zinc-400" />
+                    Billing & Charges
+                  </div>
+                  <div className="space-y-3 pl-6 border-l-2 border-zinc-100">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-zinc-400">Shipping Costs</p>
+                      <p className="text-sm font-bold text-zinc-900 capitalize">
+                        {selectedShipment?.billing?.shipping || 'Shipper'}
+                        {selectedShipment?.billing?.shippingAccountNumber && (
+                          <span className="text-zinc-400 font-mono text-xs ml-2">({selectedShipment.billing.shippingAccountNumber})</span>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-zinc-400">Duties & Taxes</p>
+                      <p className="text-sm font-bold text-zinc-900 capitalize">
+                        {selectedShipment?.billing?.duties || 'Shipper'}
+                        {selectedShipment?.billing?.dutiesAccountNumber && (
+                          <span className="text-zinc-400 font-mono text-xs ml-2">({selectedShipment.billing.dutiesAccountNumber})</span>
+                        )}
+                      </p>
+                    </div>
+                    {selectedShipment?.shipDate && (
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-zinc-400">Shipment Date</p>
+                        <p className="text-sm font-bold text-zinc-900 italic">
+                          {new Date(selectedShipment.shipDate).toLocaleDateString(undefined, { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Items & Packages */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 uppercase tracking-tight">
+                    <Package size={16} className="text-zinc-400" />
+                    Items & Packages
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Items list */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-zinc-400">Shipment Contents</p>
+                    <div className="space-y-2">
+                      {selectedShipment?.items && selectedShipment.items.length > 0 ? (
+                        selectedShipment.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-white shadow-sm hover:border-zinc-300 transition-colors">
+                            <div className="space-y-0.5">
+                              <p className="text-sm font-bold text-zinc-900">{item.name}</p>
+                              <p className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">{item.sku}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs font-black text-zinc-900">x{item.qty}</p>
+                              <p className="text-[10px] text-zinc-400">{credentials.general.currency} {item.price.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-zinc-500 italic pl-2 border-l-2 border-zinc-100">No items listed for this shipment.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Packages info */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-zinc-400">Package Details</p>
+                    <div className="space-y-2">
+                       {selectedShipment?.packages && selectedShipment.packages.length > 0 ? (
+                          selectedShipment.packages.map((pkg, idx) => (
+                            <div key={idx} className="p-3 rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 flex items-center gap-4">
+                              <div className="w-8 h-8 rounded bg-white border flex items-center justify-center text-xs font-bold text-zinc-400">
+                                {idx + 1}
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-8 gap-y-1 flex-1">
+                                <div>
+                                  <p className="text-[9px] uppercase font-bold text-zinc-400">Weight</p>
+                                  <p className="text-xs font-bold text-zinc-900">{pkg.weight} KG</p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] uppercase font-bold text-zinc-400">Dimensions</p>
+                                  <p className="text-xs font-bold text-zinc-900">{pkg.length} x {pkg.width} x {pkg.height} CM</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                       ) : (
+                         <p className="text-sm text-zinc-500 italic pl-2 border-l-2 border-zinc-100">No package dimensions recorded.</p>
+                       )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+          
+          <div className="p-6 border-t bg-zinc-50/50 flex justify-end">
+            <Button onClick={() => setIsDetailsOpen(false)} variant="outline">Close Details</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

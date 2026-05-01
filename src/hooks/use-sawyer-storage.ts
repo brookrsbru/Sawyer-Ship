@@ -121,6 +121,36 @@ export interface SawyerShipment {
   status?: string;
   hasError?: boolean;
   lastUpdated?: string;
+  // Expanded details for "Order Details" view
+  address?: {
+    street: string[];
+    city: string;
+    region: string;
+    postcode: string;
+    country: string;
+    telephone?: string;
+    email?: string;
+  };
+  billing?: {
+    shipping: string;
+    duties: string;
+    shippingAccountNumber?: string;
+    dutiesAccountNumber?: string;
+  };
+  packages?: {
+    weight: string;
+    length: string;
+    width: string;
+    height: string;
+  }[];
+  items?: {
+    name: string;
+    sku: string;
+    qty: number;
+    price: number;
+  }[];
+  labelBase64?: string;
+  labelUrl?: string;
 }
 
 const DEFAULT_SHIPPING_DEFAULTS: ShippingDefaults = {

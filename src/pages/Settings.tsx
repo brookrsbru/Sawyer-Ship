@@ -1285,7 +1285,6 @@ export default function Settings({
                       Tracking API Credentials
                     </h3>
                     <p className="text-[10px] text-zinc-500 pl-6 border-l-2 border-zinc-100 italic">
-                      If your FedEx setup requires a separate project for Tracking, enter those credentials below. 
                       Leave empty to use main Account Credentials above.
                     </p>
                     <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
