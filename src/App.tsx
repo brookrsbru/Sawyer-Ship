@@ -223,9 +223,9 @@ function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: strin
 
 function Layout({ onLogout }: { onLogout: () => void }) {
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className="h-screen bg-zinc-50 flex overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-zinc-200 flex flex-col h-screen sticky top-0 shrink-0">
+      <aside className="w-64 bg-white border-r border-zinc-200 flex flex-col h-full shrink-0">
         <div className="p-6">
           <div className="flex items-center gap-2 font-bold text-xl">
             <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center">
@@ -235,7 +235,7 @@ function Layout({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
         
-        <nav className="flex-1 px-4 space-y-1">
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
           <Link to="/" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
@@ -263,8 +263,8 @@ function Layout({ onLogout }: { onLogout: () => void }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto p-8">
+      <main className="flex-1 overflow-y-auto w-full">
+        <div className="max-w-7xl mx-auto p-8 min-h-full">
           <Outlet />
         </div>
       </main>

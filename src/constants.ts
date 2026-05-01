@@ -1,2 +1,7 @@
-// MajorVersion.MinorVersion.Patch
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.8.1';
+
+// Major Addition
+// .
+// Feature Addition
+// .
+// Feature Change / Fix

@@ -169,7 +169,7 @@ export default function Settings({
 
   return (
     <div className="space-y-8 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 bg-zinc-50/80 backdrop-blur-md z-10 py-4 -mt-4 border-b border-zinc-200 mb-4">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 border-b border-zinc-200 mb-8">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold text-zinc-900">Settings</h1>
@@ -190,7 +190,7 @@ export default function Settings({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Navigation Sidebar */}
         <div className="hidden lg:block relative">
-          <div className="sticky top-24 space-y-4 z-10">
+          <div className="sticky top-6 space-y-4 z-20">
             <Card className="border-none shadow-none bg-transparent">
               <CardHeader className="px-0 pt-0">
                 <CardTitle className="text-xs font-bold uppercase text-zinc-400 tracking-widest text-center w-full">Navigation</CardTitle>
@@ -232,7 +232,7 @@ export default function Settings({
 
         <div className="lg:col-span-3 space-y-12">
           {/* General Section */}
-          <section id="general" className="scroll-mt-24 space-y-6">
+          <section id="general" className="scroll-mt-6 space-y-6">
             <div className="flex items-center gap-4">
               <div className="h-px flex-1 bg-zinc-200" />
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">General Preferences</h2>
@@ -629,7 +629,7 @@ export default function Settings({
           </section>
 
             {/* Shipping Defaults Section */}
-            <section id="shipping" className="scroll-mt-24 space-y-6">
+            <section id="shipping" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-zinc-200" />
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Shipping Defaults</h2>
@@ -940,7 +940,7 @@ export default function Settings({
             </section>
 
             {/* Magento Section */}
-            <section id="magento" className="scroll-mt-24 space-y-6">
+            <section id="magento" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-zinc-200" />
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Magento Integration</h2>
@@ -988,7 +988,7 @@ export default function Settings({
             </section>
 
             {/* UPS Section */}
-            <section id="ups" className="scroll-mt-24 space-y-6">
+            <section id="ups" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-zinc-200" />
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">UPS Integration</h2>
@@ -1151,7 +1151,7 @@ export default function Settings({
             </section>
 
             {/* FedEx Section */}
-            <section id="fedex" className="scroll-mt-24 space-y-6">
+            <section id="fedex" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-zinc-200" />
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">FedEx Integration</h2>
@@ -1411,7 +1411,7 @@ export default function Settings({
             </section>
 
             {/* Security Section */}
-            <section id="security" className="scroll-mt-24 space-y-6">
+            <section id="security" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-zinc-200" />
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Security & Backup</h2>
@@ -1512,7 +1512,7 @@ export default function Settings({
             </AlertDialog>
 
             {/* Dev Menu Section */}
-            <section id="dev" className="scroll-mt-24 space-y-6">
+            <section id="dev" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-zinc-200" />
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Dev Menu</h2>
@@ -1588,7 +1588,7 @@ export default function Settings({
             </section>
 
             {/* Help Section */}
-            <section id="help" className="scroll-mt-24">
+            <section id="help" className="scroll-mt-6">
               <Card className="bg-zinc-900 text-white border-none">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-white">
