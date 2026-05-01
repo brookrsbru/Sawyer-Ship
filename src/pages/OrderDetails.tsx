@@ -223,7 +223,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     
     setFullNameInput(customer.fullname);
     setAddressBookRef(customer.reference || '');
-    setAddressBookSync(true);
     setOrder({
       ...order,
       customer_email: customer.email || '',
