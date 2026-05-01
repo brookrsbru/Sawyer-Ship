@@ -10,8 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight, ChevronLeft, ChevronRight, Box, Trash2, Copy, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
-import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
+import { SawyerCredentials, AddressBookCustomer } from '@/src/hooks/use-sawyer-storage';
 import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
 import { normalizeRegion } from '@/src/lib/regions';
@@ -84,6 +85,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [isLabelViewerOpen, setIsLabelViewerOpen] = useState(false);
   const [fullNameInput, setFullNameInput] = useState("");
+  const [addressBookSync, setAddressBookSync] = useState(false);
+  const [addressBookRef, setAddressBookRef] = useState("");
   const [addressSearch, setAddressSearch] = useState("");
   const [addressPage, setAddressPage] = useState(1);
   const ADDRESSES_PER_PAGE = 10;
@@ -219,6 +222,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     const last = parts.slice(1).join(' ') || '';
     
     setFullNameInput(customer.fullname);
+    setAddressBookRef(customer.reference || '');
+    setAddressBookSync(true);
     setOrder({
       ...order,
       customer_email: customer.email || '',
@@ -344,6 +349,54 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     order?.shipping_address?.postcode,
     order?.shipping_address?.country_id
   ]);
+
+  const handleContinueToShipping = async () => {
+    if (id === 'manual' && addressBookSync && addressBookRef.trim()) {
+      try {
+        const addr = order!.shipping_address!;
+        const newEntry: AddressBookCustomer = {
+          id: '', // Will be set/replaced
+          reference: addressBookRef.trim().toUpperCase(),
+          fullname: fullNameInput,
+          company: addr.company,
+          email: order!.customer_email,
+          telephone: addr.telephone,
+          street1: addr.street[0] || '',
+          street2: addr.street[1] || '',
+          street3: addr.street[2] || '',
+          city: addr.city,
+          region: addr.region,
+          postcode: addr.postcode,
+          country: addr.country_id,
+          residential: !!addr.is_residential
+        };
+
+        const existingIdx = credentials.addressBook.findIndex(
+          a => a.reference.toUpperCase() === newEntry.reference
+        );
+
+        let updatedBook = [...credentials.addressBook];
+        if (existingIdx !== -1) {
+          newEntry.id = updatedBook[existingIdx].id;
+          updatedBook[existingIdx] = newEntry;
+          toast.success(`Updated address book entry: ${newEntry.reference}`);
+        } else {
+          newEntry.id = crypto.randomUUID();
+          updatedBook.push(newEntry);
+          toast.success(`Added to address book: ${newEntry.reference}`);
+        }
+
+        await onSave({
+          ...credentials,
+          addressBook: updatedBook
+        });
+      } catch (e) {
+        console.error("Failed to update address book:", e);
+        toast.error("Failed to update address book");
+      }
+    }
+    setIsManualReady(true);
+  };
 
   const ValidationIcon = ({ status }: { status: 'none' | 'loading' | 'valid' | 'invalid' }) => {
     if (status === 'loading') return <Loader2 className="animate-spin w-4 h-4 text-zinc-400" />;
@@ -1682,6 +1735,32 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 </div>
               </div>
 
+              {id === 'manual' && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="address-book-sync" 
+                      checked={addressBookSync} 
+                      onCheckedChange={setAddressBookSync}
+                    />
+                    <Label htmlFor="address-book-sync" className="text-sm font-medium cursor-pointer">
+                      Add/Update Address Book
+                    </Label>
+                  </div>
+                  
+                  {addressBookSync && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <Label className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Address Book Reference</Label>
+                      <Input 
+                        value={addressBookRef}
+                        onChange={(e) => setAddressBookRef(e.target.value.toUpperCase())}
+                        className="uppercase font-mono text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg items-center h-[58px]">
                 <div className="flex-1 flex items-center relative">
                   <Button
@@ -1727,7 +1806,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               <Button 
                 className="w-full bg-zinc-900 hover:bg-zinc-800" 
                 disabled={!isComplete}
-                onClick={() => setIsManualReady(true)}
+                onClick={handleContinueToShipping}
               >
                 Continue to Shipping
               </Button>
