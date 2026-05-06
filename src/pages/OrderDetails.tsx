@@ -3058,7 +3058,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       >
                         <div className="flex justify-between items-center">
                           <div>
-                            <p className="font-bold text-sm">{rate.carrier} {rate.service}</p>
+                            <p className="font-bold text-sm">
+                              {rate.service.toLowerCase().includes(rate.carrier.toLowerCase()) 
+                                ? rate.service 
+                                : `${rate.carrier} ${rate.service}`}
+                            </p>
                             <p className="text-xs text-zinc-500">{rate.delivery}</p>
                           </div>
                           <p className="font-bold text-zinc-900">
