@@ -335,6 +335,19 @@ export class UPSClient {
     return data.access_token;
   }
 
+  private cleanObject(obj: any): any {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.cleanObject(item));
+    }
+    
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => [k, this.cleanObject(v)])
+    );
+  }
+
   async getRates(params: any): Promise<any> {
     console.log(`[UPSClient] Fetching rates`, params);
     const token = await this.getAccessToken();
@@ -348,7 +361,7 @@ export class UPSClient {
         'transId': `sawyer-${Date.now()}`,
         'transactionSrc': 'sawyer-ship'
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify(this.cleanObject(params)),
     });
 
     if (!response.ok) {
@@ -375,7 +388,7 @@ export class UPSClient {
         'transId': `sawyer-${Date.now()}`,
         'transactionSrc': 'sawyer-ship'
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify(this.cleanObject(params)),
     });
 
     if (!response.ok) {
@@ -452,7 +465,7 @@ export class UPSClient {
         'transId': `sawyer-${Date.now()}`,
         'transactionSrc': 'sawyer-ship'
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify(this.cleanObject(params)),
     });
 
     if (!response.ok) {
