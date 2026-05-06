@@ -18,6 +18,20 @@ import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
 import { normalizeRegion } from '@/src/lib/regions';
 import { toast } from 'sonner';
 
+const UPS_SERVICE_NAMES: Record<string, string> = {
+  '01': 'UPS Next Day Air',
+  '02': 'UPS 2nd Day Air',
+  '03': 'UPS Ground',
+  '07': 'UPS Express',
+  '08': 'UPS Expedited',
+  '11': 'UPS Standard',
+  '12': 'UPS 3 Day Select',
+  '13': 'UPS Next Day Air Saver',
+  '14': 'UPS Next Day Air Early',
+  '54': 'UPS Express Plus',
+  '65': 'UPS Saver',
+};
+
 interface Parcel {
   id: string;
   weightKg: string;
@@ -759,7 +773,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               allRates.push({
                 id: `ups-${s.Service.Code}`,
                 carrier: 'UPS',
-                service: `Service ${s.Service.Code}`,
+                service: UPS_SERVICE_NAMES[s.Service.Code] || `UPS Service ${s.Service.Code}`,
                 price: parseFloat(s.TotalCharges.MonetaryValue),
                 delivery: deliveryInfo
               });
@@ -1070,18 +1084,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           credentials.ups.isSandbox,
           credentials.general.proxyUrl
         );
-
-        // Map service name to code (simplified mapping)
-        const serviceMap: Record<string, string> = {
-          'Ground': '03',
-          'Next Day Air': '01',
-          '2nd Day Air': '02',
-          'Standard': '11',
-          'Worldwide Express': '07',
-          'Worldwide Expedited': '08',
-          'Worldwide Saver': '65',
-        };
-        const serviceCode = serviceMap[selectedRate.service] || '03';
+        
+        // Extract service code from ID (e.g. "ups-11" -> "11")
+        const serviceCode = selectedRate.id.startsWith('ups-') 
+          ? selectedRate.id.replace('ups-', '') 
+          : '03';
 
         const upsParams: any = {
           ShipmentRequest: {
