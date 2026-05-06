@@ -15,6 +15,7 @@ import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/a
 import { SawyerCredentials, AddressBookCustomer, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
+import { getUpsCode } from '@/src/lib/ups-mappings';
 import { normalizeRegion } from '@/src/lib/regions';
 import { toast } from 'sonner';
 
@@ -120,7 +121,12 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [shipAccountNumber, setShipAccountNumber] = useState('');
   const [dutyAccountNumber, setDutyAccountNumber] = useState('');
 
-  const getCarrierCountryCode = (code: string | undefined) => {
+  const getCarrierCountryCode = (code: string | undefined, carrier?: string) => {
+    if (carrier === 'UPS') {
+      const clean = code?.trim().toUpperCase();
+      if (clean === 'XI' || clean === 'NORTHERN IRELAND') return 'NB';
+      return getUpsCode(getCountryCode(code));
+    }
     return getCountryCode(code);
   };
 
@@ -299,7 +305,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             PoliticalDivision2: order.shipping_address.city,
             PoliticalDivision1: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
             PostcodePrimaryLow: order.shipping_address.postcode,
-            CountryCode: getCarrierCountryCode(order.shipping_address.country_id)
+            CountryCode: getCarrierCountryCode(order.shipping_address.country_id, 'UPS')
           }
         }
       };
@@ -746,7 +752,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       if (credentials.ups.enabled && hasUpsCreds) {
         try {
           const destCountry = order.shipping_address?.country_id;
-          const isDomestic = getCarrierCountryCode(destCountry) === getCarrierCountryCode(credentials.general.originCountry);
+          const isDomestic = getCarrierCountryCode(destCountry, 'UPS') === getCarrierCountryCode(credentials.general.originCountry, 'UPS');
           const accountNumber = credentials.ups.accountNumber;
 
           console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
@@ -769,13 +775,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 Shipper: {
                   Address: {
                     PostalCode: credentials.general.originPostalCode,
-                    CountryCode: getCarrierCountryCode(credentials.general.originCountry)
+                    CountryCode: getCarrierCountryCode(credentials.general.originCountry, 'UPS')
                   }
                 },
                 ShipTo: {
                   Address: {
                     PostalCode: order.shipping_address.postcode,
-                    CountryCode: getCarrierCountryCode(order.shipping_address.country_id),
+                    CountryCode: getCarrierCountryCode(order.shipping_address.country_id, 'UPS'),
                     StateProvinceCode: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
                     ResidentialAddressIndicator: order.shipping_address.is_residential ? "" : undefined
                   }
@@ -1141,7 +1147,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         width: width,
         height: height
       }];
-      const isDomestic = getCarrierCountryCode(order.shipping_address?.country_id) === getCarrierCountryCode(credentials.general.originCountry);
+      const isDomestic = getCarrierCountryCode(order.shipping_address?.country_id, 'UPS') === getCarrierCountryCode(credentials.general.originCountry, 'UPS');
 
       if (selectedRate.carrier === 'UPS') {
         const accountNumber = credentials.ups.accountNumber;
@@ -1173,7 +1179,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   City: credentials.general.originCity,
                   StateProvinceCode: getCarrierRegion(credentials.general.originState, credentials.general.originCountry),
                   PostalCode: credentials.general.originPostalCode,
-                  CountryCode: getCarrierCountryCode(credentials.general.originCountry)
+                  CountryCode: getCarrierCountryCode(credentials.general.originCountry, 'UPS')
                 }
               },
               ShipTo: {
@@ -1185,7 +1191,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   City: order.shipping_address?.city,
                   StateProvinceCode: getCarrierRegion(order.shipping_address?.region, order.shipping_address?.country_id),
                   PostalCode: order.shipping_address?.postcode,
-                  CountryCode: getCarrierCountryCode(order.shipping_address?.country_id),
+                  CountryCode: getCarrierCountryCode(order.shipping_address?.country_id, 'UPS'),
                   ResidentialAddressIndicator: order.shipping_address?.is_residential ? "" : undefined
                 }
               },
@@ -1254,7 +1260,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                     UnitOfMeasurement: { Code: "PCS" }
                   },
                   CommodityCode: getAttr('commodity_code'),
-                  OriginCountryCode: getCarrierCountryCode(getAttr('country_of_manufacture') || credentials.general.originCountry)
+                  OriginCountryCode: getCarrierCountryCode(getAttr('country_of_manufacture') || credentials.general.originCountry, 'UPS')
                 };
               })
             }
