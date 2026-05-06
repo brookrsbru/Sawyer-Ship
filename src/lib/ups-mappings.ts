@@ -263,36 +263,17 @@ export const UPS_NAME_MAP: Record<string, string> = {
   "NETHERLANDS": "NL",
   "HOLLAND": "HO", // File says Holland - HO - NL
   "CHINA, PEOPLES REPUBLIC OF": "CN",
-  "WALES": "WL" // Added as it follows the pattern EN, SF, NB, WL
 };
 
 /**
- * Gets the UPS-specific country code, optionally using region to distinguish UK territories.
+ * Gets the UPS-specific country code.
  */
-export function getUpsCode(isoCodeOrName: string | undefined, region?: string): string {
-  if (!isoCodeOrName) return 'GB';
-  const clean = isoCodeOrName.trim().toUpperCase();
+export function getUpsCode(isoCode: string | undefined): string {
+  if (!isoCode) return 'GB';
+  const clean = isoCode.trim().toUpperCase();
   
-  // 1. Check direct name map
-  if (UPS_NAME_MAP[clean]) return UPS_NAME_MAP[clean];
+  // Direct territorial mapping for UPS
+  if (clean === 'XI') return 'NB'; // Northern Ireland for UPS
   
-  // 2. Specialty territorial mapping
-  if (clean === 'XI' || clean === 'NORTHERN IRELAND') return 'NB'; 
-  
-  // 3. Handle UK territory detection if we have a generic UK/GB code
-  if (clean === 'GB' || clean === 'UK' || clean === 'UNITED KINGDOM') {
-    const r = region?.trim().toUpperCase() || '';
-    if (r.includes('SCOTLAND')) return 'SF';
-    if (r.includes('ENGLAND')) return 'EN';
-    if (r.includes('NORTHERN IRELAND') || r.includes('XI')) return 'NB';
-    if (r.includes('WALES')) return 'WL';
-    
-    // Default to EN for UK if we don't know the specific territory, as requested by user
-    return 'EN';
-  }
-
-  // 4. Check UPS_COUNTRY_MAP
-  if (UPS_COUNTRY_MAP[clean]) return UPS_COUNTRY_MAP[clean];
-  
-  return clean.length === 2 ? clean : 'GB';
+  return UPS_COUNTRY_MAP[clean] || clean || 'GB';
 }
