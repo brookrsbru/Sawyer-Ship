@@ -268,12 +268,19 @@ export const UPS_NAME_MAP: Record<string, string> = {
 /**
  * Gets the UPS-specific country code.
  */
-export function getUpsCode(isoCode: string | undefined): string {
-  if (!isoCode) return 'GB';
-  const clean = isoCode.trim().toUpperCase();
+export function getUpsCode(nameOrCode: string | undefined): string {
+  if (!nameOrCode) return 'GB';
+  const clean = nameOrCode.trim().toUpperCase();
   
   // Direct territorial mapping for UPS
-  if (clean === 'XI') return 'NB'; // Northern Ireland for UPS
+  if (clean === 'XI' || clean === 'NORTHERN IRELAND') return 'NB';
+  if (clean === 'ENGLAND') return 'EN';
+  if (clean === 'SCOTLAND') return 'SF';
+  if (clean === 'UNITED KINGDOM' || clean === 'UK') return 'GB';
   
+  // Try name map first
+  if (UPS_NAME_MAP[clean]) return UPS_NAME_MAP[clean];
+  
+  // Then try country map
   return UPS_COUNTRY_MAP[clean] || clean || 'GB';
 }

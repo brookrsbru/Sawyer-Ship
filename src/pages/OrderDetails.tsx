@@ -123,9 +123,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
   const getCarrierCountryCode = (code: string | undefined, carrier?: string) => {
     if (carrier === 'UPS') {
-      const clean = code?.trim().toUpperCase();
-      if (clean === 'XI' || clean === 'NORTHERN IRELAND') return 'NB';
-      return getUpsCode(getCountryCode(code));
+      return getUpsCode(code || getCountryCode(code));
     }
     return getCountryCode(code);
   };
@@ -293,6 +291,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         credentials.general.proxyUrl
       );
 
+      const destCountry = getCarrierCountryCode(order.shipping_address.country_id, 'UPS');
       const params = {
         XAVRequest: {
           Request: {
@@ -300,12 +299,12 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             TransactionReference: { CustomerContext: "Address Validation" }
           },
           AddressKeyFormat: {
-            ConsigneeName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`,
-            AddressLine: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region),
+            ConsigneeName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`.substring(0, 35),
+            AddressLine: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region).slice(0, 3),
             PoliticalDivision2: order.shipping_address.city,
-            PoliticalDivision1: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
+            PoliticalDivision1: destCountry === 'GB' || destCountry === 'NB' || destCountry === 'EN' || destCountry === 'SF' ? undefined : getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
             PostcodePrimaryLow: order.shipping_address.postcode,
-            CountryCode: getCarrierCountryCode(order.shipping_address.country_id, 'UPS')
+            CountryCode: destCountry
           }
         }
       };
