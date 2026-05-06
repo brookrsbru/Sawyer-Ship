@@ -110,6 +110,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [isValidatingFedEx, setIsValidatingFedEx] = useState(false);
   const [recommendedResidential, setRecommendedResidential] = useState<boolean | null>(null);
   const [isUPSValid, setIsUPSValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
+  const [isValidatingUPS, setIsValidatingUPS] = useState(false);
 
   // Weight fields
   const [weightKg, setWeightKg] = useState('');
@@ -272,6 +273,73 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     }
   };
 
+  const handleValidateAddressUPS = async () => {
+    if (!order?.shipping_address || !credentials.ups.enabled) return;
+    
+    setIsValidatingUPS(true);
+    setIsUPSValid('loading');
+    
+    try {
+      const ups = new UPSClient(
+        credentials.ups.apiKey,
+        credentials.ups.secretKey,
+        credentials.ups.accountNumber,
+        credentials.ups.isSandbox,
+        credentials.general.proxyUrl
+      );
+
+      const params = {
+        XAVRequest: {
+          AddressKeyFormat: {
+            ConsigneeName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`,
+            AddressLine: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region),
+            PoliticalDivision2: order.shipping_address.city,
+            PoliticalDivision1: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
+            PostcodePrimaryLow: order.shipping_address.postcode,
+            CountryCode: getCarrierCountryCode(order.shipping_address.country_id)
+          }
+        }
+      };
+
+      const result = await ups.validateAddress(params);
+      const xavResponse = result?.XAVResponse;
+      
+      // UPS returns valid if there are no errors and it found matches
+      // If ValidAddressIndicator exists, it's a good sign
+      // If AmbiguousAddressIndicator exists, it means multiple possibilities
+      // If NoCandidatesIndicator exists, it's invalid
+      
+      if (xavResponse?.ValidAddressIndicator !== undefined || xavResponse?.Candidate !== undefined) {
+        setIsUPSValid('valid');
+        
+        // Check for residential indicator if available in response
+        const candidate = Array.isArray(xavResponse.Candidate) ? xavResponse.Candidate[0] : xavResponse.Candidate;
+        const addressKey = xavResponse.AddressKeyFormat || candidate?.AddressKeyFormat;
+        const isResidential = addressKey?.AddressClassification?.Code === '2'; // 2 is Residential, 1 is Commercial
+        
+        if (addressKey?.AddressClassification?.Code) {
+          setRecommendedResidential(isResidential);
+          if (order) {
+            setOrder({
+              ...order,
+              shipping_address: {
+                ...order.shipping_address,
+                is_residential: isResidential
+              }
+            });
+          }
+        }
+      } else {
+        setIsUPSValid('invalid');
+      }
+    } catch (e) {
+      console.error("[UPS Address Validation] Error:", e);
+      setIsUPSValid('invalid');
+    } finally {
+      setIsValidatingUPS(false);
+    }
+  };
+
   const handleValidateAddress = async () => {
     if (!order?.shipping_address || !credentials.fedex.enabled) return;
     
@@ -353,6 +421,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       if (addr.street.some(s => s.length > 5) && addr.city && addr.postcode && addr.country_id) {
         const timer = setTimeout(() => {
           handleValidateAddress();
+          handleValidateAddressUPS();
         }, 1500);
         return () => clearTimeout(timer);
       }
@@ -1845,16 +1914,26 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">FedEx</span>
-                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                  <button 
+                    type="button"
+                    onClick={handleValidateAddress}
+                    disabled={isValidatingFedEx}
+                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                  >
                     <ValidationIcon status={isFedExValid} />
-                  </div>
+                  </button>
                 </div>
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">UPS</span>
-                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                  <button 
+                    type="button"
+                    onClick={handleValidateAddressUPS}
+                    disabled={isValidatingUPS}
+                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                  >
                     <ValidationIcon status={isUPSValid} />
-                  </div>
+                  </button>
                 </div>
               </div>
 
@@ -2210,16 +2289,26 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       <Separator orientation="vertical" className="h-6" />
                       <div className="flex-1 flex items-center justify-between">
                         <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
-                        <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                        <button 
+                          type="button"
+                          onClick={handleValidateAddress}
+                          disabled={isValidatingFedEx}
+                          className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                        >
                           <ValidationIcon status={isFedExValid} />
-                        </div>
+                        </button>
                       </div>
                       <Separator orientation="vertical" className="h-6" />
                       <div className="flex-1 flex items-center justify-between">
                         <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
-                        <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                        <button 
+                          type="button"
+                          onClick={handleValidateAddressUPS}
+                          disabled={isValidatingUPS}
+                          className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                        >
                           <ValidationIcon status={isUPSValid} />
-                        </div>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2270,16 +2359,26 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
-                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                  <button 
+                    type="button"
+                    onClick={handleValidateAddress}
+                    disabled={isValidatingFedEx}
+                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                  >
                     <ValidationIcon status={isFedExValid} />
-                  </div>
+                  </button>
                 </div>
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
-                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
+                  <button 
+                    type="button"
+                    onClick={handleValidateAddressUPS}
+                    disabled={isValidatingUPS}
+                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                  >
                     <ValidationIcon status={isUPSValid} />
-                  </div>
+                  </button>
                 </div>
               </div>
             </CardContent>

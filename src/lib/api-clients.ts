@@ -439,6 +439,32 @@ export class UPSClient {
     console.log(`[UPSClient] Void response:`, data);
     return data;
   }
+
+  async validateAddress(params: any): Promise<any> {
+    console.log(`[UPSClient] Validating address`, params);
+    const token = await this.getAccessToken();
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/addressvalidation/v1/pv`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'transId': `sawyer-${Date.now()}`,
+        'transactionSrc': 'sawyer-ship'
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const msg = errorData?.response?.errors?.[0]?.message || `UPS Address Validation Error: ${response.status} ${response.statusText}`;
+      throw new Error(msg);
+    }
+
+    const data = await response.json();
+    console.log(`[UPSClient] Address validation response:`, data);
+    return data;
+  }
 }
 
 export class FedExClient {
