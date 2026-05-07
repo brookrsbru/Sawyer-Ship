@@ -79,6 +79,10 @@ export class ServerSideFedExClient {
   async cancelShipment(trackingNumber: string): Promise<any> {
     return this.request('cancel', { trackingNumber });
   }
+
+  async validateAddress(params: any): Promise<any> {
+    return this.request('validate-address', params);
+  }
 }
 
 // Global utility to save and load server credentials via API

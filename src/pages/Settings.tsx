@@ -1026,7 +1026,8 @@ export default function Settings({
                         </ol>
                       </p>
                       <p>
-                        <strong>Note:</strong> Requires Node.js 18 or higher for built-in fetch support.
+                        <strong>Note:</strong> Supports address validation, rating, tracking, shipping, and voiding for both UPS and FedEx. 
+                        Requires Node.js 18 or higher.
                       </p>
                       <p>
                         When enabled, the application will communicate with your backend at <code>/api/ups/*</code> instead of making direct browser fetch calls.
