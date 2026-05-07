@@ -121,15 +121,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [shipAccountNumber, setShipAccountNumber] = useState('');
   const [dutyAccountNumber, setDutyAccountNumber] = useState('');
 
-  const getCarrierCountryCode = (code: string | undefined, carrier?: string, isValidation?: boolean) => {
+  const getCarrierCountryCode = (code: string | undefined, carrier?: string) => {
     if (carrier === 'UPS') {
-      const upsCode = getUpsCode(code || getCountryCode(code));
-      // For address validation, UPS usually requires standard ISO codes.
-      // NB, EN, SF are territorial codes used in Shipping/Rating but often fail in XAV.
-      if (isValidation && (upsCode === 'NB' || upsCode === 'EN' || upsCode === 'SF')) {
-        return 'GB';
-      }
-      return upsCode;
+      const clean = code?.trim().toUpperCase();
+      if (clean === 'XI' || clean === 'NORTHERN IRELAND') return 'NB';
+      return getUpsCode(getCountryCode(code));
     }
     return getCountryCode(code);
   };
@@ -297,7 +293,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         credentials.general.proxyUrl
       );
 
-      const destCountry = getCarrierCountryCode(order.shipping_address.country_id, 'UPS', true);
       const params = {
         XAVRequest: {
           Request: {
@@ -305,12 +300,12 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             TransactionReference: { CustomerContext: "Address Validation" }
           },
           AddressKeyFormat: {
-            ConsigneeName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`.substring(0, 35),
-            AddressLine: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region).slice(0, 3),
+            ConsigneeName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`,
+            AddressLine: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region),
             PoliticalDivision2: order.shipping_address.city,
-            PoliticalDivision1: destCountry === 'GB' || destCountry === 'NB' || destCountry === 'EN' || destCountry === 'SF' ? undefined : getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
+            PoliticalDivision1: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
             PostcodePrimaryLow: order.shipping_address.postcode,
-            CountryCode: destCountry
+            CountryCode: getCarrierCountryCode(order.shipping_address.country_id, 'UPS')
           }
         }
       };
@@ -361,7 +356,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     setIsFedExValid('loading');
     
     try {
-      const isDomestic = getCarrierCountryCode(order.shipping_address.country_id, 'UPS', true) === getCarrierCountryCode(credentials.general.originCountry, 'UPS', true);
+      const isDomestic = getCarrierCountryCode(order.shipping_address.country_id) === getCarrierCountryCode(credentials.general.originCountry);
         const accountNumber = credentials.fedex.isSandbox
         ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
         : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
@@ -757,7 +752,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       if (credentials.ups.enabled && hasUpsCreds) {
         try {
           const destCountry = order.shipping_address?.country_id;
-          const isDomestic = getCarrierCountryCode(destCountry, 'UPS', true) === getCarrierCountryCode(credentials.general.originCountry, 'UPS', true);
+          const isDomestic = getCarrierCountryCode(destCountry, 'UPS') === getCarrierCountryCode(credentials.general.originCountry, 'UPS');
           const accountNumber = credentials.ups.accountNumber;
 
           console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
@@ -1152,7 +1147,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         width: width,
         height: height
       }];
-      const isDomestic = getCarrierCountryCode(order.shipping_address?.country_id, 'UPS', true) === getCarrierCountryCode(credentials.general.originCountry, 'UPS', true);
+      const isDomestic = getCarrierCountryCode(order.shipping_address?.country_id, 'UPS') === getCarrierCountryCode(credentials.general.originCountry, 'UPS');
 
       if (selectedRate.carrier === 'UPS') {
         const accountNumber = credentials.ups.accountNumber;

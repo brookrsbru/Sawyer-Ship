@@ -456,7 +456,7 @@ export class UPSClient {
   async validateAddress(params: any): Promise<any> {
     console.log(`[UPSClient] Validating address`, params);
     const token = await this.getAccessToken();
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/addressvalidation/v1/xav`;
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/addressvalidation/v1/1`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
