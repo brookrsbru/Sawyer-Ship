@@ -298,14 +298,22 @@ export class UPSClient {
   constructor(private apiKey: string, private secretKey: string, private accountNumber: string, private isSandbox: boolean = true, private proxyUrl: string = '') {}
 
   private get baseUrl() {
-    return this.isSandbox ? 'https://wwwcie.ups.com' : 'https://onlinetools.ups.com';
+    return this.isSandbox ? 'https://sandbox.api.ups.com' : 'https://api.ups.com';
   }
 
   private getProxyUrl() {
     return this.proxyUrl ? (this.proxyUrl.endsWith('/') ? this.proxyUrl : `${this.proxyUrl}/`) : '';
   }
 
+  private accessToken: string | null = null;
+  private tokenExpiresAt: number = 0;
+
   async getAccessToken(): Promise<string> {
+    // Return cached token if valid (give 5 min buffer)
+    if (this.accessToken && Date.now() < this.tokenExpiresAt - 300000) {
+      return this.accessToken;
+    }
+
     const url = `${this.getProxyUrl()}${this.baseUrl}/security/v1/oauth/token`;
     const auth = btoa(`${this.apiKey}:${this.secretKey}`);
     
@@ -332,7 +340,12 @@ export class UPSClient {
       throw new Error('UPS Auth Error: No access token returned');
     }
 
-    return data.access_token;
+    this.accessToken = data.access_token;
+    // Set expiry (default 3600 seconds)
+    const expiresIn = parseInt(data.expires_in || '3600');
+    this.tokenExpiresAt = Date.now() + (expiresIn * 1000);
+
+    return this.accessToken;
   }
 
   private cleanObject(obj: any): any {
@@ -358,6 +371,7 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
         'transId': `sawyer-${Date.now()}`,
         'transactionSrc': 'sawyer-ship'
       },
@@ -384,7 +398,7 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'x-merchant-id': this.apiKey,
+        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
         'transId': `sawyer-${Date.now()}`,
         'transactionSrc': 'sawyer-ship'
       },
@@ -411,6 +425,7 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
         'transId': `sawyer-${Date.now()}`,
         'transactionSrc': 'sawyer-ship'
       }
@@ -441,7 +456,7 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'x-merchant-id': this.apiKey
+        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {})
       }
     });
 
@@ -462,6 +477,7 @@ export class UPSClient {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
         'transId': `sawyer-${Date.now()}`,
         'transactionSrc': 'sawyer-ship'
       },
