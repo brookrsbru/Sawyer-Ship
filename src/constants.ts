@@ -1,4 +1,4 @@
-export const APP_VERSION = '2.2.8';
+export const APP_VERSION = '2.2.9';
 
 // Major Addition
 // .

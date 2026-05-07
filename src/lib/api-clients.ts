@@ -319,33 +319,50 @@ export class UPSClient {
     
     console.log(`[UPSClient] Requesting token from: ${url}`);
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ grant_type: 'client_credentials' }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for auth
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[UPSClient] Token request failed (${response.status}):`, errorText);
-      throw new Error(`UPS Auth Error: ${response.status} ${errorText}`);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ grant_type: 'client_credentials' }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        if (response.status === 504 || response.status === 502) {
+          throw new Error(`UPS Auth Proxy Timeout (${response.status}): The authentication request timed out. Please check your credentials and proxy.`);
+        }
+        console.error(`[UPSClient] Token request failed (${response.status}):`, errorText);
+        throw new Error(`UPS Auth Error: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      if (!data.access_token) {
+        console.error(`[UPSClient] No access_token in UPS response:`, data);
+        throw new Error('UPS Auth Error: No access token returned');
+      }
+
+      this.accessToken = data.access_token;
+      // Set expiry (default 3600 seconds)
+      const expiresIn = parseInt(data.expires_in || '3600');
+      this.tokenExpiresAt = Date.now() + (expiresIn * 1000);
+
+      return this.accessToken;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('UPS Auth Timeout: The authentication request took longer than 15 seconds and was aborted.');
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    if (!data.access_token) {
-      console.error(`[UPSClient] No access_token in UPS response:`, data);
-      throw new Error('UPS Auth Error: No access token returned');
-    }
-
-    this.accessToken = data.access_token;
-    // Set expiry (default 3600 seconds)
-    const expiresIn = parseInt(data.expires_in || '3600');
-    this.tokenExpiresAt = Date.now() + (expiresIn * 1000);
-
-    return this.accessToken;
   }
 
   private cleanObject(obj: any): any {
@@ -361,138 +378,94 @@ export class UPSClient {
     );
   }
 
+  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
+    const token = await this.getAccessToken();
+    const url = `${this.getProxyUrl()}${this.baseUrl}${endpoint}`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
+          'transId': `sawyer-${Date.now()}`,
+          'transactionSrc': 'sawyer-ship',
+          ...options.headers,
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let errorData: any = {};
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          // If not JSON, it might be a proxy HTML error
+          const text = await response.text().catch(() => '');
+          if (response.status === 504 || response.status === 502) {
+            throw new Error(`UPS Proxy Timeout (${response.status}): The request timed out at the gateway. Please try again.`);
+          }
+          throw new Error(`UPS API Error (${response.status}): ${text || response.statusText}`);
+        }
+        
+        const msg = errorData?.response?.errors?.[0]?.message 
+                 || errorData?.errors?.[0]?.message 
+                 || `UPS Error (${response.status}): ${response.statusText}`;
+        throw new Error(msg);
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('UPS Request Timeout: The request took longer than 30 seconds and was aborted.');
+      }
+      throw error;
+    }
+  }
+
   async getRates(params: any): Promise<any> {
     console.log(`[UPSClient] Fetching rates`, params);
-    const token = await this.getAccessToken();
-    console.log(`[UPSClient] OAuth token obtained`);
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/rating/v1/shop`;
-    const response = await fetch(url, {
+    return this.request('/api/rating/v1/shop', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
-        'transId': `sawyer-${Date.now()}`,
-        'transactionSrc': 'sawyer-ship'
-      },
       body: JSON.stringify(this.cleanObject(params)),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const msg = errorData?.response?.errors?.[0]?.message || `UPS Rate Error: ${response.status} ${response.statusText}`;
-      throw new Error(msg);
-    }
-
-    const data = await response.json();
-    console.log(`[UPSClient] Rates response:`, data);
-    return data;
   }
 
   async createShipment(params: any): Promise<any> {
     console.log(`[UPSClient] Creating shipment`, params);
-    const token = await this.getAccessToken();
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/ship`;
-    const response = await fetch(url, {
+    return this.request('/api/shipments/v1/ship', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
-        'transId': `sawyer-${Date.now()}`,
-        'transactionSrc': 'sawyer-ship'
-      },
       body: JSON.stringify(this.cleanObject(params)),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const msg = errorData?.response?.errors?.[0]?.message || `UPS Shipment Error: ${response.status} ${response.statusText}`;
-      throw new Error(msg);
-    }
-
-    const data = await response.json();
-    console.log(`[UPSClient] Shipment response:`, data);
-    return data;
   }
 
   async trackShipment(trackingNumber: string): Promise<any> {
     console.log(`[UPSClient] Tracking shipment: ${trackingNumber}`);
-    const token = await this.getAccessToken();
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/track/v1/details/${trackingNumber}?locale=en_US&returnSignature=false&returnMilestones=false`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
-        'transId': `sawyer-${Date.now()}`,
-        'transactionSrc': 'sawyer-ship'
-      }
+    return this.request(`/api/track/v1/details/${trackingNumber}?locale=en_US&returnSignature=false&returnMilestones=false`, {
+      method: 'GET'
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData?.response?.errors?.[0]?.message || `UPS Error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log(`[UPSClient] Tracking response:`, data);
-
-    if (data?.trackResponse?.shipment?.[0]?.warnings) {
-      console.warn(`[UPSClient] Tracking warnings:`, data.trackResponse.shipment[0].warnings);
-    }
-
-    return data;
   }
 
   async cancelShipment(trackingNumber: string): Promise<any> {
     console.log(`[UPSClient] Voiding shipment: ${trackingNumber}`);
-    const token = await this.getAccessToken();
-    // UPS Void (Cancel) endpoint: PUT /shipments/v1/void/cancel/{trackingnumber}
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/void/cancel/${trackingNumber}`;
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {})
-      }
+    return this.request(`/api/shipments/v1/void/cancel/${trackingNumber}`, {
+      method: 'PUT'
     });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.response?.errors?.[0]?.message || `UPS Void Error: ${response.status}`);
-    }
-    console.log(`[UPSClient] Void response:`, data);
-    return data;
   }
 
   async validateAddress(params: any): Promise<any> {
     console.log(`[UPSClient] Validating address`, params);
-    const token = await this.getAccessToken();
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/addressvalidation/v1/1`;
-    const response = await fetch(url, {
+    return this.request('/api/addressvalidation/v1/1', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
-        'transId': `sawyer-${Date.now()}`,
-        'transactionSrc': 'sawyer-ship'
-      },
       body: JSON.stringify(this.cleanObject(params)),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const msg = errorData?.response?.errors?.[0]?.message || `UPS Address Validation Error: ${response.status} ${response.statusText}`;
-      throw new Error(msg);
-    }
-
-    const data = await response.json();
-    console.log(`[UPSClient] Address validation response:`, data);
-    return data;
   }
 }
 
