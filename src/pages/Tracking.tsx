@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban, FileText, MapPin, User, Package, CreditCard, Printer, Eye } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { UPSClient, FedExClient } from '@/src/lib/api-clients';
+import { ServerSideUPSClient, ServerSideFedExClient } from '@/src/lib/server-api-client';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -104,15 +105,19 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         const apiKey = credentials.ups.apiKey;
         const secretKey = credentials.ups.secretKey;
 
-        if (!apiKey || !secretKey) throw new Error('Missing UPS credentials');
-
-        const client = new UPSClient(
-          apiKey,
-          secretKey,
-          accountNumber,
-          credentials.ups.isSandbox,
-          credentials.general.proxyUrl
-        );
+        let client;
+        if (credentials.general.serverSide) {
+          client = new ServerSideUPSClient(credentials.general.serverUrl);
+        } else {
+          if (!apiKey || !secretKey) throw new Error('Missing UPS credentials');
+          client = new UPSClient(
+            apiKey,
+            secretKey,
+            accountNumber,
+            credentials.ups.isSandbox,
+            credentials.general.proxyUrl
+          );
+        }
         const data = await client.trackShipment(shipment.trackingNumber);
         newStatus = data?.trackResponse?.shipment?.[0]?.package?.[0]?.activity?.[0]?.status?.description || 'Active';
       } else if (shipment.carrier === 'FedEx') {
@@ -134,13 +139,18 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
 
         if (!apiKey || !secretKey) throw new Error('Missing FedEx credentials');
 
-        const client = new FedExClient(
-          apiKey,
-          secretKey,
-          accountNumber,
-          isTrackingSandbox,
-          credentials.general.proxyUrl
-        );
+        let client;
+        if (credentials.general.serverSide) {
+          client = new ServerSideFedExClient(credentials.general.serverUrl);
+        } else {
+          client = new FedExClient(
+            apiKey,
+            secretKey,
+            accountNumber,
+            isTrackingSandbox,
+            credentials.general.proxyUrl
+          );
+        }
         const data = await client.trackShipment(shipment.trackingNumber);
         newStatus = data?.output?.completeTrackResults?.[0]?.trackResults?.[0]?.latestStatusDetail?.description || 'Active';
       }
@@ -209,15 +219,19 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         const apiKey = credentials.ups.apiKey;
         const secretKey = credentials.ups.secretKey;
 
-        if (!apiKey || !secretKey) throw new Error('Missing UPS credentials');
-
-        const client = new UPSClient(
-          apiKey,
-          secretKey,
-          accountNumber,
-          credentials.ups.isSandbox,
-          credentials.general.proxyUrl
-        );
+        let client;
+        if (credentials.general.serverSide) {
+          client = new ServerSideUPSClient(credentials.general.serverUrl);
+        } else {
+          if (!apiKey || !secretKey) throw new Error('Missing UPS credentials');
+          client = new UPSClient(
+            apiKey,
+            secretKey,
+            accountNumber,
+            credentials.ups.isSandbox,
+            credentials.general.proxyUrl
+          );
+        }
         await client.cancelShipment(shipment.trackingNumber);
       } else if (shipment.carrier === 'FedEx') {
         // Use SHIPPING credentials, not tracking ones
@@ -239,13 +253,18 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
 
         if (!apiKey || !secretKey) throw new Error('Missing FedEx shipping credentials');
 
-        const client = new FedExClient(
-          apiKey,
-          secretKey,
-          accountNumber,
-          isSandbox,
-          credentials.general.proxyUrl
-        );
+        let client;
+        if (credentials.general.serverSide) {
+          client = new ServerSideFedExClient(credentials.general.serverUrl);
+        } else {
+          client = new FedExClient(
+            apiKey,
+            secretKey,
+            accountNumber,
+            isSandbox,
+            credentials.general.proxyUrl
+          );
+        }
         await client.cancelShipment(shipment.trackingNumber);
       }
 

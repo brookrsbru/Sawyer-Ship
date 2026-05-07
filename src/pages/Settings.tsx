@@ -40,6 +40,7 @@ const FEDEX_PICKUP_LABELS: Record<string, string> = {
 };
 
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
+import { ServerSideUPSClient, ServerSettingsClient } from '@/src/lib/server-api-client';
 
 export default function Settings({ 
   credentials, 
@@ -201,6 +202,7 @@ export default function Settings({
                     { id: 'general', label: 'General Preferences', icon: SettingsIcon },
                     { id: 'shipping', label: 'Shipping Defaults', icon: Truck },
                     { id: 'magento', label: 'Magento Integration', icon: Globe },
+                    { id: 'server', label: 'Server-Side Integration', icon: HardDrive },
                     { id: 'ups', label: 'UPS Integration', icon: Truck },
                     { id: 'fedex', label: 'FedEx Integration', icon: Truck },
                     { id: 'security', label: 'Security & Backup', icon: Shield },
@@ -986,6 +988,181 @@ export default function Settings({
               </CardContent>
               </Card>
             </section>
+
+          {/* Server-Side Integration Section */}
+          <section id="server" className="scroll-mt-6 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="h-px flex-1 bg-zinc-200" />
+              <div className="flex items-center gap-2">
+                <HardDrive size={18} className="text-zinc-400" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Server-Side Integration</h2>
+              </div>
+              <div className="h-px flex-1 bg-zinc-200" />
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Node.js Server Management</CardTitle>
+                <CardDescription>
+                  Configure server-side storage and direct API handling to bypass client-side proxy limitations.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Info size={18} className="text-blue-500 mt-0.5" />
+                    <div className="text-xs text-zinc-600 space-y-2">
+                      <p>
+                        <strong>Why use server-side?</strong> Running requests from your own server bypasses CORS restrictions and proxy timeouts. 
+                        It also allows for encrypted storage of credentials on your filesystem rather than the browser's LocalStorage.
+                      </p>
+                      <p>
+                        <strong>How to run locally:</strong> 
+                        <ol className="list-decimal pl-4 mt-1 space-y-1">
+                          <li>Create a new folder on your machine.</li>
+                          <li>Save <code>server.js</code> and the provided <code>package.json</code> into that folder.</li>
+                          <li>Open a terminal in that folder and run <code>npm install</code>.</li>
+                          <li>Run <code>node server.js</code> or use <code>pm2 start server.js</code>.</li>
+                        </ol>
+                      </p>
+                      <p>
+                        <strong>Note:</strong> Requires Node.js 18 or higher for built-in fetch support.
+                      </p>
+                      <p>
+                        When enabled, the application will communicate with your backend at <code>/api/ups/*</code> instead of making direct browser fetch calls.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
+                  <div className="space-y-1 flex-1">
+                    <Label className="text-base">Server Base URL</Label>
+                    <p className="text-xs text-zinc-500">The root URL where your standalone Node.js server is running (e.g. http://localhost:3000).</p>
+                    <div className="flex gap-2 mt-2">
+                      <Input 
+                        value={formData.general.serverUrl}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          general: { ...formData.general, serverUrl: e.target.value }
+                        })}
+                        placeholder="http://localhost:3000"
+                        className="max-w-md h-8 text-sm"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-8"
+                        onClick={async () => {
+                          try {
+                            const url = formData.general.serverUrl.endsWith('/') ? formData.general.serverUrl.slice(0, -1) : formData.general.serverUrl;
+                            const res = await fetch(`${url}/api/health`);
+                            const data = await res.json();
+                            toast.success(`Server Connected: v${data.version}`);
+                          } catch (e) {
+                            toast.error("Server connection failed. Check URL and ensure backend is running.");
+                          }
+                        }}
+                      >
+                        Ping
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
+                  <div className="space-y-1">
+                    <Label className="text-base">Local Connectivity (Internal)</Label>
+                    <p className="text-xs text-zinc-500">Check if the current environment's built-in backend is responsive.</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/health');
+                        const data = await res.json();
+                        toast.success(`Internal Server: v${data.version}`);
+                      } catch (e) {
+                        toast.error("Internal fallback failed.");
+                      }
+                    }}
+                  >
+                    Quick Check
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Lock size={14} className="text-zinc-400" />
+                    Unified Server Sync
+                  </h3>
+                  <div className="p-4 border rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Enabled Server-Side Processing</Label>
+                        <p className="text-[10px] text-zinc-500">
+                          Route all UPS & FedEx API calls through your Node.js backend.
+                        </p>
+                      </div>
+                      <Switch 
+                        checked={formData.general.serverSide}
+                        onCheckedChange={(checked) => setFormData({
+                          ...formData,
+                          general: { ...formData.general, serverSide: checked }
+                        })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {formData.general.serverSide && (
+                  <div className="p-4 bg-orange-50 border border-orange-100 rounded-lg space-y-4 animate-in fade-in zoom-in-95">
+                    <h3 className="text-xs font-bold text-orange-800 uppercase tracking-wider">Sync Global Credentials</h3>
+                    <p className="text-xs text-orange-700">
+                      The server-side storage is independent of your browser. You must sync your current carrier keys to the server to enable this mode for both UPS and FedEx.
+                    </p>
+                    <Button 
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                      size="sm"
+                      onClick={async () => {
+                        const loading = toast.loading("Syncing all credentials to server...");
+                        try {
+                          await ServerSettingsClient.saveCredentials({
+                            ups: {
+                              enabled: formData.ups.enabled,
+                              apiKey: formData.ups.apiKey,
+                              secretKey: formData.ups.secretKey,
+                              accountNumber: formData.ups.accountNumber,
+                              isSandbox: formData.ups.isSandbox
+                            },
+                            fedex: {
+                              enabled: formData.fedex.enabled,
+                              apiKey: formData.fedex.apiKey,
+                              secretKey: formData.fedex.secretKey,
+                              sandboxApiKey: formData.fedex.sandboxApiKey,
+                              sandboxSecretKey: formData.fedex.sandboxSecretKey,
+                              productionApiKey: formData.fedex.productionApiKey,
+                              productionSecretKey: formData.fedex.productionSecretKey,
+                              accountNumber: formData.fedex.accountNumber,
+                              isSandbox: formData.fedex.isSandbox
+                            }
+                          }, formData.general.serverUrl);
+                          toast.dismiss(loading);
+                          toast.success("UPS & FedEx credentials synced to server storage.");
+                        } catch (e: any) {
+                          toast.dismiss(loading);
+                          toast.error(`Sync failed: ${e.message}`);
+                        }
+                      }}
+                    >
+                      Process Global Server Sync
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
 
             {/* UPS Section */}
             <section id="ups" className="scroll-mt-6 space-y-6">

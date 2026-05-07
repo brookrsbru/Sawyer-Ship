@@ -73,6 +73,8 @@ export interface SawyerCredentials {
   };
   general: {
     proxyUrl: string;
+    serverUrl: string;
+    serverSide: boolean;
     labelFormat: 'PDF' | 'ZPL';
     currency: string;
     autoLockMinutes: number;
@@ -196,6 +198,8 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   },
   general: { 
     proxyUrl: 'https://cors-anywhere.herokuapp.com/', 
+    serverUrl: 'http://localhost:3000',
+    serverSide: false,
     labelFormat: 'PDF', 
     currency: 'GBP', 
     autoLockMinutes: 0,

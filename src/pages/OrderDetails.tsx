@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
+import { ServerSideUPSClient, ServerSideFedExClient } from '@/src/lib/server-api-client';
 import { SawyerCredentials, AddressBookCustomer, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
@@ -285,13 +286,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     setIsUPSValid('loading');
     
     try {
-      const ups = new UPSClient(
-        credentials.ups.apiKey,
-        credentials.ups.secretKey,
-        credentials.ups.accountNumber,
-        credentials.ups.isSandbox,
-        credentials.general.proxyUrl
-      );
+      let ups;
+      if (credentials.general.serverSide) {
+        ups = new ServerSideUPSClient(credentials.general.serverUrl);
+      } else {
+        ups = new UPSClient(
+          credentials.ups.apiKey,
+          credentials.ups.secretKey,
+          credentials.ups.accountNumber,
+          credentials.ups.isSandbox,
+          credentials.general.proxyUrl
+        );
+      }
 
       const params = {
         XAVRequest: {
@@ -361,13 +367,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
         : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
 
-      const fedex = new FedExClient(
-        credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
-        credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
-        accountNumber,
-        credentials.fedex.isSandbox,
-        credentials.general.proxyUrl
-      );
+      let fedex;
+      if (credentials.general.serverSide) {
+        fedex = new ServerSideFedExClient(credentials.general.serverUrl);
+      } else {
+        fedex = new FedExClient(
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
+          accountNumber,
+          credentials.fedex.isSandbox,
+          credentials.general.proxyUrl
+        );
+      }
 
       const params = {
         addressesToValidate: [
@@ -756,13 +767,19 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           const accountNumber = credentials.ups.accountNumber;
 
           console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
-          const ups = new UPSClient(
-            credentials.ups.apiKey,
-            credentials.ups.secretKey,
-            accountNumber,
-            credentials.ups.isSandbox,
-            credentials.general.proxyUrl
-          );
+          
+          let ups;
+          if (credentials.general.serverSide) {
+            ups = new ServerSideUPSClient(credentials.general.serverUrl);
+          } else {
+            ups = new UPSClient(
+              credentials.ups.apiKey,
+              credentials.ups.secretKey,
+              accountNumber,
+              credentials.ups.isSandbox,
+              credentials.general.proxyUrl
+            );
+          }
 
           // Simplified UPS Rating Request
           const upsParams = {
@@ -881,13 +898,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             : (credentials.fedex.productionAccountNumber || accountNumber);
           
           console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
-          const fedex = new FedExClient(
-            credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
-            credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
-            accountNumber,
-            credentials.fedex.isSandbox,
-            credentials.general.proxyUrl
-          );
+          let fedex;
+          if (credentials.general.serverSide) {
+            fedex = new ServerSideFedExClient(credentials.general.serverUrl);
+          } else {
+            fedex = new FedExClient(
+              credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+              credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
+              accountNumber,
+              credentials.fedex.isSandbox,
+              credentials.general.proxyUrl
+            );
+          }
 
           const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
 
@@ -1152,13 +1174,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       if (selectedRate.carrier === 'UPS') {
         const accountNumber = credentials.ups.accountNumber;
 
-        const ups = new UPSClient(
-          credentials.ups.apiKey,
-          credentials.ups.secretKey,
-          accountNumber,
-          credentials.ups.isSandbox,
-          credentials.general.proxyUrl
-        );
+        let ups;
+        if (credentials.general.serverSide) {
+          ups = new ServerSideUPSClient(credentials.general.serverUrl);
+        } else {
+          ups = new UPSClient(
+            credentials.ups.apiKey,
+            credentials.ups.secretKey,
+            accountNumber,
+            credentials.ups.isSandbox,
+            credentials.general.proxyUrl
+          );
+        }
         
         // Extract service code from ID (e.g. "ups-11" -> "11")
         const serviceCode = selectedRate.id.startsWith('ups-') 
@@ -1313,13 +1340,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           ? (credentials.fedex.paymentAccountNumber || accountNumber)
           : (credentials.fedex.productionAccountNumber || accountNumber);
 
-        const fedex = new FedExClient(
-          credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
-          credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
-          accountNumber,
-          credentials.fedex.isSandbox,
-          credentials.general.proxyUrl
-        );
+        let fedex;
+        if (credentials.general.serverSide) {
+          fedex = new ServerSideFedExClient(credentials.general.serverUrl);
+        } else {
+          fedex = new FedExClient(
+            credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+            credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
+            accountNumber,
+            credentials.fedex.isSandbox,
+            credentials.general.proxyUrl
+          );
+        }
 
         const referenceId = order.increment_id?.trim();
         const shouldSendReference = referenceId && referenceId !== 'MANUAL';
