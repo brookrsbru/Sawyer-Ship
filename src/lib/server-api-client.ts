@@ -124,6 +124,10 @@ export class ServerSideMagentoClient {
     return this.request('attribute-options', { attributeCode });
   }
 
+  async getDevOrderData(incrementId: string): Promise<any> {
+    return this.request('dev-order', { incrementId });
+  }
+
   async createShipment(orderId: number | string, tracks: any[]): Promise<any> {
     return this.request('ship', { orderId, tracks });
   }

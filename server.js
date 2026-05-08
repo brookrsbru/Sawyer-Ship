@@ -273,7 +273,8 @@ app.post('/api/magento/:action', async (req, res) => {
     const creds = await loadCredentials();
     if (!creds?.magento) throw new Error('Magento credentials not configured on server');
     
-    const magento = new MagentoClient(creds.magento.url || creds.magento.baseUrl, creds.magento.token);
+    const magentoUrl = creds.magento.url || creds.magento.baseUrl || creds.magento.baseUrl;
+    const magento = new MagentoClient(magentoUrl, creds.magento.token);
     let result;
     const { params } = req.body;
 
@@ -308,7 +309,7 @@ app.post('/api/magento/:action', async (req, res) => {
           items: [],
           notify: true,
           appendComment: true,
-          comment: { extension_attributes: {}, comment: "Shipment created via Sawyer-Ship Server", is_visible_on_front: 1 },
+          comment: { extension_attributes: {}, comment: `Shipment created via Sawyer-Ship Server (v${req.app.get('version') || '4.0.0'})`, is_visible_on_front: 1 },
           tracks: tracks
         })
       });
@@ -316,6 +317,13 @@ app.post('/api/magento/:action', async (req, res) => {
     else if (action === 'attribute-options') {
       const { attributeCode } = params;
       result = await magento.fetch(`products/attributes/${attributeCode}/options`);
+    }
+    else if (action === 'dev-order') {
+       // Support for raw dev order data fetching
+       const { incrementId } = params;
+       const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${incrementId}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+       const data = await magento.fetch(`orders?${searchCriteria}`);
+       result = data.items?.[0] || null;
     }
     else throw new Error(`Unknown Magento action: ${action}`);
 
@@ -414,13 +422,46 @@ app.post('/api/fedex/:action', async (req, res) => {
     let result;
     const { params } = req.body;
 
+    // --- FedEx Account Number Invariant Fix ---
+    // Ensure the payload account number matches the client account number to prevent "Account Number Mismatch"
+    if (params.accountNumber) {
+      params.accountNumber.value = fedex.accountNumber;
+    }
+
+    // Force Payor Account Number to match Shipper Account Number for SENDER payment type
+    // This resolves the user error: "Account Number Mismatch -As the payment Type is SENDER..."
+    if (params.requestedShipment) {
+      const shipment = params.requestedShipment;
+      
+      // Inject into Shipper if exists (Rates API uses this)
+      if (shipment.shipper && shipment.shipper.accountNumber) {
+        shipment.shipper.accountNumber = fedex.accountNumber;
+      }
+
+      // Inject into Payor (Ship/Rate API uses this)
+      if (shipment.shippingChargesPayment?.payor?.responsibleParty?.accountNumber) {
+        shipment.shippingChargesPayment.payor.responsibleParty.accountNumber.value = fedex.accountNumber;
+      }
+
+      // Inject into Master Account Number for tracking/cancel
+      if (shipment.masterTrackingNumber && shipment.accountNumber) {
+          shipment.accountNumber.value = fedex.accountNumber;
+      }
+    }
+
     if (action === 'rates') result = await fedex.request('/rate/v1/rates/quotes', { method: 'POST', body: JSON.stringify(params) });
     else if (action === 'ship') result = await fedex.request('/ship/v1/shipments', { method: 'POST', body: JSON.stringify(params) });
     else if (action === 'track') {
       const trackingNum = params.trackingNumber || params;
       result = await fedex.request('/track/v1/trackingnumbers', { method: 'POST', body: JSON.stringify({ trackingInfo: [{ trackingNumberInfo: { trackingNumber: trackingNum } }], includeDetailedScans: true }) });
     }
-    else if (action === 'cancel') result = await fedex.request('/ship/v1/shipments/cancel', { method: 'PUT', body: JSON.stringify({ accountNumber: { value: creds.fedex.accountNumber }, trackingNumber: params.trackingNumber }) });
+    else if (action === 'cancel') {
+        const payload = { 
+            accountNumber: { value: fedex.accountNumber }, 
+            trackingNumber: params.trackingNumber 
+        };
+        result = await fedex.request('/ship/v1/shipments/cancel', { method: 'PUT', body: JSON.stringify(payload) });
+    }
     else if (action === 'validate-address') result = await fedex.request('/address/v1/addresses/resolve', { method: 'POST', body: JSON.stringify(params) });
     else throw new Error(`Unknown FedEx action: ${action}`);
 
