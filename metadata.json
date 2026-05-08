@@ -1,5 +1,5 @@
 {
   "name": "Sawyer-Ship",
-  "description": "A shipping project",
+  "description": "Multi-carrier shipping dashboard for Magento, UPS, and FedEx with secure server-side proxying.",
   "requestFramePermissions": []
 }

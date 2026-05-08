@@ -179,7 +179,7 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
-  const SERVER_VERSION = '4.1.0';
+  const SERVER_VERSION = '4.1.1';
 
   // API Routes
   app.get('/api/health', (req, res) => res.json({ status: 'ok', version: SERVER_VERSION }));
@@ -240,7 +240,7 @@ async function startServer() {
         });
       } else if (action === 'attribute-options') {
         result = await magento.fetch(`products/attributes/${params.attributeCode}/options`);
-      } else throw new Error(`Unknown: ${action}`);
+      } else throw new Error(`Unknown action: ${action}`);
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -250,7 +250,7 @@ async function startServer() {
   app.post('/api/ups/:action', async (req, res) => {
     try {
       const creds = await loadCredentials();
-      if (!creds?.ups) throw new Error('UPS missing');
+      if (!creds?.ups) throw new Error('UPS credentials missing');
       const ups = new UPSClient(creds.ups.apiKey, creds.ups.secretKey, creds.ups.accountNumber, creds.ups.isSandbox);
       const { action } = req.params;
       const { params } = req.body;
@@ -270,7 +270,7 @@ async function startServer() {
   app.post('/api/fedex/:action', async (req, res) => {
     try {
       const creds = await loadCredentials();
-      if (!creds?.fedex) throw new Error('FedEx missing');
+      if (!creds?.fedex) throw new Error('FedEx credentials missing');
       const isSandbox = creds.fedex.isSandbox === true || String(creds.fedex.isSandbox) === 'true';
       const acct = isSandbox ? (creds.fedex.domesticAccountNumber || creds.fedex.globalAccountNumber || creds.fedex.accountNumber || '') : (creds.fedex.productionAccountNumber || creds.fedex.accountNumber || '');
       const fedex = new FedExClient(isSandbox ? (creds.fedex.sandboxApiKey || creds.fedex.apiKey) : (creds.fedex.productionApiKey || creds.fedex.apiKey), isSandbox ? (creds.fedex.sandboxSecretKey || creds.fedex.secretKey) : (creds.fedex.productionSecretKey || creds.fedex.secretKey), acct.trim(), isSandbox);
