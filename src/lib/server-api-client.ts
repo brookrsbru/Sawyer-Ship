@@ -1,159 +1,125 @@
-// Frontend client for calling Server-side carrier API routes via Transparent Proxy
+// Frontend client for calling Server-side carrier API routes
 // This client talks to OUR backend, which then injects credentials and forwards to the carriers.
-
-import { normalizeMagentoOrder } from './magento-utils';
 
 export class ServerSideUPSClient {
   constructor(private serverBaseUrl: string = '') {}
 
-  private async request(endpoint: string, method: string = 'POST', params: any = {}): Promise<any> {
-    const url = `${this.serverBaseUrl}/api/proxy/ups${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+  private async request(action: string, params: any = {}): Promise<any> {
+    const url = this.serverBaseUrl ? `${this.serverBaseUrl}/api/ups/${action}` : `/api/ups/${action}`;
     const response = await fetch(url, {
-      method,
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: method !== 'GET' ? JSON.stringify(params) : undefined,
+      body: JSON.stringify({ params }),
     });
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || data.message || `UPS Proxy Error: ${response.status}`);
+      throw new Error(data.error || `Server UPS Error: ${response.status}`);
     }
 
     return data;
   }
 
   async getRates(params: any): Promise<any> {
-    return this.request('/api/rating/v1/shop', 'POST', params);
+    return this.request('rates', params);
   }
 
   async createShipment(params: any): Promise<any> {
-    return this.request('/api/shipments/v1/ship', 'POST', params);
+    return this.request('ship', params);
   }
 
   async trackShipment(trackingNumber: string): Promise<any> {
-    return this.request(`/api/track/v1/details/${trackingNumber}?locale=en_US`, 'GET');
+    return this.request('track', { trackingNumber });
   }
 
   async cancelShipment(trackingNumber: string): Promise<any> {
-    return this.request(`/api/shipments/v1/void/cancel/${trackingNumber}`, 'PUT');
+    return this.request('cancel', { trackingNumber });
   }
 
   async validateAddress(params: any): Promise<any> {
-    return this.request('/api/addressvalidation/v1/1', 'POST', params);
+    return this.request('validate-address', params);
   }
 }
 
 export class ServerSideFedExClient {
   constructor(private serverBaseUrl: string = '') {}
 
-  private async request(endpoint: string, method: string = 'POST', params: any = {}): Promise<any> {
-    const url = `${this.serverBaseUrl}/api/proxy/fedex${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+  private async request(action: string, params: any = {}): Promise<any> {
+    const url = this.serverBaseUrl ? `${this.serverBaseUrl}/api/fedex/${action}` : `/api/fedex/${action}`;
     const response = await fetch(url, {
-      method,
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: method !== 'GET' ? JSON.stringify(params) : undefined,
+      body: JSON.stringify({ params }),
     });
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || data.message || `FedEx Proxy Error: ${response.status}`);
+      throw new Error(data.error || `Server FedEx Error: ${response.status}`);
     }
 
     return data;
   }
 
   async getRates(params: any): Promise<any> {
-    return this.request('/rate/v1/rates/quotes', 'POST', params);
+    return this.request('rates', params);
   }
 
   async createShipment(params: any): Promise<any> {
-    return this.request('/ship/v1/shipments', 'POST', params);
+    return this.request('ship', params);
   }
 
-  async trackShipment(trackingNumber: string, accountNumber?: string): Promise<any> {
-    const trackBody: any = {
-      trackingInfo: [{ trackingNumberInfo: { trackingNumber } }],
-      includeDetailedScans: true
-    };
-    if (accountNumber) trackBody.trackingInfo[0].accountNumber = accountNumber;
-    return this.request('/track/v1/trackingnumbers', 'POST', trackBody);
+  async trackShipment(trackingNumber: string): Promise<any> {
+    return this.request('track', { trackingNumber });
   }
 
-  async cancelShipment(trackingNumber: string, accountNumber: string): Promise<any> {
-    const body = {
-      accountNumber: { value: accountNumber },
-      trackingNumber: trackingNumber
-    };
-    return this.request('/ship/v1/shipments/cancel', 'PUT', body);
+  async cancelShipment(trackingNumber: string): Promise<any> {
+    return this.request('cancel', { trackingNumber });
   }
 
   async validateAddress(params: any): Promise<any> {
-    return this.request('/address/v1/addresses/resolve', 'POST', params);
+    return this.request('validate-address', params);
   }
 }
 
 export class ServerSideMagentoClient {
   constructor(private serverBaseUrl: string = '') {}
 
-  private async request(endpoint: string, method: string = 'GET', params: any = {}): Promise<any> {
-    const url = `${this.serverBaseUrl}/api/proxy/magento/${endpoint}`;
+  private async request(action: string, params: any = {}): Promise<any> {
+    const url = this.serverBaseUrl ? `${this.serverBaseUrl}/api/magento/${action}` : `/api/magento/${action}`;
     const response = await fetch(url, {
-      method,
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: method !== 'GET' ? JSON.stringify(params) : undefined,
+      body: JSON.stringify({ params }),
     });
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || data.message || `Magento Proxy Error: ${response.status}`);
+      throw new Error(data.error || `Server Magento Error: ${response.status}`);
     }
 
     return data;
   }
 
   async searchOrders(query: string): Promise<any[]> {
-    const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
-    const data = await this.request(`orders?${searchCriteria}`);
-    const items = data.items || [];
-    return items.map((item: any) => normalizeMagentoOrder(item));
+    const data = await this.request('orders', { query });
+    return data.items || [];
   }
 
   async getOrder(id: string): Promise<any> {
-    try {
-      const data = await this.request(`orders/${id}`);
-      return normalizeMagentoOrder(data);
-    } catch (error: any) {
-      if (error.message.includes('404')) {
-        const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${id}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
-        const data = await this.request(`orders?${searchCriteria}`);
-        if (data.items && data.items.length > 0) return normalizeMagentoOrder(data.items[0]);
-      }
-      throw error;
-    }
+    return this.request('order', { id });
   }
 
   async getProducts(skus: string[]): Promise<any[]> {
-    const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=sku&searchCriteria[filter_groups][0][filters][0][value]=${skus.map(s => encodeURIComponent(s)).join(',')}&searchCriteria[filter_groups][0][filters][0][condition_type]=in`;
-    const data = await this.request(`products?${searchCriteria}`);
+    const data = await this.request('products', { skus });
     return data.items || [];
   }
 
   async getAttributeOptions(attributeCode: string): Promise<any[]> {
-    return this.request(`products/attributes/${attributeCode}/options`);
+    return this.request('attribute-options', { attributeCode });
   }
 
   async createShipment(orderId: number | string, tracks: any[]): Promise<any> {
-    return this.request(`order/${orderId}/ship`, 'POST', {
-      items: [],
-      notify: true,
-      appendComment: true,
-      comment: { 
-        extension_attributes: {}, 
-        comment: "Shipment created via Sawyer-Ship (Server Proxy)", 
-        is_visible_on_front: 1 
-      },
-      tracks
-    });
+    return this.request('ship', { orderId, tracks });
   }
 }
 
