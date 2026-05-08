@@ -258,6 +258,61 @@ class MagentoClient {
     }
     return data;
   }
+
+  normalizeOrder(order) {
+    if (!order) return order;
+    
+    // Debug log for order structure if needed (server-side only)
+    // console.log(`[Magento Normalize] Processing order: ${order.increment_id}`);
+
+    // Magento 2 orders often have shipping address in extension_attributes
+    // We try multiple paths to find the most populated address object
+    let shippingAddress = {};
+    
+    if (order.extension_attributes?.shipping_assignments?.[0]?.shipping?.address) {
+      shippingAddress = order.extension_attributes.shipping_assignments[0].shipping.address;
+    } else if (order.extension_attributes?.shipping_address) {
+      // Some Magento versions/modules put it here
+      shippingAddress = order.extension_attributes.shipping_address;
+    } else if (order.extension_attributes?.shipping_address_id) {
+       // If it's just an ID, we might have a problem, but let's hope one of the other fallbacks works
+       if (order.shipping_address) shippingAddress = order.shipping_address;
+    } else if (order.shipping_address && (order.shipping_address.street || order.shipping_address.city)) {
+      shippingAddress = order.shipping_address;
+    } else if (order.billing_address) {
+      shippingAddress = order.billing_address;
+    }
+
+    // Double check: if shippingAddress is still mostly empty, check billing_address again explicitly
+    if (!shippingAddress.street && order.billing_address) {
+      shippingAddress = order.billing_address;
+    }
+
+    // Ensure street is an array
+    let street = shippingAddress.street || [];
+    if (typeof street === 'string') {
+      street = [street];
+    }
+
+    // Combine into a clean object the frontend expects
+    return {
+      ...order,
+      // Ensure top-level customer names are from the shipping address if available
+      customer_firstname: shippingAddress.firstname || order.customer_firstname || '',
+      customer_lastname: shippingAddress.lastname || order.customer_lastname || '',
+      shipping_address: {
+        firstname: shippingAddress.firstname || order.customer_firstname || '',
+        lastname: shippingAddress.lastname || order.customer_lastname || '',
+        company: shippingAddress.company || '',
+        street: street,
+        city: shippingAddress.city || '',
+        region: shippingAddress.region || '',
+        postcode: shippingAddress.postcode || '',
+        country_id: shippingAddress.country_id || '',
+        telephone: shippingAddress.telephone || '',
+      }
+    };
+  }
 }
 
 // --- API Routes ---
@@ -281,17 +336,22 @@ app.post('/api/magento/:action', async (req, res) => {
     if (action === 'orders') {
       const { query } = params;
       const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
-      result = await magento.fetch(`orders?${searchCriteria}`);
+      const data = await magento.fetch(`orders?${searchCriteria}`);
+      if (data.items) {
+        data.items = data.items.map(item => magento.normalizeOrder(item));
+      }
+      result = data;
     } 
     else if (action === 'order') {
       const { id } = params;
       try {
-        result = await magento.fetch(`orders/${id}`);
+        const data = await magento.fetch(`orders/${id}`);
+        result = magento.normalizeOrder(data);
       } catch (e) {
         if (e.message.includes('404')) {
           const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${id}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
           const data = await magento.fetch(`orders?${searchCriteria}`);
-          if (data.items?.length > 0) result = data.items[0];
+          if (data.items?.length > 0) result = magento.normalizeOrder(data.items[0]);
           else throw e;
         } else throw e;
       }
@@ -323,7 +383,7 @@ app.post('/api/magento/:action', async (req, res) => {
        const { incrementId } = params;
        const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${incrementId}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
        const data = await magento.fetch(`orders?${searchCriteria}`);
-       result = data.items?.[0] || null;
+       result = data.items?.[0] ? magento.normalizeOrder(data.items[0]) : null;
     }
     else throw new Error(`Unknown Magento action: ${action}`);
 
@@ -413,10 +473,19 @@ app.post('/api/fedex/:action', async (req, res) => {
     const creds = await loadCredentials();
     if (!creds?.fedex) throw new Error('FedEx credentials not configured on server');
     
+    // Pick the best available account number for FedEx
+    let fedexAccount = '';
+    if (creds.fedex.isSandbox) {
+      // Priority: domestic -> global -> payment -> any
+      fedexAccount = creds.fedex.domesticAccountNumber || creds.fedex.globalAccountNumber || creds.fedex.paymentAccountNumber || creds.fedex.accountNumber || '';
+    } else {
+      fedexAccount = creds.fedex.productionAccountNumber || creds.fedex.accountNumber || '';
+    }
+
     const fedex = new FedExClient(
       creds.fedex.isSandbox ? creds.fedex.sandboxApiKey : (creds.fedex.productionApiKey || creds.fedex.apiKey),
       creds.fedex.isSandbox ? creds.fedex.sandboxSecretKey : (creds.fedex.productionSecretKey || creds.fedex.secretKey),
-      creds.fedex.isSandbox ? creds.fedex.accountNumber : (creds.fedex.productionAccountNumber || creds.fedex.accountNumber),
+      fedexAccount,
       creds.fedex.isSandbox
     );
     let result;
@@ -424,8 +493,10 @@ app.post('/api/fedex/:action', async (req, res) => {
 
     // --- FedEx Account Number Invariant Fix ---
     // Ensure the payload account number matches the client account number to prevent "Account Number Mismatch"
-    if (params.accountNumber) {
-      params.accountNumber.value = fedex.accountNumber;
+    // We prioritize the server-side credential, but if it's missing, we let the client's value stay (if any)
+    if (fedexAccount) {
+      params.accountNumber = params.accountNumber || { value: fedexAccount };
+      params.accountNumber.value = fedexAccount;
     }
 
     // Force Payor Account Number to match Shipper Account Number for SENDER payment type
@@ -434,18 +505,34 @@ app.post('/api/fedex/:action', async (req, res) => {
       const shipment = params.requestedShipment;
       
       // Inject into Shipper if exists (Rates API uses this)
-      if (shipment.shipper && shipment.shipper.accountNumber) {
-        shipment.shipper.accountNumber = fedex.accountNumber;
+      if (shipment.shipper) {
+        if (shipment.shipper.accountNumber && fedexAccount) {
+          if (typeof shipment.shipper.accountNumber === 'object') {
+            shipment.shipper.accountNumber.value = fedexAccount;
+          } else {
+            shipment.shipper.accountNumber = fedexAccount;
+          }
+        }
       }
 
       // Inject into Payor (Ship/Rate API uses this)
-      if (shipment.shippingChargesPayment?.payor?.responsibleParty?.accountNumber) {
-        shipment.shippingChargesPayment.payor.responsibleParty.accountNumber.value = fedex.accountNumber;
+      if (shipment.shippingChargesPayment?.payor?.responsibleParty && fedexAccount) {
+        const rp = shipment.shippingChargesPayment.payor.responsibleParty;
+        if (rp.accountNumber) {
+            rp.accountNumber.value = fedexAccount;
+        } else {
+            rp.accountNumber = { value: fedexAccount };
+        }
       }
 
-      // Inject into Master Account Number for tracking/cancel
-      if (shipment.masterTrackingNumber && shipment.accountNumber) {
-          shipment.accountNumber.value = fedex.accountNumber;
+      // Rates API specific structure check
+      if (shipment.shippingChargesPayment?.payor?.responsibleParty?.contact && !shipment.shippingChargesPayment.payor.responsibleParty.accountNumber && fedexAccount) {
+        shipment.shippingChargesPayment.payor.responsibleParty.accountNumber = { value: fedexAccount };
+      }
+      
+      // Additional safety for Master Account Number (Track/Cancel)
+      if (shipment.masterTrackingNumber && shipment.accountNumber && fedexAccount) {
+          shipment.accountNumber.value = fedexAccount;
       }
     }
 
