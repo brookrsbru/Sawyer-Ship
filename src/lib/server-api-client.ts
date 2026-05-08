@@ -1,23 +1,25 @@
 // Frontend client for calling Server-side carrier API routes
-// This client talks to OUR backend, which then injects credentials and forwards to the carriers.
+// This client talks to OUR backend, which then talks to the carriers.
 
 export class ServerSideUPSClient {
-  constructor(private serverBaseUrl: string = '') {}
+  constructor(private baseUrl: string = '') {}
 
   private async request(action: string, params: any = {}): Promise<any> {
-    const url = this.serverBaseUrl ? `${this.serverBaseUrl}/api/ups/${action}` : `/api/ups/${action}`;
+    const url = this.baseUrl ? `${this.baseUrl}/api/ups/${action}` : `/api/ups/${action}`;
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ params }),
     });
 
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || `Server UPS Error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Server UPS Error: ${response.status}`);
     }
 
-    return data;
+    return response.json();
   }
 
   async getRates(params: any): Promise<any> {
@@ -42,22 +44,24 @@ export class ServerSideUPSClient {
 }
 
 export class ServerSideFedExClient {
-  constructor(private serverBaseUrl: string = '') {}
+  constructor(private baseUrl: string = '') {}
 
   private async request(action: string, params: any = {}): Promise<any> {
-    const url = this.serverBaseUrl ? `${this.serverBaseUrl}/api/fedex/${action}` : `/api/fedex/${action}`;
+    const url = this.baseUrl ? `${this.baseUrl}/api/fedex/${action}` : `/api/fedex/${action}`;
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ params }),
     });
 
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || `Server FedEx Error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Server FedEx Error: ${response.status}`);
     }
 
-    return data;
+    return response.json();
   }
 
   async getRates(params: any): Promise<any> {
@@ -82,22 +86,24 @@ export class ServerSideFedExClient {
 }
 
 export class ServerSideMagentoClient {
-  constructor(private serverBaseUrl: string = '') {}
+  constructor(private baseUrl: string = '') {}
 
   private async request(action: string, params: any = {}): Promise<any> {
-    const url = this.serverBaseUrl ? `${this.serverBaseUrl}/api/magento/${action}` : `/api/magento/${action}`;
+    const url = this.baseUrl ? `${this.baseUrl}/api/magento/${action}` : `/api/magento/${action}`;
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ params }),
     });
 
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || `Server Magento Error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Server Magento Error: ${response.status}`);
     }
 
-    return data;
+    return response.json();
   }
 
   async searchOrders(query: string): Promise<any[]> {

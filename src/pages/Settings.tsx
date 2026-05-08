@@ -104,7 +104,7 @@ export default function Settings({
     setDevOrderData(null);
     try {
       const client = new ServerSideMagentoClient(credentials.general.serverUrl);
-      const data = await client.getDevOrderData(devOrderId);
+      const data = await client.getOrder(devOrderId);
       setDevOrderData(data);
       toast.success("Order data fetched successfully.");
     } catch (e: any) {

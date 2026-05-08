@@ -101,108 +101,230 @@ async function loadCredentials() {
   }
 }
 
-// --- Token Cache for Carriers ---
-const TOKEN_CACHE = {
-  ups: { token: null, expires: 0 },
-  fedex: { token: null, expires: 0 }
-};
-
-// --- API Proxy Implementation ---
-async function handleProxy(req, res) {
-  const { service } = req.params;
-  const endpoint = req.params[0]; // Captures the '*' part of the route
-  const creds = await loadCredentials();
-
-  if (!creds || !creds[service]) {
-    return res.status(400).json({ error: `Credentials for ${service} not configured on server.` });
+// --- UPS Client Implementation ---
+class UPSClient {
+  constructor(apiKey, secretKey, accountNumber, isSandbox) {
+    this.apiKey = apiKey;
+    this.secretKey = secretKey;
+    this.accountNumber = accountNumber;
+    this.baseUrl = isSandbox ? 'https://sandbox.api.ups.com' : 'https://api.ups.com';
   }
 
-  try {
-    let targetUrl = '';
-    const headers = { 'Content-Type': 'application/json' };
-    const method = req.method;
-    const body = method !== 'GET' && Object.keys(req.body).length > 0 ? JSON.stringify(req.body.params || req.body) : null;
-
-    if (service === 'magento') {
-      const config = creds.magento;
-      const baseUrl = (config.url || config.baseUrl || '').replace(/\/+$/, '');
-      targetUrl = `${baseUrl}/rest/V1/${endpoint}`;
-      headers['Authorization'] = `Bearer ${config.token}`;
-    } 
-    else if (service === 'ups') {
-      const config = creds.ups;
-      const baseUrl = config.isSandbox ? 'https://sandbox.api.ups.com' : 'https://api.ups.com';
-      targetUrl = `${baseUrl}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-      
-      // Handle OAuth
-      let token = TOKEN_CACHE.ups.token;
-      if (!token || Date.now() > TOKEN_CACHE.ups.expires) {
-        console.log('[UPS Proxy] Requesting new OAuth token...');
-        const auth = Buffer.from(`${config.apiKey}:${config.secretKey}`).toString('base64');
-        const tokenRes = await fetch(`${baseUrl}/security/v1/oauth/token`, {
-          method: 'POST',
-          headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ grant_type: 'client_credentials' })
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok) throw new Error(`UPS Auth Failed: ${JSON.stringify(tokenData)}`);
-        TOKEN_CACHE.ups.token = tokenData.access_token;
-        TOKEN_CACHE.ups.expires = Date.now() + (parseInt(tokenData.expires_in || '3600') * 1000) - 60000;
-        token = TOKEN_CACHE.ups.token;
-      }
-      
-      headers['Authorization'] = `Bearer ${token}`;
-      if (config.accountNumber) headers['x-merchant-id'] = config.accountNumber;
-      headers['transId'] = `sawyer-${Date.now()}`;
-      headers['transactionSrc'] = 'sawyer-ship';
+  async getAccessToken() {
+    const auth = Buffer.from(`${this.apiKey}:${this.secretKey}`).toString('base64');
+    console.log(`[UPS] Requesting OAuth token (${this.baseUrl})...`);
+    const response = await fetch(`${this.baseUrl}/security/v1/oauth/token`, {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'client_credentials' })
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`[UPS] Auth failed: ${response.status}`, text);
+      throw new Error(`UPS Auth Failed (${response.status}): ${text}`);
     }
-    else if (service === 'fedex') {
-      const config = creds.fedex;
-      const isSandbox = config.isSandbox === true || config.isSandbox === 'true';
-      const baseUrl = isSandbox ? 'https://apis-sandbox.fedex.com' : 'https://apis.fedex.com';
-      targetUrl = `${baseUrl}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    const data = await response.json();
+    return data.access_token;
+  }
 
-      // Handle OAuth
-      let token = TOKEN_CACHE.fedex.token;
-      if (!token || Date.now() > TOKEN_CACHE.fedex.expires) {
-        console.log('[FedEx Proxy] Requesting new OAuth token...');
-        const tokenRes = await fetch(`${baseUrl}/oauth/token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ 
-            grant_type: 'client_credentials', 
-            client_id: isSandbox ? (config.sandboxApiKey || config.apiKey) : (config.productionApiKey || config.apiKey), 
-            client_secret: isSandbox ? (config.sandboxSecretKey || config.secretKey) : (config.productionSecretKey || config.secretKey)
-          })
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok) throw new Error(`FedEx Auth Failed: ${JSON.stringify(tokenData)}`);
-        TOKEN_CACHE.fedex.token = tokenData.access_token;
-        TOKEN_CACHE.fedex.expires = Date.now() + (parseInt(tokenData.access_token_expires_in || '3600') * 1000) - 60000;
-        token = TOKEN_CACHE.fedex.token;
+  async request(endpoint, options = {}) {
+    try {
+      const token = await this.getAccessToken();
+      console.log(`[UPS] Request: ${options.method || 'GET'} ${endpoint}`);
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
+          'transId': `sawyer-${Date.now()}`,
+          'transactionSrc': 'sawyer-ship',
+          ...options.headers
+        }
+      });
+
+      const contentType = response.headers.get('content-type');
+      let data;
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = { message: await response.text() };
       }
 
-      headers['Authorization'] = `Bearer ${token}`;
-      headers['x-customer-transaction-id'] = `sawyer-${Date.now()}`;
-      headers['x-locale'] = 'en_US';
+      if (!response.ok) {
+        console.error(`[UPS] API Error (${response.status}):`, data);
+        const errMsg = data?.response?.errors?.[0]?.message || data?.errors?.[0]?.message || data?.message || 'UPS API Error';
+        throw new Error(errMsg);
+      }
+      return data;
+    } catch (error) {
+      console.error(`[UPS] Request failed:`, error.message);
+      throw error;
     }
+  }
+}
 
-    console.log(`[Proxy] ${method} ${targetUrl}`);
-    const apiResponse = await fetch(targetUrl, { method, headers, body });
-    
-    // Transparently return content-type and status
-    const data = await apiResponse.json().catch(() => ({}));
-    res.status(apiResponse.status).json(data);
+// --- FedEx Client Implementation ---
+class FedExClient {
+  constructor(apiKey, secretKey, accountNumber, isSandbox) {
+    this.apiKey = apiKey;
+    this.secretKey = secretKey;
+    this.accountNumber = accountNumber;
+    this.baseUrl = isSandbox ? 'https://apis-sandbox.fedex.com' : 'https://apis.fedex.com';
+  }
 
-  } catch (error) {
-    console.error(`[Proxy Error] ${service}:`, error.message);
-    res.status(500).json({ error: error.message });
+  async getAccessToken() {
+    try {
+      console.log(`[FedEx] Requesting OAuth token (${this.baseUrl})...`);
+      const response = await fetch(`${this.baseUrl}/oauth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 
+          grant_type: 'client_credentials', 
+          client_id: this.apiKey, 
+          client_secret: this.secretKey 
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error(`[FedEx] Auth failed: ${response.status}`, text);
+        throw new Error(`FedEx Auth Failed (${response.status}): ${text}`);
+      }
+      const data = await response.json();
+      return data.access_token;
+    } catch (error) {
+      console.error(`[FedEx] OAuth failed:`, error.message);
+      throw error;
+    }
+  }
+
+  async request(endpoint, options = {}) {
+    try {
+      const token = await this.getAccessToken();
+      console.log(`[FedEx] Request: ${options.method || 'GET'} ${endpoint}`);
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+
+      const contentType = response.headers.get('content-type');
+      let data;
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = { message: await response.text() };
+      }
+
+      if (!response.ok) {
+        console.error(`[FedEx] API Error (${response.status}):`, data);
+        const errMsg = data?.errors?.[0]?.message || data?.message || 'FedEx API Error';
+        throw new Error(errMsg);
+      }
+      return data;
+    } catch (error) {
+      console.error(`[FedEx] Request failed:`, error.message);
+      throw error;
+    }
+  }
+}
+
+// --- Magento Client Implementation ---
+class MagentoClient {
+  constructor(baseUrl, token) {
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.token = token;
+  }
+
+  async fetch(endpoint, options = {}) {
+    const url = `${this.baseUrl}/rest/V1/${endpoint}`;
+    console.log(`[Magento] Request: ${options.method || 'GET'} ${url}`);
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const msg = data.message || response.statusText || 'Magento API Error';
+      throw new Error(`Magento Error (${response.status}): ${msg}`);
+    }
+    return data;
   }
 }
 
 // --- API Routes ---
-app.all('/api/proxy/:service/*', handleProxy);
+app.get('/api/health', (req, res) => {
+  console.log('[Server] Health check ping');
+  res.json({ status: 'ok', version: '4.0.0' });
+});
 
+app.post('/api/magento/:action', async (req, res) => {
+  const { action } = req.params;
+  try {
+    console.log(`[Magento Proxy] Starting action: ${action}`);
+    const creds = await loadCredentials();
+    if (!creds?.magento) throw new Error('Magento credentials not configured on server');
+    
+    const magento = new MagentoClient(creds.magento.url || creds.magento.baseUrl, creds.magento.token);
+    let result;
+    const { params } = req.body;
+
+    if (action === 'orders') {
+      const { query } = params;
+      const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
+      result = await magento.fetch(`orders?${searchCriteria}`);
+    } 
+    else if (action === 'order') {
+      const { id } = params;
+      try {
+        result = await magento.fetch(`orders/${id}`);
+      } catch (e) {
+        if (e.message.includes('404')) {
+          const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${id}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+          const data = await magento.fetch(`orders?${searchCriteria}`);
+          if (data.items?.length > 0) result = data.items[0];
+          else throw e;
+        } else throw e;
+      }
+    }
+    else if (action === 'products') {
+      const { skus } = params;
+      const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=sku&searchCriteria[filter_groups][0][filters][0][value]=${skus.map(s => encodeURIComponent(s)).join(',')}&searchCriteria[filter_groups][0][filters][0][condition_type]=in`;
+      result = await magento.fetch(`products?${searchCriteria}`);
+    }
+    else if (action === 'ship') {
+      const { orderId, tracks } = params;
+      result = await magento.fetch(`order/${orderId}/ship`, {
+        method: 'POST',
+        body: JSON.stringify({
+          items: [],
+          notify: true,
+          appendComment: true,
+          comment: { extension_attributes: {}, comment: "Shipment created via Sawyer-Ship Server", is_visible_on_front: 1 },
+          tracks: tracks
+        })
+      });
+    }
+    else if (action === 'attribute-options') {
+      const { attributeCode } = params;
+      result = await magento.fetch(`products/attributes/${attributeCode}/options`);
+    }
+    else throw new Error(`Unknown Magento action: ${action}`);
+
+    res.json(result);
+  } catch (e) {
+    console.error(`[Magento Proxy] Action ${action} failed:`, e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.post('/api/settings/credentials', async (req, res) => {
   try {
@@ -244,6 +366,67 @@ app.post('/api/data/load', async (req, res) => {
     res.json({ data });
   } catch (e) {
     console.error('[Server] Data load failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/ups/:action', async (req, res) => {
+  const { action } = req.params;
+  try {
+    console.log(`[UPS Proxy] Starting action: ${action}`);
+    const creds = await loadCredentials();
+    if (!creds?.ups) throw new Error('UPS credentials not configured on server');
+    
+    const ups = new UPSClient(creds.ups.apiKey, creds.ups.secretKey, creds.ups.accountNumber, creds.ups.isSandbox);
+    let result;
+    const { params } = req.body;
+
+    if (action === 'rates') result = await ups.request('/api/rating/v1/shop', { method: 'POST', body: JSON.stringify(params) });
+    else if (action === 'ship') result = await ups.request('/api/shipments/v1/ship', { method: 'POST', body: JSON.stringify(params) });
+    else if (action === 'track') {
+      const trackingNum = params.trackingNumber || params;
+      result = await ups.request(`/api/track/v1/details/${trackingNum}?locale=en_US`);
+    }
+    else if (action === 'cancel') result = await ups.request(`/api/shipments/v1/void/cancel/${params.trackingNumber}`, { method: 'PUT' });
+    else if (action === 'validate-address') result = await ups.request('/api/addressvalidation/v1/1', { method: 'POST', body: JSON.stringify(params) });
+    else throw new Error(`Unknown UPS action: ${action}`);
+
+    res.json(result);
+  } catch (e) {
+    console.error(`[UPS Proxy] Action ${action} failed:`, e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/fedex/:action', async (req, res) => {
+  const { action } = req.params;
+  try {
+    console.log(`[FedEx Proxy] Starting action: ${action}`);
+    const creds = await loadCredentials();
+    if (!creds?.fedex) throw new Error('FedEx credentials not configured on server');
+    
+    const fedex = new FedExClient(
+      creds.fedex.isSandbox ? creds.fedex.sandboxApiKey : (creds.fedex.productionApiKey || creds.fedex.apiKey),
+      creds.fedex.isSandbox ? creds.fedex.sandboxSecretKey : (creds.fedex.productionSecretKey || creds.fedex.secretKey),
+      creds.fedex.isSandbox ? creds.fedex.accountNumber : (creds.fedex.productionAccountNumber || creds.fedex.accountNumber),
+      creds.fedex.isSandbox
+    );
+    let result;
+    const { params } = req.body;
+
+    if (action === 'rates') result = await fedex.request('/rate/v1/rates/quotes', { method: 'POST', body: JSON.stringify(params) });
+    else if (action === 'ship') result = await fedex.request('/ship/v1/shipments', { method: 'POST', body: JSON.stringify(params) });
+    else if (action === 'track') {
+      const trackingNum = params.trackingNumber || params;
+      result = await fedex.request('/track/v1/trackingnumbers', { method: 'POST', body: JSON.stringify({ trackingInfo: [{ trackingNumberInfo: { trackingNumber: trackingNum } }], includeDetailedScans: true }) });
+    }
+    else if (action === 'cancel') result = await fedex.request('/ship/v1/shipments/cancel', { method: 'PUT', body: JSON.stringify({ accountNumber: { value: creds.fedex.accountNumber }, trackingNumber: params.trackingNumber }) });
+    else if (action === 'validate-address') result = await fedex.request('/address/v1/addresses/resolve', { method: 'POST', body: JSON.stringify(params) });
+    else throw new Error(`Unknown FedEx action: ${action}`);
+
+    res.json(result);
+  } catch (e) {
+    console.error(`[FedEx Proxy] Action ${action} failed:`, e.message);
     res.status(500).json({ error: e.message });
   }
 });

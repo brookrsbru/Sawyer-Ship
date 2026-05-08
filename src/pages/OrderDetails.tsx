@@ -852,7 +852,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
 
           const fedexParams: any = {
-            accountNumber: { value: accountNumber },
+            accountNumber: { value: payorAccountNumber },
             requestedShipment: {
               rateRequestType: ["ACCOUNT", "LIST"],
               carrierCodes: ["FDXE", "FDXG"],
@@ -870,8 +870,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   emailAddress: credentials.general.originEmail,
                   phoneNumber: credentials.general.originPhone,
                   companyName: credentials.general.originCompanyName
-                },
-                accountNumber: { value: accountNumber }
+                }
               },
               recipient: {
                 address: {
@@ -1276,7 +1275,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
         const fedexParams: any = {
           labelResponseOptions: "LABEL",
-          accountNumber: { value: accountNumber },
+          accountNumber: { value: payorAccountNumber },
           requestedShipment: {
             shipper: {
               contact: {
@@ -1290,8 +1289,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 stateOrProvinceCode: getCarrierRegion(credentials.general.originState, credentials.general.originCountry),
                 postalCode: credentials.general.originPostalCode,
                 countryCode: getCarrierCountryCode(credentials.general.originCountry)
-              },
-              accountNumber: { value: accountNumber }
+              }
             },
             recipients: [{
               contact: {

@@ -4,8 +4,6 @@
  * CORS issues are expected unless a proxy is used or the APIs support it.
  */
 
-import { normalizeMagentoOrder } from './magento-utils';
-
 export interface MagentoOrder {
   entity_id: number;
   increment_id: string;
@@ -182,7 +180,34 @@ export class MagentoClient {
   }
 
   private normalizeOrder(order: any): MagentoOrder {
-    return normalizeMagentoOrder(order);
+    // Magento 2 orders often have shipping address in extension_attributes
+    const shippingAddress = order.extension_attributes?.shipping_assignments?.[0]?.shipping?.address 
+      || order.shipping_address 
+      || order.billing_address 
+      || {};
+
+    // Ensure street is an array (sometimes it comes as a string or is missing)
+    let street = shippingAddress.street || [];
+    if (typeof street === 'string') {
+      street = [street];
+    }
+
+    return {
+      ...order,
+      customer_firstname: shippingAddress.firstname || order.customer_firstname || '',
+      customer_lastname: shippingAddress.lastname || order.customer_lastname || '',
+      shipping_address: {
+        firstname: shippingAddress.firstname || order.customer_firstname || '',
+        lastname: shippingAddress.lastname || order.customer_lastname || '',
+        company: shippingAddress.company || '',
+        street: street,
+        city: shippingAddress.city || '',
+        region: shippingAddress.region || '',
+        postcode: shippingAddress.postcode || '',
+        country_id: shippingAddress.country_id || '',
+        telephone: shippingAddress.telephone || '',
+      }
+    };
   }
 
   async getProduct(sku: string): Promise<any> {
