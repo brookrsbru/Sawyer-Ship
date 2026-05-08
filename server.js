@@ -20,27 +20,29 @@ const ENCRYPTION_KEY = process.env.SERVER_STORAGE_KEY || 'sawyer-ship-secure-v2-
 const IV_LENGTH = 16;
 const STORAGE_DIR = path.join(__dirname, 'storage');
 const CREDS_FILE = path.join(STORAGE_DIR, 'carrier-credentials.enc');
+const APP_DATA_FILE = path.join(STORAGE_DIR, 'app-data.enc');
 
 console.log('--- Sawyer Ship Standalone Server ---');
 console.log(`Node Version: ${process.version}`);
 console.log(`Working Directory: ${process.cwd()}`);
-console.log(`Storage Path: ${CREDS_FILE}`);
+console.log(`Storage Path: ${STORAGE_DIR}`);
 console.log('-------------------------------------');
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increase limit for full data sync
 
 // --- Encryption Utility ---
-function getEncryptionKey() {
-  const key = process.env.SERVER_STORAGE_KEY || 'sawyer-ship-secure-v2-dev-key-32ch';
+function getEncryptionKey(customPassword = null) {
+  const baseKey = process.env.SERVER_STORAGE_KEY || 'sawyer-ship-secure-v2-dev-key-32ch';
+  const finalKey = customPassword ? `${baseKey}:${customPassword}` : baseKey;
   // Normalize key to exactly 32 bytes using SHA-256 to avoid "Invalid key length" errors
-  return crypto.createHash('sha256').update(String(key)).digest();
+  return crypto.createHash('sha256').update(String(finalKey)).digest();
 }
 
-function encrypt(text) {
+function encrypt(text, password = null) {
   try {
     const iv = crypto.randomBytes(IV_LENGTH);
-    const key = getEncryptionKey();
+    const key = getEncryptionKey(password);
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encrypted = cipher.update(text);
     encrypted = Buffer.concat([encrypted, cipher.final()]);
@@ -51,13 +53,13 @@ function encrypt(text) {
   }
 }
 
-function decrypt(text) {
+function decrypt(text, password = null) {
   try {
     const textParts = text.split(':');
     const ivStr = textParts.shift();
     if (!ivStr) throw new Error('Invalid encrypted format');
     const iv = Buffer.from(ivStr, 'hex');
-    const key = getEncryptionKey();
+    const key = getEncryptionKey(password);
     const encryptedText = Buffer.from(textParts.join(':'), 'hex');
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(encryptedText);
@@ -70,23 +72,31 @@ function decrypt(text) {
 }
 
 // --- Storage Logic ---
+async function writeStore(filePath, data, password = null) {
+  await fs.mkdir(STORAGE_DIR, { recursive: true });
+  const encrypted = encrypt(JSON.stringify(data), password);
+  await fs.writeFile(filePath, encrypted, 'utf8');
+}
+
+async function readStore(filePath, password = null) {
+  if (!(await fs.access(filePath).then(() => true).catch(() => false))) {
+    return null;
+  }
+  const encrypted = await fs.readFile(filePath, 'utf8');
+  return JSON.parse(decrypt(encrypted, password));
+}
+
 async function saveCredentials(data) {
   console.log('[Storage] Saving credentials to disk...');
-  await fs.mkdir(STORAGE_DIR, { recursive: true });
-  const encrypted = encrypt(JSON.stringify(data));
-  await fs.writeFile(CREDS_FILE, encrypted, 'utf8');
+  await writeStore(CREDS_FILE, data);
   console.log('[Storage] Success: Credentials saved.');
 }
 
 async function loadCredentials() {
   try {
-    if (!(await fs.access(CREDS_FILE).then(() => true).catch(() => false))) {
-      return null;
-    }
-    const encrypted = await fs.readFile(CREDS_FILE, 'utf8');
-    return JSON.parse(decrypt(encrypted));
+    return await readStore(CREDS_FILE);
   } catch (err) {
-    console.error('[Storage] Load Error:', err.message);
+    console.error('[Storage] Load Credentials Error:', err.message);
     return null;
   }
 }
@@ -223,10 +233,97 @@ class FedExClient {
   }
 }
 
+// --- Magento Client Implementation ---
+class MagentoClient {
+  constructor(baseUrl, token) {
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.token = token;
+  }
+
+  async fetch(endpoint, options = {}) {
+    const url = `${this.baseUrl}/rest/V1/${endpoint}`;
+    console.log(`[Magento] Request: ${options.method || 'GET'} ${url}`);
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const msg = data.message || response.statusText || 'Magento API Error';
+      throw new Error(`Magento Error (${response.status}): ${msg}`);
+    }
+    return data;
+  }
+}
+
 // --- API Routes ---
 app.get('/api/health', (req, res) => {
   console.log('[Server] Health check ping');
-  res.json({ status: 'ok', version: '3.0.0' });
+  res.json({ status: 'ok', version: '4.0.0' });
+});
+
+app.post('/api/magento/:action', async (req, res) => {
+  const { action } = req.params;
+  try {
+    console.log(`[Magento Proxy] Starting action: ${action}`);
+    const creds = await loadCredentials();
+    if (!creds?.magento) throw new Error('Magento credentials not configured on server');
+    
+    const magento = new MagentoClient(creds.magento.url || creds.magento.baseUrl, creds.magento.token);
+    let result;
+    const { params } = req.body;
+
+    if (action === 'orders') {
+      const { query } = params;
+      const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
+      result = await magento.fetch(`orders?${searchCriteria}`);
+    } 
+    else if (action === 'order') {
+      const { id } = params;
+      try {
+        result = await magento.fetch(`orders/${id}`);
+      } catch (e) {
+        if (e.message.includes('404')) {
+          const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=${id}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+          const data = await magento.fetch(`orders?${searchCriteria}`);
+          if (data.items?.length > 0) result = data.items[0];
+          else throw e;
+        } else throw e;
+      }
+    }
+    else if (action === 'products') {
+      const { skus } = params;
+      const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=sku&searchCriteria[filter_groups][0][filters][0][value]=${skus.map(s => encodeURIComponent(s)).join(',')}&searchCriteria[filter_groups][0][filters][0][condition_type]=in`;
+      result = await magento.fetch(`products?${searchCriteria}`);
+    }
+    else if (action === 'ship') {
+      const { orderId, tracks } = params;
+      result = await magento.fetch(`order/${orderId}/ship`, {
+        method: 'POST',
+        body: JSON.stringify({
+          items: [],
+          notify: true,
+          appendComment: true,
+          comment: { extension_attributes: {}, comment: "Shipment created via Sawyer-Ship Server", is_visible_on_front: 1 },
+          tracks: tracks
+        })
+      });
+    }
+    else if (action === 'attribute-options') {
+      const { attributeCode } = params;
+      result = await magento.fetch(`products/attributes/${attributeCode}/options`);
+    }
+    else throw new Error(`Unknown Magento action: ${action}`);
+
+    res.json(result);
+  } catch (e) {
+    console.error(`[Magento Proxy] Action ${action} failed:`, e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/settings/credentials', async (req, res) => {
@@ -245,6 +342,30 @@ app.get('/api/settings/credentials', async (req, res) => {
     const creds = await loadCredentials();
     res.json({ credentials: creds });
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/data/save', async (req, res) => {
+  try {
+    const { data, password } = req.body;
+    console.log('[Server] Saving full application data...');
+    await writeStore(APP_DATA_FILE, data, password);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[Server] Data save failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/data/load', async (req, res) => {
+  try {
+    const { password } = req.body;
+    console.log('[Server] Loading full application data...');
+    const data = await readStore(APP_DATA_FILE, password);
+    res.json({ data });
+  } catch (e) {
+    console.error('[Server] Data load failed:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -285,9 +406,9 @@ app.post('/api/fedex/:action', async (req, res) => {
     if (!creds?.fedex) throw new Error('FedEx credentials not configured on server');
     
     const fedex = new FedExClient(
-      creds.fedex.isSandbox ? creds.fedex.sandboxApiKey : creds.fedex.apiKey,
-      creds.fedex.isSandbox ? creds.fedex.sandboxSecretKey : creds.fedex.secretKey,
-      creds.fedex.accountNumber,
+      creds.fedex.isSandbox ? creds.fedex.sandboxApiKey : (creds.fedex.productionApiKey || creds.fedex.apiKey),
+      creds.fedex.isSandbox ? creds.fedex.sandboxSecretKey : (creds.fedex.productionSecretKey || creds.fedex.secretKey),
+      creds.fedex.isSandbox ? creds.fedex.accountNumber : (creds.fedex.productionAccountNumber || creds.fedex.accountNumber),
       creds.fedex.isSandbox
     );
     let result;
@@ -310,4 +431,4 @@ app.post('/api/fedex/:action', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Standalone Sawyer Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Standalone Sawyer Server running on http://0.0.0.0:${PORT}`));

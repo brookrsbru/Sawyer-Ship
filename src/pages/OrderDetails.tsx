@@ -11,8 +11,8 @@ import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
-import { ServerSideUPSClient, ServerSideFedExClient } from '@/src/lib/server-api-client';
+import { MagentoOrder } from '@/src/lib/api-clients';
+import { ServerSideUPSClient, ServerSideFedExClient, ServerSideMagentoClient } from '@/src/lib/server-api-client';
 import { SawyerCredentials, AddressBookCustomer, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
@@ -155,11 +155,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     if (order && order.items && order.items.length > 0) {
       const fetchOptions = async () => {
         try {
-          const client = new MagentoClient(
-            credentials.magento.url,
-            credentials.magento.token,
-            credentials.general.proxyUrl
-          );
+          const client = new ServerSideMagentoClient(credentials.general.serverUrl);
           // Fetch options for attributes that might be dropdowns
           const codes = ['commodity_code', 'harmonized_system_code'];
           const optionsMap: Record<string, any[]> = {};
@@ -286,18 +282,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     setIsUPSValid('loading');
     
     try {
-      let ups;
-      if (credentials.general.serverSide) {
-        ups = new ServerSideUPSClient(credentials.general.serverUrl);
-      } else {
-        ups = new UPSClient(
-          credentials.ups.apiKey,
-          credentials.ups.secretKey,
-          credentials.ups.accountNumber,
-          credentials.ups.isSandbox,
-          credentials.general.proxyUrl
-        );
-      }
+      const ups = new ServerSideUPSClient(credentials.general.serverUrl);
 
       const params = {
         XAVRequest: {
@@ -362,23 +347,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     setIsFedExValid('loading');
     
     try {
-      const isDomestic = getCarrierCountryCode(order.shipping_address.country_id) === getCarrierCountryCode(credentials.general.originCountry);
-        const accountNumber = credentials.fedex.isSandbox
-        ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
-        : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
-
-      let fedex;
-      if (credentials.general.serverSide) {
-        fedex = new ServerSideFedExClient(credentials.general.serverUrl);
-      } else {
-        fedex = new FedExClient(
-          credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
-          credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
-          accountNumber,
-          credentials.fedex.isSandbox,
-          credentials.general.proxyUrl
-        );
-      }
+      const fedex = new ServerSideFedExClient(credentials.general.serverUrl);
 
       const params = {
         addressesToValidate: [
@@ -526,12 +495,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       setIsLoading(true);
       setError(null);
       try {
-        console.log(`[OrderDetails] Fetching order from Magento: ${credentials.magento.url}`);
-        const client = new MagentoClient(
-          credentials.magento.url,
-          credentials.magento.token,
-          credentials.general.proxyUrl
-        );
+        console.log(`[OrderDetails] Fetching order from server: ${credentials.general.serverUrl}`);
+        const client = new ServerSideMagentoClient(credentials.general.serverUrl);
         const fetchedOrder = await client.getOrder(id);
         console.log(`[OrderDetails] Order fetched successfully:`, fetchedOrder);
         setOrder(fetchedOrder);
@@ -560,13 +525,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
       if (!credentials.magento.url || !credentials.magento.token) return;
       
-      console.log(`[OrderDetails] Fetching product details for ${order.items.length} items`);
+      console.log(`[OrderDetails] Fetching product details for ${order.items.length} items via server`);
       setIsFetchingProducts(true);
-      const client = new MagentoClient(
-        credentials.magento.url,
-        credentials.magento.token,
-        credentials.general.proxyUrl
-      );
+      const client = new ServerSideMagentoClient(credentials.general.serverUrl);
 
       const details: Record<string, any> = {};
       try {
@@ -766,20 +727,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           const isDomestic = getCarrierCountryCode(destCountry, 'UPS') === getCarrierCountryCode(credentials.general.originCountry, 'UPS');
           const accountNumber = credentials.ups.accountNumber;
 
-          console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
-          
-          let ups;
-          if (credentials.general.serverSide) {
-            ups = new ServerSideUPSClient(credentials.general.serverUrl);
-          } else {
-            ups = new UPSClient(
-              credentials.ups.apiKey,
-              credentials.ups.secretKey,
-              accountNumber,
-              credentials.ups.isSandbox,
-              credentials.general.proxyUrl
-            );
-          }
+          console.log(`[OrderDetails] Calling UPS API (Server Side)...`);
+          const ups = new ServerSideUPSClient(credentials.general.serverUrl);
 
           // Simplified UPS Rating Request
           const upsParams = {
@@ -897,19 +846,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             ? (credentials.fedex.paymentAccountNumber || accountNumber)
             : (credentials.fedex.productionAccountNumber || accountNumber);
           
-          console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
-          let fedex;
-          if (credentials.general.serverSide) {
-            fedex = new ServerSideFedExClient(credentials.general.serverUrl);
-          } else {
-            fedex = new FedExClient(
-              credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
-              credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
-              accountNumber,
-              credentials.fedex.isSandbox,
-              credentials.general.proxyUrl
-            );
-          }
+          console.log(`[OrderDetails] Calling FedEx API (Server Side)...`);
+          const fedex = new ServerSideFedExClient(credentials.general.serverUrl);
 
           const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
 
@@ -1173,19 +1111,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
       if (selectedRate.carrier === 'UPS') {
         const accountNumber = credentials.ups.accountNumber;
-
-        let ups;
-        if (credentials.general.serverSide) {
-          ups = new ServerSideUPSClient(credentials.general.serverUrl);
-        } else {
-          ups = new UPSClient(
-            credentials.ups.apiKey,
-            credentials.ups.secretKey,
-            accountNumber,
-            credentials.ups.isSandbox,
-            credentials.general.proxyUrl
-          );
-        }
+        const ups = new ServerSideUPSClient(credentials.general.serverUrl);
         
         // Extract service code from ID (e.g. "ups-11" -> "11")
         const serviceCode = selectedRate.id.startsWith('ups-') 
@@ -1332,6 +1258,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           throw new Error(error.Description || error.message || "UPS Shipment Failed");
         }
       } else if (selectedRate.carrier === 'FedEx') {
+        const destCountry = order.shipping_address.country_id;
+        const isDomestic = getCarrierCountryCode(destCountry) === getCarrierCountryCode(credentials.general.originCountry);
         const accountNumber = credentials.fedex.isSandbox
           ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
           : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
@@ -1340,18 +1268,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           ? (credentials.fedex.paymentAccountNumber || accountNumber)
           : (credentials.fedex.productionAccountNumber || accountNumber);
 
-        let fedex;
-        if (credentials.general.serverSide) {
-          fedex = new ServerSideFedExClient(credentials.general.serverUrl);
-        } else {
-          fedex = new FedExClient(
-            credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
-            credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
-            accountNumber,
-            credentials.fedex.isSandbox,
-            credentials.general.proxyUrl
-          );
-        }
+        const fedex = new ServerSideFedExClient(credentials.general.serverUrl);
 
         const referenceId = order.increment_id?.trim();
         const shouldSendReference = referenceId && referenceId !== 'MANUAL';
@@ -1572,12 +1489,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
         if (credentials.general.markAsShipped && id !== 'manual' && !isSandbox) {
           try {
-            console.log(`[OrderDetails] Updating Magento shipment status...`);
-            const client = new MagentoClient(
-              credentials.magento.url,
-              credentials.magento.token,
-              credentials.general.proxyUrl
-            );
+            console.log(`[OrderDetails] Updating Magento shipment status via server...`);
+            const client = new ServerSideMagentoClient(credentials.general.serverUrl);
 
             const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
             const carrierCode = selectedRate.carrier.toLowerCase();

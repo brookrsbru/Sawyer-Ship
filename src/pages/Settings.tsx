@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Database } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -39,8 +39,7 @@ const FEDEX_PICKUP_LABELS: Record<string, string> = {
   "USE_SCHEDULED_PICKUP": "Use Scheduled Pickup"
 };
 
-import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
-import { ServerSideUPSClient, ServerSettingsClient } from '@/src/lib/server-api-client';
+import { ServerSideUPSClient, ServerDataClient, ServerSideMagentoClient } from '@/src/lib/server-api-client';
 
 export default function Settings({ 
   credentials, 
@@ -104,12 +103,8 @@ export default function Settings({
     setIsDevLoading(true);
     setDevOrderData(null);
     try {
-      const client = new MagentoClient(
-        credentials.magento.url,
-        credentials.magento.token,
-        credentials.general.proxyUrl
-      );
-      const data = await client.getDevOrderData(devOrderId);
+      const client = new ServerSideMagentoClient(credentials.general.serverUrl);
+      const data = await client.getOrder(devOrderId);
       setDevOrderData(data);
       toast.success("Order data fetched successfully.");
     } catch (e: any) {
@@ -253,37 +248,6 @@ export default function Settings({
                     Connectivity & Automation
                   </h3>
                   <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
-                    <div className="space-y-2">
-                      <Label htmlFor="proxy">CORS Proxy URL</Label>
-                      <div className="flex gap-2">
-                        <Input 
-                          id="proxy" 
-                          placeholder="https://cors-anywhere.herokuapp.com/" 
-                          value={formData.general.proxyUrl}
-                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } })}
-                          className="flex-1"
-                        />
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          type="button"
-                          title="Request Access to Proxy"
-                          onClick={() => window.open(formData.general.proxyUrl, '_blank')}
-                        >
-                          <ExternalLink size={18} />
-                        </Button>
-                      </div>
-                      <p className="text-xs text-zinc-500">Required for browser-based API calls. Click the button to request temporary access if using Heroku CORS Anywhere.</p>
-                      <Button 
-                        variant="link" 
-                        size="sm" 
-                        className="h-auto p-0 text-xs text-zinc-500 hover:text-zinc-900"
-                        onClick={() => setFormData({ ...formData, general: { ...formData.general, proxyUrl: 'https://cors-anywhere.herokuapp.com/' } })}
-                      >
-                        Reset to demo server (Heroku)
-                      </Button>
-                    </div>
-
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label>Mark as Shipped in Magento</Label>
@@ -1039,7 +1003,7 @@ export default function Settings({
                 <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
                   <div className="space-y-1 flex-1">
                     <Label className="text-base">Server Base URL</Label>
-                    <p className="text-xs text-zinc-500">The root URL where your standalone Node.js server is running (e.g. http://localhost:3000).</p>
+                    <p className="text-xs text-zinc-500">The root URL where your Sawyer-Ship standalone Node.js server is running (e.g. http://localhost:3000).</p>
                     <div className="flex gap-2 mt-2">
                       <Input 
                         value={formData.general.serverUrl}
@@ -1071,96 +1035,38 @@ export default function Settings({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
-                  <div className="space-y-1">
-                    <Label className="text-base">Local Connectivity (Internal)</Label>
-                    <p className="text-xs text-zinc-500">Check if the current environment's built-in backend is responsive.</p>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch('/api/health');
-                        const data = await res.json();
-                        toast.success(`Internal Server: v${data.version}`);
-                      } catch (e) {
-                        toast.error("Internal fallback failed.");
-                      }
-                    }}
-                  >
-                    Quick Check
-                  </Button>
-                </div>
-
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <Lock size={14} className="text-zinc-400" />
-                    Unified Server Sync
+                    Vault Sync Status
                   </h3>
-                  <div className="p-4 border rounded-lg space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Enabled Server-Side Processing</Label>
-                        <p className="text-[10px] text-zinc-500">
-                          Route all UPS & FedEx API calls through your Node.js backend.
-                        </p>
-                      </div>
-                      <Switch 
-                        checked={formData.general.serverSide}
-                        onCheckedChange={(checked) => setFormData({
-                          ...formData,
-                          general: { ...formData.general, serverSide: checked }
-                        })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {formData.general.serverSide && (
-                  <div className="p-4 bg-orange-50 border border-orange-100 rounded-lg space-y-4 animate-in fade-in zoom-in-95">
-                    <h3 className="text-xs font-bold text-orange-800 uppercase tracking-wider">Sync Global Credentials</h3>
-                    <p className="text-xs text-orange-700">
-                      The server-side storage is independent of your browser. You must sync your current carrier keys to the server to enable this mode for both UPS and FedEx.
+                  <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-lg space-y-4">
+                    <p className="text-xs text-zinc-600">
+                      Standalone server (<strong>{formData.general.serverUrl}</strong>) is your current vault provider. 
+                      Changes are encrypted and saved automatically.
                     </p>
                     <Button 
-                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                      className="w-full bg-zinc-900 hover:bg-zinc-800 text-white h-9 font-bold"
                       size="sm"
                       onClick={async () => {
-                        const loading = toast.loading("Syncing all credentials to server...");
+                        const loading = toast.loading("Syncing carrier keys to server...");
                         try {
-                          await ServerSettingsClient.saveCredentials({
-                            ups: {
-                              enabled: formData.ups.enabled,
-                              apiKey: formData.ups.apiKey,
-                              secretKey: formData.ups.secretKey,
-                              accountNumber: formData.ups.accountNumber,
-                              isSandbox: formData.ups.isSandbox
-                            },
-                            fedex: {
-                              enabled: formData.fedex.enabled,
-                              apiKey: formData.fedex.apiKey,
-                              secretKey: formData.fedex.secretKey,
-                              sandboxApiKey: formData.fedex.sandboxApiKey,
-                              sandboxSecretKey: formData.fedex.sandboxSecretKey,
-                              productionApiKey: formData.fedex.productionApiKey,
-                              productionSecretKey: formData.fedex.productionSecretKey,
-                              accountNumber: formData.fedex.accountNumber,
-                              isSandbox: formData.fedex.isSandbox
-                            }
+                          await ServerDataClient.saveCredentials({
+                            ups: formData.ups,
+                            fedex: formData.fedex
                           }, formData.general.serverUrl);
                           toast.dismiss(loading);
-                          toast.success("UPS & FedEx credentials synced to server storage.");
+                          toast.success("Carrier keys shared with server storage.");
                         } catch (e: any) {
                           toast.dismiss(loading);
                           toast.error(`Sync failed: ${e.message}`);
                         }
                       }}
                     >
-                      Process Global Server Sync
+                      Process Force Sync
                     </Button>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           </section>
