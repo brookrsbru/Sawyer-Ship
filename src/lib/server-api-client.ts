@@ -1,6 +1,8 @@
 // Frontend client for calling Server-side carrier API routes
 // This client talks to OUR backend, which then talks to the carriers.
 
+import { MagentoOrder, normalizeMagentoOrder } from '@/src/lib/api-clients';
+
 export class ServerSideUPSClient {
   constructor(private baseUrl: string = '') {}
 
@@ -106,13 +108,15 @@ export class ServerSideMagentoClient {
     return response.json();
   }
 
-  async searchOrders(query: string): Promise<any[]> {
+  async searchOrders(query: string): Promise<MagentoOrder[]> {
     const data = await this.request('orders', { query });
-    return data.items || [];
+    const items = data.items || [];
+    return items.map((item: any) => normalizeMagentoOrder(item));
   }
 
-  async getOrder(id: string): Promise<any> {
-    return this.request('order', { id });
+  async getOrder(id: string): Promise<MagentoOrder> {
+    const data = await this.request('order', { id });
+    return normalizeMagentoOrder(data);
   }
 
   async getProducts(skus: string[]): Promise<any[]> {

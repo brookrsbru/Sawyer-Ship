@@ -29,7 +29,7 @@ console.log(`Storage Path: ${STORAGE_DIR}`);
 console.log('-------------------------------------');
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Increase limit for full data sync
+app.use(express.json({ limit: '50mb' })); // Increased limit for full data sync and labels
 
 // --- Encryption Utility ---
 function getEncryptionKey(customPassword = null) {
@@ -405,12 +405,39 @@ app.post('/api/fedex/:action', async (req, res) => {
     const creds = await loadCredentials();
     if (!creds?.fedex) throw new Error('FedEx credentials not configured on server');
     
+    const isSandbox = creds.fedex.isSandbox;
+    let apiKey, secretKey, accountNumber;
+
+    if (action === "track") {
+      const isTrackingSandbox = creds.fedex.isTrackingSandbox;
+      apiKey = isTrackingSandbox 
+        ? (creds.fedex.sandboxTrackingApiKey || creds.fedex.sandboxApiKey)
+        : (creds.fedex.productionTrackingApiKey || creds.fedex.productionApiKey || creds.fedex.apiKey);
+      secretKey = isTrackingSandbox
+        ? (creds.fedex.sandboxTrackingSecretKey || creds.fedex.sandboxSecretKey)
+        : (creds.fedex.productionTrackingSecretKey || creds.fedex.productionSecretKey || creds.fedex.secretKey);
+      accountNumber = isTrackingSandbox
+        ? (creds.fedex.sandboxTrackingAccountNumber || creds.fedex.accountNumber)
+        : (creds.fedex.productionTrackingAccountNumber || creds.fedex.productionAccountNumber || creds.fedex.accountNumber);
+    } else {
+      apiKey = isSandbox 
+        ? creds.fedex.sandboxApiKey 
+        : (creds.fedex.productionApiKey || creds.fedex.apiKey);
+      secretKey = isSandbox 
+        ? creds.fedex.sandboxSecretKey 
+        : (creds.fedex.productionSecretKey || creds.fedex.secretKey);
+      accountNumber = isSandbox 
+        ? creds.fedex.accountNumber 
+        : (creds.fedex.productionAccountNumber || creds.fedex.accountNumber);
+    }
+
     const fedex = new FedExClient(
-      creds.fedex.isSandbox ? creds.fedex.sandboxApiKey : (creds.fedex.productionApiKey || creds.fedex.apiKey),
-      creds.fedex.isSandbox ? creds.fedex.sandboxSecretKey : (creds.fedex.productionSecretKey || creds.fedex.secretKey),
-      creds.fedex.isSandbox ? creds.fedex.accountNumber : (creds.fedex.productionAccountNumber || creds.fedex.accountNumber),
-      creds.fedex.isSandbox
+      apiKey,
+      secretKey,
+      accountNumber,
+      action === "track" ? creds.fedex.isTrackingSandbox : isSandbox
     );
+
     let result;
     const { params } = req.body;
 
@@ -420,7 +447,15 @@ app.post('/api/fedex/:action', async (req, res) => {
       const trackingNum = params.trackingNumber || params;
       result = await fedex.request('/track/v1/trackingnumbers', { method: 'POST', body: JSON.stringify({ trackingInfo: [{ trackingNumberInfo: { trackingNumber: trackingNum } }], includeDetailedScans: true }) });
     }
-    else if (action === 'cancel') result = await fedex.request('/ship/v1/shipments/cancel', { method: 'PUT', body: JSON.stringify({ accountNumber: { value: creds.fedex.accountNumber }, trackingNumber: params.trackingNumber }) });
+    else if (action === 'cancel') {
+      result = await fedex.request('/ship/v1/shipments/cancel', { 
+        method: 'PUT', 
+        body: JSON.stringify({ 
+          accountNumber: { value: accountNumber }, 
+          trackingNumber: params.trackingNumber 
+        }) 
+      });
+    }
     else if (action === 'validate-address') result = await fedex.request('/address/v1/addresses/resolve', { method: 'POST', body: JSON.stringify(params) });
     else throw new Error(`Unknown FedEx action: ${action}`);
 
@@ -430,5 +465,22 @@ app.post('/api/fedex/:action', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// --- Static File Serving ---
+// Serve frontend assets if they exist (for standalone deployment)
+const distPath = path.join(__dirname, 'dist');
+fs.access(distPath)
+  .then(() => {
+    console.log(`[Server] Serving frontend from: ${distPath}`);
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      // Don't intercept API routes
+      if (req.url.startsWith('/api/')) return res.status(404).json({ error: 'Endpoint not found' });
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  })
+  .catch(() => {
+    console.log('[Server] "dist" folder not found. Frontend serving disabled.');
+  });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Standalone Sawyer Server running on http://0.0.0.0:${PORT}`));

@@ -35,6 +35,42 @@ export interface MagentoOrder {
   product_details?: Record<string, any>;
 }
 
+export function normalizeMagentoOrder(order: any): MagentoOrder {
+  if (!order) return {} as MagentoOrder;
+
+  // Magento 2 orders often have shipping address in extension_attributes
+  const shippingAddress = order.extension_attributes?.shipping_assignments?.[0]?.shipping?.address 
+    || order.shipping_address 
+    || order.billing_address 
+    || {};
+
+  // Ensure street is an array (sometimes it comes as a string or is missing)
+  let street = shippingAddress.street || [];
+  if (typeof street === 'string') {
+    street = [street];
+  } else if (!Array.isArray(street)) {
+    street = [];
+  }
+
+  return {
+    ...order,
+    customer_firstname: shippingAddress.firstname || order.customer_firstname || '',
+    customer_lastname: shippingAddress.lastname || order.customer_lastname || '',
+    shipping_address: {
+      firstname: shippingAddress.firstname || order.customer_firstname || '',
+      lastname: shippingAddress.lastname || order.customer_lastname || '',
+      company: shippingAddress.company || '',
+      street: street,
+      city: shippingAddress.city || '',
+      region: shippingAddress.region || shippingAddress.region_id || '',
+      postcode: shippingAddress.postcode || '',
+      country_id: shippingAddress.country_id || '',
+      telephone: shippingAddress.telephone || '',
+    },
+    items: order.items || []
+  };
+}
+
 export class MagentoClient {
   constructor(private baseUrl: string, private token: string, private proxyUrl: string = '') {}
 
@@ -64,7 +100,7 @@ export class MagentoClient {
     const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
     const data = await this.fetch(`orders?${searchCriteria}`);
     const items = data.items || [];
-    const orders = items.map((item: any) => this.normalizeOrder(item));
+    const orders = items.map((item: any) => normalizeMagentoOrder(item));
 
     // Bulk fetch products for all orders to limit API requests
     const allSkus = Array.from(new Set(orders.flatMap(o => o.items.map(i => i.sku)))) as string[];
@@ -113,7 +149,7 @@ export class MagentoClient {
       }
     }
 
-    const order = this.normalizeOrder(orderData);
+    const order = normalizeMagentoOrder(orderData);
 
     // Bulk fetch products for this order to limit API requests
     const skus = order.items.map(i => i.sku) as string[];
@@ -165,7 +201,7 @@ export class MagentoClient {
     return {
       raw_order: rawOrder,
       raw_products: rawProducts,
-      normalized_order: this.normalizeOrder(rawOrder)
+      normalized_order: normalizeMagentoOrder(rawOrder)
     };
   }
 
@@ -177,37 +213,6 @@ export class MagentoClient {
       console.error(`[MagentoClient] Failed to fetch options for ${attributeCode}:`, e);
       return [];
     }
-  }
-
-  private normalizeOrder(order: any): MagentoOrder {
-    // Magento 2 orders often have shipping address in extension_attributes
-    const shippingAddress = order.extension_attributes?.shipping_assignments?.[0]?.shipping?.address 
-      || order.shipping_address 
-      || order.billing_address 
-      || {};
-
-    // Ensure street is an array (sometimes it comes as a string or is missing)
-    let street = shippingAddress.street || [];
-    if (typeof street === 'string') {
-      street = [street];
-    }
-
-    return {
-      ...order,
-      customer_firstname: shippingAddress.firstname || order.customer_firstname || '',
-      customer_lastname: shippingAddress.lastname || order.customer_lastname || '',
-      shipping_address: {
-        firstname: shippingAddress.firstname || order.customer_firstname || '',
-        lastname: shippingAddress.lastname || order.customer_lastname || '',
-        company: shippingAddress.company || '',
-        street: street,
-        city: shippingAddress.city || '',
-        region: shippingAddress.region || '',
-        postcode: shippingAddress.postcode || '',
-        country_id: shippingAddress.country_id || '',
-        telephone: shippingAddress.telephone || '',
-      }
-    };
   }
 
   async getProduct(sku: string): Promise<any> {

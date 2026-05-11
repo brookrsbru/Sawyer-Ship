@@ -129,4 +129,11 @@ export class ServerFedExClient {
       })
     });
   }
+
+  async validateAddress(params: any) {
+    return this.request('/address/v1/addresses/resolve', {
+      method: 'POST',
+      body: JSON.stringify(this.cleanObject(params)),
+    });
+  }
 }
