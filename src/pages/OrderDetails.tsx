@@ -1188,6 +1188,38 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               credentials.general.proxyUrl
             );
 
+            // "Smart Replace": if order is already complete, it means there is an existing shipment.
+            // We should remove existing shipments to allow a clean replace and avoid duplicate logs.
+            // Magento standard behavior when deleting a shipment is to reset the qty_shipped on items.
+            if (order.status === 'complete') {
+              console.log(`[OrderDetails] Order is already COMPLETE. Attempting to remove existing shipments for "Smart Replace"...`);
+              try {
+                const existingShipments = await client.getShipments(order.entity_id);
+                if (existingShipments && existingShipments.length > 0) {
+                  for (const shipment of existingShipments) {
+                    console.log(`[OrderDetails] Removing existing Magento shipment ${shipment.entity_id}`);
+                    try {
+                      await client.deleteShipment(shipment.entity_id);
+                    } catch (delError: any) {
+                      console.warn(`[OrderDetails] Failed to delete shipment entity ${shipment.entity_id}. This is common if the endpoint is not supported. Trying to delete tracks instead.`, delError);
+                      // Fallback: Delete tracks if shipment deletion fails
+                      if (shipment.tracks && shipment.tracks.length > 0) {
+                        for (const track of shipment.tracks) {
+                          try {
+                            await client.deleteTrack(track.entity_id);
+                          } catch (trackErr) {
+                            console.warn(`[OrderDetails] Failed to delete track ${track.entity_id}`, trackErr);
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (fetchErr) {
+                console.warn(`[OrderDetails] Failed to fetch or clean up existing shipments:`, fetchErr);
+              }
+            }
+
             const carrierTitle = 'Federal Express';
             const carrierCode = selectedRate.carrier.toLowerCase();
 

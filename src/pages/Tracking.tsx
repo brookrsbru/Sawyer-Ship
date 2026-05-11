@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban, FileText, MapPin, User, Package, CreditCard, Printer, Eye } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
-import { FedExClient } from '@/src/lib/api-clients';
+import { FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -92,6 +92,11 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   };
 
   const fetchStatus = async (shipment: SawyerShipment): Promise<{ status: string; hasError: boolean }> => {
+    // If it's already VOIDED, don't ever overwrite it or check FedEx again
+    if (shipment.status === 'VOIDED') {
+      return { status: 'VOIDED', hasError: false };
+    }
+    
     try {
       let newStatus = shipment.status || 'Unknown';
       
@@ -132,6 +137,9 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   };
 
   const updateShipmentStatus = async (shipment: SawyerShipment) => {
+    // Don't update if voided
+    if (shipment.status === 'VOIDED') return;
+    
     setRefreshingIds(prev => new Set(prev).add(shipment.id));
     
     try {
@@ -213,6 +221,56 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
         await client.cancelShipment(shipment.trackingNumber);
       }
 
+      // 1.5. Remove from Magento if enabled and NOT sandbox
+      const isSandbox = credentials.fedex.isSandbox;
+      if (credentials.general.markAsShipped && shipment.orderIncrementId !== 'MANUAL' && !isSandbox) {
+        try {
+          console.log(`[Tracking] Attempting to remove shipment from Magento logs for ${shipment.orderIncrementId}...`);
+          const magento = new MagentoClient(
+            credentials.magento.url,
+            credentials.magento.token,
+            credentials.general.proxyUrl
+          );
+
+          // Find the order first to get the entity_id
+          const orders = await magento.searchOrders(shipment.orderIncrementId);
+          const order = orders.find(o => o.increment_id === shipment.orderIncrementId);
+
+          if (order) {
+            const magentoShipments = await magento.getShipments(order.entity_id);
+            // Find the shipment that matches our tracking number
+            const matchingShipment = magentoShipments.find(ms => 
+              ms.tracks?.some((t: any) => t.track_number === shipment.trackingNumber)
+            );
+
+            if (matchingShipment) {
+              console.log(`[Tracking] Found matching Magento shipment ${matchingShipment.entity_id}. Deleting...`);
+              try {
+                await magento.deleteShipment(matchingShipment.entity_id);
+                toast.info("Shipment removed from Magento log.");
+              } catch (delError: any) {
+                console.warn(`[Tracking] Failed to delete shipment entity ${matchingShipment.entity_id}. Trying to delete tracks instead.`, delError);
+                if (matchingShipment.tracks) {
+                  for (const track of matchingShipment.tracks) {
+                    if (track.track_number === shipment.trackingNumber) {
+                      try {
+                        await magento.deleteTrack(track.entity_id);
+                        toast.info("Tracking number removed from Magento shipment.");
+                      } catch (trackErr) {
+                         console.warn(`[Tracking] Failed to delete track ${track.entity_id}`, trackErr);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (magentoErr) {
+          console.error("[Tracking] Failed to sync void with Magento:", magentoErr);
+          // We don't toast error here because the FedEx void was successful, Magento sync is secondary
+        }
+      }
+
       // If successful, update the status to Voided
       const updatedShipments = credentials.shipments.map(s => 
         s.id === shipment.id 
@@ -237,10 +295,15 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
 
   const refreshPageStatuses = async () => {
     if (isRefreshing) return;
-    setIsRefreshing(true);
     
-    const shipmentsToRefresh = [...paginatedShipments];
-    toast.info(`Refreshing ${shipmentsToRefresh.length} shipments sequentialy...`);
+    const shipmentsToRefresh = paginatedShipments.filter(s => s.status !== 'VOIDED');
+    if (shipmentsToRefresh.length === 0) {
+      toast.info("No active shipments to refresh on this page.");
+      return;
+    }
+
+    setIsRefreshing(true);
+    toast.info(`Refreshing ${shipmentsToRefresh.length} shipments sequentially...`);
     
     // Track which ones are currently refreshing for the UI
     setRefreshingIds(new Set(shipmentsToRefresh.map(s => s.id)));
@@ -293,10 +356,11 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   };
 
   // Initial refresh of current page on mount? Maybe not auto-refresh all to avoid rate limits
-  // but let's do it if they haven't been updated recently.
+  // but let's do it if they haven't been updated recently and are NOT voided.
   useEffect(() => {
     const now = new Date();
     const needsRefresh = paginatedShipments.filter(s => {
+      if (s.status === 'VOIDED') return false;
       if (!s.lastUpdated) return true;
       const last = new Date(s.lastUpdated);
       const diffMs = now.getTime() - last.getTime();

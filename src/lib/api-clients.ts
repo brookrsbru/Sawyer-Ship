@@ -292,6 +292,27 @@ export class MagentoClient {
     console.log(`[MagentoClient] Shipment created successfully:`, result);
     return result;
   }
+
+  async getShipments(orderId: number): Promise<any[]> {
+    console.log(`[MagentoClient] Fetching shipments for order ${orderId}`);
+    const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=order_id&searchCriteria[filter_groups][0][filters][0][value]=${orderId}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+    const data = await this.fetch(`shipments?${searchCriteria}`);
+    return data.items || [];
+  }
+
+  async deleteShipment(shipmentId: number): Promise<any> {
+    console.log(`[MagentoClient] Deleting shipment ${shipmentId}`);
+    return this.fetch(`shipment/${shipmentId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async deleteTrack(trackId: number): Promise<any> {
+    console.log(`[MagentoClient] Deleting track ${trackId}`);
+    return this.fetch(`shipment/track/${trackId}`, {
+      method: 'DELETE'
+    });
+  }
 }
 
 export class FedExClient {
