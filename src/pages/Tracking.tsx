@@ -35,18 +35,27 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const PAGE_SIZE = 20;
 
-  // Cleanup effect: Remove label data for shipments older than __ hours to save storage
-  useEffect(() => {
+  // Maintenance Settings
+  const DATA_RETENTION_DAYS = 30;
+  const ATTACHMENT_PURGE_HOURS = 48;
+
+  // Generic maintenance task to keep local storage clean
+  const performStorageMaintenance = () => {
     if (!credentials.shipments || credentials.shipments.length === 0) return;
 
-    const limitDate = new Date();
-    limitDate.setHours(limitDate.getHours() - 48); // __ hours retention
+    const attachmentLimit = new Date();
+    attachmentLimit.setHours(attachmentLimit.getHours() - ATTACHMENT_PURGE_HOURS);
+
+    const recordLimit = new Date();
+    recordLimit.setDate(recordLimit.getDate() - DATA_RETENTION_DAYS);
 
     let hasChanges = false;
-    const cleanedShipments = credentials.shipments.map(s => {
+    
+    // 1. Purge label data to save browser storage
+    const optimizedShipments = credentials.shipments.map(s => {
       if (s.labelBase64 && s.shipDate) {
         const shipDate = new Date(s.shipDate);
-        if (shipDate < limitDate) {
+        if (shipDate < attachmentLimit) {
           hasChanges = true;
           const { labelBase64, ...rest } = s;
           return { ...rest };
@@ -55,10 +64,22 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
       return s;
     });
 
+    // 2. Remove old records entirely
+    const validShipments = optimizedShipments.filter(s => {
+      const shipDate = new Date(s.shipDate);
+      const isExpired = shipDate < recordLimit;
+      if (isExpired) hasChanges = true;
+      return !isExpired;
+    });
+
     if (hasChanges) {
-      onSave({ ...credentials, shipments: cleanedShipments });
-      console.log('Cleaned up old labels to save storage space (72h limit).');
+      console.log(`[Tracking] Maintenance complete. Cleaned up expired tracking data.`);
+      onSave({ ...credentials, shipments: validShipments });
     }
+  };
+
+  useEffect(() => {
+    performStorageMaintenance();
   }, []);
 
   const handleOpenDetails = (shipment: SawyerShipment) => {
@@ -376,26 +397,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     }
   }, [currentPage]);
 
-  // Cleanup old shipments ( > 100 days)
-  useEffect(() => {
-    if (!credentials.shipments || credentials.shipments.length === 0) return;
-
-    const hundredDaysAgo = new Date();
-    hundredDaysAgo.setDate(hundredDaysAgo.getDate() - 100);
-
-    const validShipments = credentials.shipments.filter(s => {
-      const shipDate = new Date(s.shipDate);
-      return shipDate >= hundredDaysAgo;
-    });
-
-    if (validShipments.length !== credentials.shipments.length) {
-      console.log(`[Tracking] Cleaning up ${credentials.shipments.length - validShipments.length} old shipments (>100 days)`);
-      onSave({
-        ...credentials,
-        shipments: validShipments
-      });
-    }
-  }, []);
+      {/* Auto-maintenance tasks are handled in the main maintenance effect */}
 
   return (
     <div className="space-y-8">
@@ -700,7 +702,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
                    {!selectedShipment?.labelBase64 && selectedShipment?.shipDate && (
                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-[10px] font-medium text-zinc-500 italic">
                        <AlertCircle size={10} />
-                       Label purged (5d limit)
+                       Label purged ({ATTACHMENT_PURGE_HOURS}h limit)
                      </div>
                    )}
                 </div>
