@@ -621,12 +621,29 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     if (!order.shipping_address?.postcode) errors.push("Postcode");
     if (!order.shipping_address?.country_id) errors.push("Country");
     
-    const hasWeight = (weightKg && parseFloat(weightKg) > 0) || (weightG && parseFloat(weightG) > 0);
-    if (!hasWeight) errors.push("Weight (KG or Grams)");
+    // Check if we have parcels defined in "Package Options"
+    const hasParcels = parcels.length > 0;
     
-    if (!length || parseFloat(length) <= 0) errors.push("Length");
-    if (!width || parseFloat(width) <= 0) errors.push("Width");
-    if (!height || parseFloat(height) <= 0) errors.push("Height");
+    if (hasParcels) {
+      // Validate each parcel
+      const invalidParcels = parcels.filter(p => 
+        !(parseFloat(p.weight) > 0) || 
+        !(parseFloat(p.length) > 0) || 
+        !(parseFloat(p.width) > 0) || 
+        !(parseFloat(p.height) > 0)
+      );
+      if (invalidParcels.length > 0) {
+        errors.push("All packages in Package Options must have Weight and Dimensions");
+      }
+    } else {
+      // Standard single package validation
+      const hasWeight = (weightKg && parseFloat(weightKg) > 0) || (weightG && parseFloat(weightG) > 0);
+      if (!hasWeight) errors.push("Weight (KG or Grams)");
+      
+      if (!length || parseFloat(length) <= 0) errors.push("Length");
+      if (!width || parseFloat(width) <= 0) errors.push("Width");
+      if (!height || parseFloat(height) <= 0) errors.push("Height");
+    }
 
     if (errors.length > 0) {
       toast.error("Missing required fields", {
