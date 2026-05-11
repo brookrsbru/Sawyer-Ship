@@ -41,20 +41,6 @@ export interface SawyerCredentials {
     url: string;
     token: string;
   };
-  ups: {
-    enabled: boolean;
-    clientId: string; // Legacy
-    clientSecret: string; // Legacy
-    sandboxClientId: string;
-    sandboxClientSecret: string;
-    productionClientId: string;
-    productionClientSecret: string;
-    accountNumber: string; // Legacy, kept for migration
-    domesticAccountNumber: string;
-    globalAccountNumber: string;
-    productionAccountNumber: string;
-    isSandbox: boolean;
-  };
   fedex: {
     enabled: boolean;
     apiKey: string; // Legacy
@@ -97,7 +83,6 @@ export interface SawyerCredentials {
     markAsShipped: boolean;
     autoOpenLabel: boolean;
     autoPrintLabel: boolean;
-    upsPickupType: string;
     fedexPickupType: string;
     weightDisplayMode: 'both' | 'grams' | 'kg';
     labelSize: '4x6' | '8.5x11';
@@ -112,7 +97,7 @@ export interface SawyerShipment {
   id: string;
   orderIncrementId: string;
   trackingNumber: string;
-  carrier: 'UPS' | 'FedEx';
+  carrier: 'FedEx';
   service: string;
   customerName: string;
   company: string;
@@ -172,20 +157,6 @@ const DEFAULT_SHIPPING_DEFAULTS: ShippingDefaults = {
 
 const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
-  ups: { 
-    enabled: true, 
-    clientId: '', 
-    clientSecret: '', 
-    sandboxClientId: '',
-    sandboxClientSecret: '',
-    productionClientId: '',
-    productionClientSecret: '',
-    accountNumber: '', 
-    domesticAccountNumber: '', 
-    globalAccountNumber: '', 
-    productionAccountNumber: '',
-    isSandbox: true 
-  },
   fedex: { 
     enabled: true, 
     apiKey: '', 
@@ -227,7 +198,6 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     markAsShipped: true,
     autoOpenLabel: false,
     autoPrintLabel: false,
-    upsPickupType: '01',
     fedexPickupType: 'DROPOFF_AT_FEDEX_LOCATION',
     weightDisplayMode: 'both',
     labelSize: '4x6'
@@ -309,7 +279,6 @@ export function useSawyerStorage() {
         ...DEFAULT_CREDENTIALS,
         ...parsed,
         magento: { ...DEFAULT_CREDENTIALS.magento, ...(parsed.magento || {}) },
-        ups: { ...DEFAULT_CREDENTIALS.ups, ...(parsed.ups || {}) },
         fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
         general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) },
         shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) },

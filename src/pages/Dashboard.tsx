@@ -205,7 +205,7 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-zinc-900">Live Carrier Rates</h4>
-                  <p className="text-xs text-zinc-500">Get real-time shipping quotes and generate labels for FedEx and UPS in seconds.</p>
+                  <p className="text-xs text-zinc-500">Get real-time shipping quotes and generate labels for FedEx in seconds.</p>
                 </div>
               </div>
 

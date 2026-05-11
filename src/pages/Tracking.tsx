@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban, FileText, MapPin, User, Package, CreditCard, Printer, Eye } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
-import { UPSClient, FedExClient } from '@/src/lib/api-clients';
+import { FedExClient } from '@/src/lib/api-clients';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -88,9 +88,6 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   );
 
   const getTrackingUrl = (carrier: string, trackingNumber: string) => {
-    if (carrier === 'UPS') {
-      return `https://www.ups.com/track?loc=en_US&tracknum=${trackingNumber}&requester=ST/`;
-    }
     return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`;
   };
 
@@ -98,27 +95,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     try {
       let newStatus = shipment.status || 'Unknown';
       
-      if (shipment.carrier === 'UPS') {
-        const isDomestic = shipment.destCountry === credentials.general.originCountry;
-        const accountNumber = credentials.ups.isSandbox
-          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
-          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
-
-        const clientId = credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId;
-        const clientSecret = credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret;
-
-        if (!clientId || !clientSecret) throw new Error('Missing UPS credentials');
-
-        const client = new UPSClient(
-          clientId,
-          clientSecret,
-          accountNumber,
-          credentials.ups.isSandbox,
-          credentials.general.proxyUrl
-        );
-        const data = await client.trackShipment(shipment.trackingNumber);
-        newStatus = data?.trackResponse?.shipment?.[0]?.package?.[0]?.activity?.[0]?.status?.description || 'Active';
-      } else if (shipment.carrier === 'FedEx') {
+      if (shipment.carrier === 'FedEx') {
         const isTrackingSandbox = credentials.fedex.isTrackingSandbox;
         const accountNumber = isTrackingSandbox
           ? (credentials.fedex.sandboxTrackingAccountNumber || credentials.fedex.accountNumber)
@@ -206,26 +183,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     
     setIsProcessing(true);
     try {
-      if (shipment.carrier === 'UPS') {
-        const isDomestic = shipment.destCountry === credentials.general.originCountry;
-        const accountNumber = credentials.ups.isSandbox
-          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
-          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
-
-        const clientId = credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId;
-        const clientSecret = credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret;
-
-        if (!clientId || !clientSecret) throw new Error('Missing UPS credentials');
-
-        const client = new UPSClient(
-          clientId,
-          clientSecret,
-          accountNumber,
-          credentials.ups.isSandbox,
-          credentials.general.proxyUrl
-        );
-        await client.cancelShipment(shipment.trackingNumber);
-      } else if (shipment.carrier === 'FedEx') {
+      if (shipment.carrier === 'FedEx') {
         // Use SHIPPING credentials, not tracking ones
         const isSandbox = credentials.fedex.isSandbox;
         // Correctly determine which account number to use for voiding
@@ -456,9 +414,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
-                            <Badge variant="outline" className={`text-[9px] font-black uppercase tracking-tighter h-4 px-1 ${
-                              shipment.carrier === 'UPS' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                            }`}>
+                            <Badge variant="outline" className={`text-[9px] font-black uppercase tracking-tighter h-4 px-1 bg-indigo-50 text-indigo-700 border-indigo-200`}>
                               {shipment.carrier}
                             </Badge>
                             <span className="text-xs font-mono text-zinc-400 group-hover:text-zinc-900 transition-colors">
@@ -637,8 +593,8 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
               {/* Top Banner - Carrier & Tracking */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50 border border-zinc-100 items-center">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${selectedShipment?.carrier === 'UPS' ? 'bg-amber-100' : 'bg-indigo-100'}`}>
-                    <Truck className={selectedShipment?.carrier === 'UPS' ? 'text-amber-700' : 'text-indigo-700'} />
+                  <div className={`p-2 rounded-lg bg-indigo-100`}>
+                    <Truck className={'text-indigo-700'} />
                   </div>
                   <div>
                     <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Carrier & Tracking</p>

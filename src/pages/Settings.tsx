@@ -24,22 +24,13 @@ import {
 import { toast } from 'sonner';
 import { APP_VERSION } from '@/src/constants';
 
-const UPS_PICKUP_LABELS: Record<string, string> = {
-  "01": "Daily Pickup",
-  "03": "Customer Counter",
-  "06": "One Time Pickup",
-  "07": "On Call Air",
-  "19": "Letter Center",
-  "20": "Air Service Center"
-};
-
 const FEDEX_PICKUP_LABELS: Record<string, string> = {
   "CONTACT_FEDEX_TO_SCHEDULE": "Contact FedEx to Schedule",
   "DROPOFF_AT_FEDEX_LOCATION": "Dropoff at FedEx Location",
   "USE_SCHEDULED_PICKUP": "Use Scheduled Pickup"
 };
 
-import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
+import { MagentoOrder, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 
 export default function Settings({ 
   credentials, 
@@ -201,7 +192,6 @@ export default function Settings({
                     { id: 'general', label: 'General Preferences', icon: SettingsIcon },
                     { id: 'shipping', label: 'Shipping Defaults', icon: Truck },
                     { id: 'magento', label: 'Magento Integration', icon: Globe },
-                    { id: 'ups', label: 'UPS Integration', icon: Truck },
                     { id: 'fedex', label: 'FedEx Integration', icon: Truck },
                     { id: 'security', label: 'Security & Backup', icon: Shield },
                     { id: 'dev', label: 'Dev Menu', icon: FileJson },
@@ -987,169 +977,6 @@ export default function Settings({
               </Card>
             </section>
 
-            {/* UPS Section */}
-            <section id="ups" className="scroll-mt-6 space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="h-px flex-1 bg-zinc-200" />
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">UPS Integration</h2>
-                <div className="h-px flex-1 bg-zinc-200" />
-              </div>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Truck size={20} /> UPS API (OAuth 2.0)
-                    </CardTitle>
-                    <CardDescription>Modern UPS REST API credentials.</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="ups-enabled" className="text-xs">Enabled</Label>
-                    <Select 
-                      value={formData.ups.enabled ? "yes" : "no"}
-                      onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, enabled: v === "yes" } })}
-                    >
-                      <SelectTrigger id="ups-enabled" className="w-[80px] h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yes">Yes</SelectItem>
-                        <SelectItem value="no">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-8">
-                  {/* Account Credentials */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
-                      <Lock size={16} className="text-zinc-400" />
-                      Account Credentials
-                    </h3>
-                    <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Sandbox Credentials</h4>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-sandbox-client-id">Client ID</Label>
-                            <Input 
-                              id="ups-sandbox-client-id" 
-                              value={formData.ups.sandboxClientId}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientId: e.target.value } })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-sandbox-client-secret">Client Secret</Label>
-                            <Input 
-                              id="ups-sandbox-client-secret" 
-                              autoComplete="off"
-                              value={formData.ups.sandboxClientSecret}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientSecret: e.target.value } })}
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Production Credentials</h4>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-production-client-id">Client ID</Label>
-                            <Input 
-                              id="ups-production-client-id" 
-                              value={formData.ups.productionClientId}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientId: e.target.value } })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-production-client-secret">Client Secret</Label>
-                            <Input 
-                              id="ups-production-client-secret" 
-                              autoComplete="off"
-                              value={formData.ups.productionClientSecret}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientSecret: e.target.value } })}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      {formData.ups.isSandbox ? (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-domestic-account">Sandbox Domestic Account Number</Label>
-                            <Input 
-                              id="ups-domestic-account" 
-                              value={formData.ups.domesticAccountNumber}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, domesticAccountNumber: e.target.value } })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ups-global-account">Sandbox Global Account Number</Label>
-                            <Input 
-                              id="ups-global-account" 
-                              value={formData.ups.globalAccountNumber}
-                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, globalAccountNumber: e.target.value } })}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-prod-account">Production Account Number</Label>
-                          <Input 
-                            id="ups-prod-account" 
-                            value={formData.ups.productionAccountNumber}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionAccountNumber: e.target.value } })}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Service Preferences */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
-                      <SettingsIcon size={16} className="text-zinc-400" />
-                      Service Preferences
-                    </h3>
-                    <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-pickup">Pickup Type</Label>
-                          <Select 
-                            value={formData.general.upsPickupType}
-                            onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, upsPickupType: v } })}
-                          >
-                            <SelectTrigger id="ups-pickup">
-                              <SelectValue placeholder="Select pickup type">
-                                {UPS_PICKUP_LABELS[formData.general.upsPickupType] || formData.general.upsPickupType}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(UPS_PICKUP_LABELS).map(([val, label]) => (
-                                <SelectItem key={val} value={val}>{label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-env">Environment</Label>
-                          <Select 
-                            value={formData.ups.isSandbox ? "sandbox" : "production"}
-                            onValueChange={(v) => setFormData({ ...formData, ups: { ...formData.ups, isSandbox: v === "sandbox" } })}
-                          >
-                            <SelectTrigger id="ups-env">
-                              <SelectValue placeholder="Select environment" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="sandbox">Sandbox (Testing)</SelectItem>
-                              <SelectItem value="production">Production (Live)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-
             {/* FedEx Section */}
             <section id="fedex" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
@@ -1596,9 +1423,6 @@ export default function Settings({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm space-y-4 opacity-90">
-                  <p>
-                    <strong>UPS Credentials:</strong> Get them at the <a href="https://developer.ups.com/" target="_blank" className="underline">UPS Developer Portal</a>. Create an "App" to get your Client ID and Secret.
-                  </p>
                   <p>
                     <strong>FedEx Credentials:</strong> Get them at the <a href="https://developer.fedex.com/" target="_blank" className="underline">FedEx Developer Portal</a>.
                   </p>

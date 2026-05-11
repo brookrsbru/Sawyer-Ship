@@ -1,5 +1,5 @@
 /**
- * API Clients for Magento, UPS, and FedEx.
+ * API Clients for Magento and FedEx.
  * Note: These calls are made directly from the browser.
  * CORS issues are expected unless a proxy is used or the APIs support it.
  */
@@ -291,121 +291,6 @@ export class MagentoClient {
     });
     console.log(`[MagentoClient] Shipment created successfully:`, result);
     return result;
-  }
-}
-
-export class UPSClient {
-  constructor(private clientId: string, private clientSecret: string, private accountNumber: string, private isSandbox: boolean = true, private proxyUrl: string = '') {}
-
-  private get baseUrl() {
-    return this.isSandbox ? 'https://wwwcie.ups.com' : 'https://onlinetools.ups.com';
-  }
-
-  private getProxyUrl() {
-    return this.proxyUrl ? (this.proxyUrl.endsWith('/') ? this.proxyUrl : `${this.proxyUrl}/`) : '';
-  }
-
-  async getAccessToken(): Promise<string> {
-    const url = `${this.getProxyUrl()}${this.baseUrl}/security/v1/oauth/token`;
-    const auth = btoa(`${this.clientId}:${this.clientSecret}`);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'x-merchant-id': this.clientId
-      },
-      body: new URLSearchParams({ grant_type: 'client_credentials' }),
-    });
-    const data = await response.json();
-    return data.access_token;
-  }
-
-  async getRates(params: any): Promise<any> {
-    console.log(`[UPSClient] Fetching rates`, params);
-    const token = await this.getAccessToken();
-    console.log(`[UPSClient] OAuth token obtained`);
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/rating/v1/shop`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
-    const data = await response.json();
-    console.log(`[UPSClient] Rates response:`, data);
-    return data;
-  }
-
-  async createShipment(params: any): Promise<any> {
-    console.log(`[UPSClient] Creating shipment`, params);
-    const token = await this.getAccessToken();
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/ship`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'x-merchant-id': this.clientId
-      },
-      body: JSON.stringify(params),
-    });
-    const data = await response.json();
-    console.log(`[UPSClient] Shipment response:`, data);
-    return data;
-  }
-
-  async trackShipment(trackingNumber: string): Promise<any> {
-    console.log(`[UPSClient] Tracking shipment: ${trackingNumber}`);
-    const token = await this.getAccessToken();
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/track/v1/details/${trackingNumber}?locale=en_US&returnSignature=false&returnMilestones=false`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'transId': `sawyer-${Date.now()}`,
-        'transactionSrc': 'sawyer-ship'
-      }
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData?.response?.errors?.[0]?.message || `UPS Error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log(`[UPSClient] Tracking response:`, data);
-
-    if (data?.trackResponse?.shipment?.[0]?.warnings) {
-      console.warn(`[UPSClient] Tracking warnings:`, data.trackResponse.shipment[0].warnings);
-    }
-
-    return data;
-  }
-
-  async cancelShipment(trackingNumber: string): Promise<any> {
-    console.log(`[UPSClient] Voiding shipment: ${trackingNumber}`);
-    const token = await this.getAccessToken();
-    // UPS Void (Cancel) endpoint: PUT /shipments/v1/void/cancel/{trackingnumber}
-    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/void/cancel/${trackingNumber}`;
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'x-merchant-id': this.clientId
-      }
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.response?.errors?.[0]?.message || `UPS Void Error: ${response.status}`);
-    }
-    console.log(`[UPSClient] Void response:`, data);
-    return data;
   }
 }
 
