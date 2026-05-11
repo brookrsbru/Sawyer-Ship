@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Database } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +39,7 @@ const FEDEX_PICKUP_LABELS: Record<string, string> = {
   "USE_SCHEDULED_PICKUP": "Use Scheduled Pickup"
 };
 
-import { ServerSideUPSClient, ServerDataClient, ServerSideMagentoClient } from '@/src/lib/server-api-client';
+import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 
 export default function Settings({ 
   credentials, 
@@ -103,8 +103,12 @@ export default function Settings({
     setIsDevLoading(true);
     setDevOrderData(null);
     try {
-      const client = new ServerSideMagentoClient(credentials.general.serverUrl);
-      const data = await client.getOrder(devOrderId);
+      const client = new MagentoClient(
+        credentials.magento.url,
+        credentials.magento.token,
+        credentials.general.proxyUrl
+      );
+      const data = await client.getDevOrderData(devOrderId);
       setDevOrderData(data);
       toast.success("Order data fetched successfully.");
     } catch (e: any) {
@@ -197,7 +201,6 @@ export default function Settings({
                     { id: 'general', label: 'General Preferences', icon: SettingsIcon },
                     { id: 'shipping', label: 'Shipping Defaults', icon: Truck },
                     { id: 'magento', label: 'Magento Integration', icon: Globe },
-                    { id: 'server', label: 'Server-Side Integration', icon: HardDrive },
                     { id: 'ups', label: 'UPS Integration', icon: Truck },
                     { id: 'fedex', label: 'FedEx Integration', icon: Truck },
                     { id: 'security', label: 'Security & Backup', icon: Shield },
@@ -248,6 +251,37 @@ export default function Settings({
                     Connectivity & Automation
                   </h3>
                   <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
+                    <div className="space-y-2">
+                      <Label htmlFor="proxy">CORS Proxy URL</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="proxy" 
+                          placeholder="https://cors-anywhere.herokuapp.com/" 
+                          value={formData.general.proxyUrl}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } })}
+                          className="flex-1"
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          type="button"
+                          title="Request Access to Proxy"
+                          onClick={() => window.open(formData.general.proxyUrl, '_blank')}
+                        >
+                          <ExternalLink size={18} />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-zinc-500">Required for browser-based API calls. Click the button to request temporary access if using Heroku CORS Anywhere.</p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="h-auto p-0 text-xs text-zinc-500 hover:text-zinc-900"
+                        onClick={() => setFormData({ ...formData, general: { ...formData.general, proxyUrl: 'https://cors-anywhere.herokuapp.com/' } })}
+                      >
+                        Reset to demo server (Heroku)
+                      </Button>
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label>Mark as Shipped in Magento</Label>
@@ -953,124 +987,6 @@ export default function Settings({
               </Card>
             </section>
 
-          {/* Server-Side Integration Section */}
-          <section id="server" className="scroll-mt-6 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="h-px flex-1 bg-zinc-200" />
-              <div className="flex items-center gap-2">
-                <HardDrive size={18} className="text-zinc-400" />
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Server-Side Integration</h2>
-              </div>
-              <div className="h-px flex-1 bg-zinc-200" />
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Node.js Server Management</CardTitle>
-                <CardDescription>
-                  Configure server-side storage and direct API handling to bypass client-side proxy limitations.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-4 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Info size={18} className="text-blue-500 mt-0.5" />
-                    <div className="text-xs text-zinc-600 space-y-2">
-                      <p>
-                        <strong>Why use server-side?</strong> Running requests from your own server bypasses CORS restrictions and proxy timeouts. 
-                        It also allows for encrypted storage of credentials on your filesystem rather than the browser's LocalStorage.
-                      </p>
-                      <p>
-                        <strong>How to run locally:</strong> 
-                        <ol className="list-decimal pl-4 mt-1 space-y-1">
-                          <li>Create a new folder on your machine.</li>
-                          <li>Save <code>server.js</code> and the provided <code>package.json</code> into that folder.</li>
-                          <li>Open a terminal in that folder and run <code>npm install</code>.</li>
-                          <li>Run <code>node server.js</code> or use <code>pm2 start server.js</code>.</li>
-                        </ol>
-                      </p>
-                      <p>
-                        <strong>Note:</strong> Supports address validation, rating, tracking, shipping, and voiding for both UPS and FedEx. 
-                        Requires Node.js 18 or higher.
-                      </p>
-                      <p>
-                        When enabled, the application will communicate with your backend at <code>/api/ups/*</code> instead of making direct browser fetch calls.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
-                  <div className="space-y-1 flex-1">
-                    <Label className="text-base">Server Base URL</Label>
-                    <p className="text-xs text-zinc-500">The root URL where your Sawyer-Ship standalone Node.js server is running (e.g. http://localhost:3000).</p>
-                    <div className="flex gap-2 mt-2">
-                      <Input 
-                        value={formData.general.serverUrl}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          general: { ...formData.general, serverUrl: e.target.value }
-                        })}
-                        placeholder="http://localhost:3000"
-                        className="max-w-md h-8 text-sm"
-                      />
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="h-8"
-                        onClick={async () => {
-                          try {
-                            const url = formData.general.serverUrl.endsWith('/') ? formData.general.serverUrl.slice(0, -1) : formData.general.serverUrl;
-                            const res = await fetch(`${url}/api/health`);
-                            const data = await res.json();
-                            toast.success(`Server Connected: v${data.version}`);
-                          } catch (e) {
-                            toast.error("Server connection failed. Check URL and ensure backend is running.");
-                          }
-                        }}
-                      >
-                        Ping
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Lock size={14} className="text-zinc-400" />
-                    Vault Sync Status
-                  </h3>
-                  <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-lg space-y-4">
-                    <p className="text-xs text-zinc-600">
-                      Standalone server (<strong>{formData.general.serverUrl}</strong>) is your current vault provider. 
-                      Changes are encrypted and saved automatically.
-                    </p>
-                    <Button 
-                      className="w-full bg-zinc-900 hover:bg-zinc-800 text-white h-9 font-bold"
-                      size="sm"
-                      onClick={async () => {
-                        const loading = toast.loading("Syncing carrier keys to server...");
-                        try {
-                          await ServerDataClient.saveCredentials({
-                            ups: formData.ups,
-                            fedex: formData.fedex
-                          }, formData.general.serverUrl);
-                          toast.dismiss(loading);
-                          toast.success("Carrier keys shared with server storage.");
-                        } catch (e: any) {
-                          toast.dismiss(loading);
-                          toast.error(`Sync failed: ${e.message}`);
-                        }
-                      }}
-                    >
-                      Process Force Sync
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
             {/* UPS Section */}
             <section id="ups" className="scroll-mt-6 space-y-6">
               <div className="flex items-center gap-4">
@@ -1111,32 +1027,76 @@ export default function Settings({
                     </h3>
                     <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-api-key">API Key</Label>
-                          <Input 
-                            id="ups-api-key" 
-                            value={formData.ups.apiKey}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, apiKey: e.target.value } })}
-                          />
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Sandbox Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-sandbox-client-id">Client ID</Label>
+                            <Input 
+                              id="ups-sandbox-client-id" 
+                              value={formData.ups.sandboxClientId}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientId: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-sandbox-client-secret">Client Secret</Label>
+                            <Input 
+                              id="ups-sandbox-client-secret" 
+                              autoComplete="off"
+                              value={formData.ups.sandboxClientSecret}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, sandboxClientSecret: e.target.value } })}
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ups-secret-key">Secret Key</Label>
-                          <Input 
-                            id="ups-secret-key" 
-                            autoComplete="off"
-                            value={formData.ups.secretKey}
-                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, secretKey: e.target.value } })}
-                          />
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Production Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-production-client-id">Client ID</Label>
+                            <Input 
+                              id="ups-production-client-id" 
+                              value={formData.ups.productionClientId}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientId: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-production-client-secret">Client Secret</Label>
+                            <Input 
+                              id="ups-production-client-secret" 
+                              autoComplete="off"
+                              value={formData.ups.productionClientSecret}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionClientSecret: e.target.value } })}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ups-account">Account Number</Label>
-                        <Input 
-                          id="ups-account" 
-                          value={formData.ups.accountNumber}
-                          onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, accountNumber: e.target.value } })}
-                        />
-                      </div>
+                      {formData.ups.isSandbox ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-domestic-account">Sandbox Domestic Account Number</Label>
+                            <Input 
+                              id="ups-domestic-account" 
+                              value={formData.ups.domesticAccountNumber}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, domesticAccountNumber: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="ups-global-account">Sandbox Global Account Number</Label>
+                            <Input 
+                              id="ups-global-account" 
+                              value={formData.ups.globalAccountNumber}
+                              onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, globalAccountNumber: e.target.value } })}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label htmlFor="ups-prod-account">Production Account Number</Label>
+                          <Input 
+                            id="ups-prod-account" 
+                            value={formData.ups.productionAccountNumber}
+                            onChange={(e) => setFormData({ ...formData, ups: { ...formData.ups, productionAccountNumber: e.target.value } })}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 

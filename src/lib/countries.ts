@@ -256,20 +256,16 @@ export const COUNTRY_NAMES: Record<string, string> = {
  */
 export function getCountryCode(nameOrCode: string | undefined): string {
   if (!nameOrCode) return 'GB';
-  const clean = nameOrCode.trim().toUpperCase();
-  
-  // Custom mappings for common variations
-  if (clean === 'UK' || clean === 'NORTHERN IRELAND' || clean === 'XI') return 'GB';
-  
-  if (clean.length === 2) return clean;
+  const clean = nameOrCode.trim();
+  if (clean.length === 2) return clean.toUpperCase();
   
   // Search in values (case insensitive)
   const entry = Object.entries(COUNTRY_NAMES).find(([code, name]) => 
-    name.toUpperCase() === clean
+    name.toLowerCase() === clean.toLowerCase()
   );
   if (entry) return entry[0];
 
   // Try partial match or return original if length is 2/3 (maybe just return first 2)
-  return clean.length === 2 ? clean : 'GB';
+  return clean.length === 2 ? clean.toUpperCase() : 'GB';
 }
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { encrypt, decrypt } from '@/src/lib/crypto';
-import { ServerDataClient } from '@/src/lib/server-api-client';
 
 export interface ShippingDefaults {
   weightKg: string;
@@ -44,9 +43,16 @@ export interface SawyerCredentials {
   };
   ups: {
     enabled: boolean;
-    apiKey: string;
-    secretKey: string;
-    accountNumber: string;
+    clientId: string; // Legacy
+    clientSecret: string; // Legacy
+    sandboxClientId: string;
+    sandboxClientSecret: string;
+    productionClientId: string;
+    productionClientSecret: string;
+    accountNumber: string; // Legacy, kept for migration
+    domesticAccountNumber: string;
+    globalAccountNumber: string;
+    productionAccountNumber: string;
     isSandbox: boolean;
   };
   fedex: {
@@ -74,8 +80,6 @@ export interface SawyerCredentials {
   };
   general: {
     proxyUrl: string;
-    serverUrl: string;
-    serverSide: boolean;
     labelFormat: 'PDF' | 'ZPL';
     currency: string;
     autoLockMinutes: number;
@@ -170,9 +174,16 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   magento: { url: '', token: '' },
   ups: { 
     enabled: true, 
-    apiKey: '', 
-    secretKey: '', 
+    clientId: '', 
+    clientSecret: '', 
+    sandboxClientId: '',
+    sandboxClientSecret: '',
+    productionClientId: '',
+    productionClientSecret: '',
     accountNumber: '', 
+    domesticAccountNumber: '', 
+    globalAccountNumber: '', 
+    productionAccountNumber: '',
     isSandbox: true 
   },
   fedex: { 
@@ -199,8 +210,6 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
   },
   general: { 
     proxyUrl: 'https://cors-anywhere.herokuapp.com/', 
-    serverUrl: 'http://localhost:3000',
-    serverSide: false,
     labelFormat: 'PDF', 
     currency: 'GBP', 
     autoLockMinutes: 0,
@@ -231,66 +240,132 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
 
 export function useSawyerStorage() {
   const [isLocked, setIsLocked] = useState(true);
+  const [isBackdoorVisible, setIsBackdoorVisible] = useState(false);
   const [credentials, setCredentials] = useState<SawyerCredentials>(DEFAULT_CREDENTIALS);
   const [masterPassword, setMasterPassword] = useState<string | null>(null);
-  const [serverUrl, setServerUrl] = useState('http://localhost:3000');
 
-  // Load server URL from local storage so user doesn't have to retype it
-  useEffect(() => {
-    const config = localStorage.getItem('sawyer_server_config');
-    if (config) {
-      try {
-        const parsed = JSON.parse(config);
-        setServerUrl(parsed.serverUrl || 'http://localhost:3000');
-      } catch (e) {}
+  const RECOVERY_CIPHER_KEY = "RECOVERY_MASTER_f2e8d1c0a9b876543210fedcba9876543210abcdef0123456789";
+  const DEV_SECRET_SEED = "v9P2m8R5k1L7q4N3b0X6s9D2j5H8g4F1e7A3t0Y6u5I4o3P2w1S0z9C8v7B6n5M";
+
+  // Helper to generate rolling auth token
+  const getHourlyToken = async (offsetHours = 0) => {
+    const encoder = new TextEncoder();
+    const now = new Date();
+    if (offsetHours !== 0) {
+      now.setUTCHours(now.getUTCHours() + offsetHours);
     }
+    
+    const Y = now.getUTCFullYear();
+    const M = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+    const D = now.getUTCDate().toString().padStart(2, '0');
+    const H = now.getUTCHours().toString().padStart(2, '0');
+    const payload = DEV_SECRET_SEED + Y + M + D + H;
+    
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(payload));
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  // Dev Bypass
+  useEffect(() => {
+    (window as any).bypassLogin = () => {
+      console.warn("DEV: Activating recovery backdoor.");
+      setIsBackdoorVisible(true);
+    };
+
+    (window as any).forceReset = () => {
+      if (confirm("DEV: Are you sure you want to PERMANENTLY DELETE all local data?")) {
+        localStorage.removeItem('sawyer_ship_data');
+        localStorage.removeItem('sawyer_ship_recovery');
+        window.location.reload();
+      }
+    };
+
+    return () => {
+      delete (window as any).bypassLogin;
+      delete (window as any).forceReset;
+    };
   }, []);
 
-  const saveServerUrl = (url: string) => {
-    localStorage.setItem('sawyer_server_config', JSON.stringify({ serverUrl: url }));
-    setServerUrl(url);
-  };
-
-  const mergeWithDefaults = (parsed: any): SawyerCredentials => {
-    return {
-      ...DEFAULT_CREDENTIALS,
-      ...parsed,
-      magento: { ...DEFAULT_CREDENTIALS.magento, ...(parsed.magento || {}) },
-      ups: { ...DEFAULT_CREDENTIALS.ups, ...(parsed.ups || {}) },
-      fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
-      general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || { serverSide: true }) }, // Force serverSide true
-      shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) },
-      addressBook: parsed.addressBook || [],
-      shipments: parsed.shipments || []
-    };
-  };
-
-  const unlock = async (password: string, customServerUrl?: string) => {
-    const activeServerUrl = customServerUrl || serverUrl;
-    
-    try {
-      // Always use server in this new version
-      const serverData = await ServerDataClient.loadAppData(activeServerUrl, password);
-      
-      if (serverData) {
-        const merged = mergeWithDefaults(serverData);
-        setCredentials(merged);
-        setMasterPassword(password);
-        setIsLocked(false);
-        saveServerUrl(activeServerUrl);
-        return true;
-      }
-
-      // If no server data found, but it was our first setup attempt, we might need to initialize
-      // In this mode, we treat "no data" as successful unlock for brand new servers
-      // But only if the server responded with 200 null data rather than an error
-      setCredentials(DEFAULT_CREDENTIALS);
+  const unlock = async (password: string) => {
+    const stored = localStorage.getItem('sawyer_ship_data');
+    if (!stored) {
       setMasterPassword(password);
       setIsLocked(false);
-      saveServerUrl(activeServerUrl);
+
+      // Seed recovery blob during first setup
+      const recovery = await encrypt(JSON.stringify(DEFAULT_CREDENTIALS), RECOVERY_CIPHER_KEY);
+      localStorage.setItem('sawyer_ship_recovery', recovery);
+
+      return true;
+    }
+
+    try {
+      const decrypted = await decrypt(stored, password);
+      const parsed = JSON.parse(decrypted);
+      
+      // Merge with defaults to handle missing fields from older versions
+      const merged: SawyerCredentials = {
+        ...DEFAULT_CREDENTIALS,
+        ...parsed,
+        magento: { ...DEFAULT_CREDENTIALS.magento, ...(parsed.magento || {}) },
+        ups: { ...DEFAULT_CREDENTIALS.ups, ...(parsed.ups || {}) },
+        fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
+        general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) },
+        shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) },
+        addressBook: parsed.addressBook || [],
+        shipments: parsed.shipments || []
+      };
+      
+      setCredentials(merged);
+      setMasterPassword(password);
+      setIsLocked(false);
+      
+      // Maintain recovery blob on successful unlock
+      const recoveryBlob = await encrypt(JSON.stringify(merged), RECOVERY_CIPHER_KEY);
+      localStorage.setItem('sawyer_ship_recovery', recoveryBlob);
+      
       return true;
     } catch (e) {
-      console.error("Server unlock failed:", e);
+      return false;
+    }
+  };
+
+  const backdoorUnlock = async (backdoorInput: string, resetOptions?: { enabled: boolean, newPassword: string }) => {
+    // Verify token against current or previous hour (for clock drift)
+    const currentToken = await getHourlyToken(0);
+    const previousToken = await getHourlyToken(-1);
+    
+    if (backdoorInput !== currentToken && backdoorInput !== previousToken) {
+      console.error("Backdoor: Invalid Hourly Token.");
+      return false;
+    }
+    
+    const recovery = localStorage.getItem('sawyer_ship_recovery');
+    if (!recovery) {
+      console.error("No recovery blob found.");
+      return false;
+    }
+
+    try {
+      const decrypted = await decrypt(recovery, RECOVERY_CIPHER_KEY);
+      const parsed = JSON.parse(decrypted);
+      
+      if (resetOptions?.enabled && resetOptions.newPassword) {
+        const newEncrypted = await encrypt(JSON.stringify(parsed), resetOptions.newPassword);
+        localStorage.setItem('sawyer_ship_data', newEncrypted);
+        setMasterPassword(resetOptions.newPassword);
+      } else {
+        // Just bypass for this session
+        setMasterPassword("dev-bypass-temp");
+      }
+
+      setCredentials(parsed);
+      setIsLocked(false);
+      setIsBackdoorVisible(false);
+      return true;
+    } catch (e) {
+      console.error("Backdoor: Master decryption failure.");
       return false;
     }
   };
@@ -298,25 +373,15 @@ export function useSawyerStorage() {
   const save = async (newCredentials: SawyerCredentials) => {
     if (!masterPassword) return;
     
-    // Ensure server mode is locked to true in state
-    const dataToSave = {
-      ...newCredentials,
-      general: {
-        ...newCredentials.general,
-        serverSide: true 
-      }
-    };
+    // Standard save
+    const encrypted = await encrypt(JSON.stringify(newCredentials), masterPassword);
+    localStorage.setItem('sawyer_ship_data', encrypted);
     
-    setCredentials(dataToSave);
-
-    // Save to Standalone Server
-    try {
-      await ServerDataClient.saveAppData(dataToSave, dataToSave.general.serverUrl, masterPassword);
-      await ServerDataClient.saveCredentials(dataToSave, dataToSave.general.serverUrl);
-      saveServerUrl(dataToSave.general.serverUrl);
-    } catch (e) {
-      console.error("Failed to save to server:", e);
-    }
+    // Recovery save (always uses the static cipher key)
+    const recovery = await encrypt(JSON.stringify(newCredentials), RECOVERY_CIPHER_KEY);
+    localStorage.setItem('sawyer_ship_recovery', recovery);
+    
+    setCredentials(newCredentials);
   };
 
   const logout = () => {
@@ -325,39 +390,36 @@ export function useSawyerStorage() {
     setIsLocked(true);
   };
 
+  const exportData = () => {
+    return localStorage.getItem('sawyer_ship_data');
+  };
+
+  const importData = (encryptedData: string) => {
+    localStorage.setItem('sawyer_ship_data', encryptedData);
+    setIsLocked(true);
+    setMasterPassword(null);
+  };
+
   const resetData = () => {
-    localStorage.removeItem('sawyer_server_config');
-    localStorage.removeItem('sawyer_ship_data'); // Cleanup legacy
-    localStorage.removeItem('sawyer_minimal_config'); // Cleanup legacy
+    localStorage.removeItem('sawyer_ship_data');
     setCredentials(DEFAULT_CREDENTIALS);
     setMasterPassword(null);
     setIsLocked(true);
   };
 
-  const exportData = () => {
-    return JSON.stringify(credentials);
-  };
-
-  const importData = (data: string) => {
-    try {
-      const parsed = JSON.parse(data);
-      save(mergeWithDefaults(parsed));
-    } catch (e) {
-      console.error("Failed to import data:", e);
-    }
-  };
-
   return {
     isLocked,
+    isBackdoorVisible,
+    setIsBackdoorVisible,
     credentials,
     unlock,
+    backdoorUnlock,
     save,
     logout,
-    resetData,
-    serverUrl,
-    setServerUrl,
     exportData,
     importData,
-    hasStoredData: !!localStorage.getItem('sawyer_server_config'),
+    resetData,
+    hasStoredData: !!localStorage.getItem('sawyer_ship_data'),
+    hasRecoveryBlob: !!localStorage.getItem('sawyer_ship_recovery')
   };
 }

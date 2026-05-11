@@ -5,8 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, Package, ArrowRight, Loader2, AlertCircle, X, Info, Globe, Truck, ShieldCheck } from 'lucide-react';
-import { ServerSideMagentoClient } from '@/src/lib/server-api-client';
-import { MagentoOrder } from '@/src/lib/api-clients';
+import { MagentoClient, MagentoOrder } from '@/src/lib/api-clients';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -35,7 +34,11 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
     setIsLoading(true);
     setHasSearched(true);
     try {
-      const client = new ServerSideMagentoClient(credentials.general.serverUrl);
+      const client = new MagentoClient(
+        credentials.magento.url, 
+        credentials.magento.token, 
+        credentials.general.proxyUrl
+      );
       const results = await client.searchOrders(searchQuery);
       setOrders(results);
       if (results.length === 0) {

@@ -11,28 +11,12 @@ import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { MagentoOrder } from '@/src/lib/api-clients';
-import { ServerSideUPSClient, ServerSideFedExClient, ServerSideMagentoClient } from '@/src/lib/server-api-client';
+import { MagentoOrder, UPSClient, FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials, AddressBookCustomer, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
-import { getUpsCode } from '@/src/lib/ups-mappings';
 import { normalizeRegion } from '@/src/lib/regions';
 import { toast } from 'sonner';
-
-const UPS_SERVICE_NAMES: Record<string, string> = {
-  '01': 'UPS Next Day Air',
-  '02': 'UPS 2nd Day Air',
-  '03': 'UPS Ground',
-  '07': 'UPS Express',
-  '08': 'UPS Expedited',
-  '11': 'UPS Standard',
-  '12': 'UPS 3 Day Select',
-  '13': 'UPS Next Day Air Saver',
-  '14': 'UPS Next Day Air Early',
-  '54': 'UPS Express Plus',
-  '65': 'UPS Saver',
-};
 
 interface Parcel {
   id: string;
@@ -112,7 +96,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [isValidatingFedEx, setIsValidatingFedEx] = useState(false);
   const [recommendedResidential, setRecommendedResidential] = useState<boolean | null>(null);
   const [isUPSValid, setIsUPSValid] = useState<'none' | 'loading' | 'valid' | 'invalid'>('none');
-  const [isValidatingUPS, setIsValidatingUPS] = useState(false);
 
   // Weight fields
   const [weightKg, setWeightKg] = useState('');
@@ -122,18 +105,14 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [shipAccountNumber, setShipAccountNumber] = useState('');
   const [dutyAccountNumber, setDutyAccountNumber] = useState('');
 
-  const getCarrierCountryCode = (code: string | undefined, carrier?: string) => {
-    if (carrier === 'UPS') {
-      const clean = code?.trim().toUpperCase();
-      if (clean === 'XI' || clean === 'NORTHERN IRELAND') return 'NB';
-      return getUpsCode(getCountryCode(code));
-    }
-    return getCountryCode(code);
+  const getCarrierCountryCode = (code: string | undefined) => {
+    const isoCode = getCountryCode(code);
+    return isoCode === 'XI' ? 'GB' : isoCode;
   };
 
   const getCarrierRegion = (region: string | undefined, countryCode: string | undefined) => {
     const isoCountry = getCarrierCountryCode(countryCode);
-    if (isoCountry === 'GB') return undefined;
+    if (isoCountry === 'GB' || isoCountry === 'XI') return undefined;
     return normalizeRegion(region || '', isoCountry);
   };
 
@@ -155,7 +134,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     if (order && order.items && order.items.length > 0) {
       const fetchOptions = async () => {
         try {
-          const client = new ServerSideMagentoClient(credentials.general.serverUrl);
+          const client = new MagentoClient(
+            credentials.magento.url,
+            credentials.magento.token,
+            credentials.general.proxyUrl
+          );
           // Fetch options for attributes that might be dropdowns
           const codes = ['commodity_code', 'harmonized_system_code'];
           const optionsMap: Record<string, any[]> = {};
@@ -275,71 +258,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     }
   };
 
-  const handleValidateAddressUPS = async () => {
-    if (!order?.shipping_address || !credentials.ups.enabled) return;
-    
-    setIsValidatingUPS(true);
-    setIsUPSValid('loading');
-    
-    try {
-      const ups = new ServerSideUPSClient(credentials.general.serverUrl);
-
-      const params = {
-        XAVRequest: {
-          Request: {
-            RequestOption: "1",
-            TransactionReference: { CustomerContext: "Address Validation" }
-          },
-          AddressKeyFormat: {
-            ConsigneeName: `${order.shipping_address.firstname} ${order.shipping_address.lastname}`,
-            AddressLine: getCarrierStreetLines(order.shipping_address.street, order.shipping_address.region),
-            PoliticalDivision2: order.shipping_address.city,
-            PoliticalDivision1: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
-            PostcodePrimaryLow: order.shipping_address.postcode,
-            CountryCode: getCarrierCountryCode(order.shipping_address.country_id, 'UPS')
-          }
-        }
-      };
-
-      const result = await ups.validateAddress(params);
-      const xavResponse = result?.XAVResponse;
-      
-      // UPS returns valid if there are no errors and it found matches
-      // If ValidAddressIndicator exists, it's a good sign
-      // If AmbiguousAddressIndicator exists, it means multiple possibilities
-      // If NoCandidatesIndicator exists, it's invalid
-      
-      if (xavResponse?.ValidAddressIndicator !== undefined || xavResponse?.Candidate !== undefined) {
-        setIsUPSValid('valid');
-        
-        // Check for residential indicator if available in response
-        const candidate = Array.isArray(xavResponse.Candidate) ? xavResponse.Candidate[0] : xavResponse.Candidate;
-        const addressKey = xavResponse.AddressKeyFormat || candidate?.AddressKeyFormat;
-        const isResidential = addressKey?.AddressClassification?.Code === '2'; // 2 is Residential, 1 is Commercial
-        
-        if (addressKey?.AddressClassification?.Code) {
-          setRecommendedResidential(isResidential);
-          if (order) {
-            setOrder({
-              ...order,
-              shipping_address: {
-                ...order.shipping_address,
-                is_residential: isResidential
-              }
-            });
-          }
-        }
-      } else {
-        setIsUPSValid('invalid');
-      }
-    } catch (e) {
-      console.error("[UPS Address Validation] Error:", e);
-      setIsUPSValid('invalid');
-    } finally {
-      setIsValidatingUPS(false);
-    }
-  };
-
   const handleValidateAddress = async () => {
     if (!order?.shipping_address || !credentials.fedex.enabled) return;
     
@@ -347,7 +265,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     setIsFedExValid('loading');
     
     try {
-      const fedex = new ServerSideFedExClient(credentials.general.serverUrl);
+      const isDomestic = order.shipping_address.country_id === credentials.general.originCountry;
+        const accountNumber = credentials.fedex.isSandbox
+        ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
+        : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
+
+      const fedex = new FedExClient(
+        credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+        credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
+        accountNumber,
+        credentials.fedex.isSandbox,
+        credentials.general.proxyUrl
+      );
 
       const params = {
         addressesToValidate: [
@@ -410,7 +339,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       if (addr.street.some(s => s.length > 5) && addr.city && addr.postcode && addr.country_id) {
         const timer = setTimeout(() => {
           handleValidateAddress();
-          handleValidateAddressUPS();
         }, 1500);
         return () => clearTimeout(timer);
       }
@@ -495,8 +423,12 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       setIsLoading(true);
       setError(null);
       try {
-        console.log(`[OrderDetails] Fetching order from server: ${credentials.general.serverUrl}`);
-        const client = new ServerSideMagentoClient(credentials.general.serverUrl);
+        console.log(`[OrderDetails] Fetching order from Magento: ${credentials.magento.url}`);
+        const client = new MagentoClient(
+          credentials.magento.url,
+          credentials.magento.token,
+          credentials.general.proxyUrl
+        );
         const fetchedOrder = await client.getOrder(id);
         console.log(`[OrderDetails] Order fetched successfully:`, fetchedOrder);
         setOrder(fetchedOrder);
@@ -525,9 +457,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
       if (!credentials.magento.url || !credentials.magento.token) return;
       
-      console.log(`[OrderDetails] Fetching product details for ${order.items.length} items via server`);
+      console.log(`[OrderDetails] Fetching product details for ${order.items.length} items`);
       setIsFetchingProducts(true);
-      const client = new ServerSideMagentoClient(credentials.general.serverUrl);
+      const client = new MagentoClient(
+        credentials.magento.url,
+        credentials.magento.token,
+        credentials.general.proxyUrl
+      );
 
       const details: Record<string, any> = {};
       try {
@@ -719,16 +655,26 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       console.log(`[OrderDetails] Rating with ${pacakgeConfigs.length} parcels`);
 
       // 1. Fetch UPS Rates if credentials exist and enabled
-      const hasUpsCreds = credentials.ups.apiKey && credentials.ups.secretKey;
+      const hasUpsCreds = credentials.ups.isSandbox 
+        ? (credentials.ups.sandboxClientId && credentials.ups.sandboxClientSecret) 
+        : (credentials.ups.productionClientId && credentials.ups.productionClientSecret);
 
       if (credentials.ups.enabled && hasUpsCreds) {
         try {
           const destCountry = order.shipping_address?.country_id;
-          const isDomestic = getCarrierCountryCode(destCountry, 'UPS') === getCarrierCountryCode(credentials.general.originCountry, 'UPS');
-          const accountNumber = credentials.ups.accountNumber;
+          const isDomestic = destCountry === credentials.general.originCountry;
+          const accountNumber = credentials.ups.isSandbox
+            ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
+            : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
 
-          console.log(`[OrderDetails] Calling UPS API (Server Side)...`);
-          const ups = new ServerSideUPSClient(credentials.general.serverUrl);
+          console.log(`[OrderDetails] Calling UPS API (${isDomestic ? 'Domestic' : 'Global'})...`);
+          const ups = new UPSClient(
+            credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
+            credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
+            accountNumber,
+            credentials.ups.isSandbox,
+            credentials.general.proxyUrl
+          );
 
           // Simplified UPS Rating Request
           const upsParams = {
@@ -741,13 +687,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 Shipper: {
                   Address: {
                     PostalCode: credentials.general.originPostalCode,
-                    CountryCode: getCarrierCountryCode(credentials.general.originCountry, 'UPS')
+                    CountryCode: getCarrierCountryCode(credentials.general.originCountry)
                   }
                 },
                 ShipTo: {
                   Address: {
                     PostalCode: order.shipping_address.postcode,
-                    CountryCode: getCarrierCountryCode(order.shipping_address.country_id, 'UPS'),
+                    CountryCode: getCarrierCountryCode(order.shipping_address.country_id),
                     StateProvinceCode: getCarrierRegion(order.shipping_address.region, order.shipping_address.country_id),
                     ResidentialAddressIndicator: order.shipping_address.is_residential ? "" : undefined
                   }
@@ -817,7 +763,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               allRates.push({
                 id: `ups-${s.Service.Code}`,
                 carrier: 'UPS',
-                service: UPS_SERVICE_NAMES[s.Service.Code] || `UPS Service ${s.Service.Code}`,
+                service: `Service ${s.Service.Code}`,
                 price: parseFloat(s.TotalCharges.MonetaryValue),
                 delivery: deliveryInfo
               });
@@ -836,8 +782,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       if (credentials.fedex.enabled && hasFedexCreds) {
         try {
           const destCountry = order.shipping_address.country_id;
-          const isDomestic = getCarrierCountryCode(destCountry) === getCarrierCountryCode(credentials.general.originCountry) || 
-                            (getCarrierCountryCode(credentials.general.originCountry) === 'GB' && getCarrierCountryCode(destCountry) === 'IE'); // ROI special case for FedEx UK? (Optional)
+          const isDomestic = destCountry === credentials.general.originCountry || 
+                            (credentials.general.originCountry === 'GB' && destCountry === 'XI') ||
+                            (credentials.general.originCountry === 'XI' && destCountry === 'GB');
           const accountNumber = credentials.fedex.isSandbox
             ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
             : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
@@ -846,8 +793,14 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             ? (credentials.fedex.paymentAccountNumber || accountNumber)
             : (credentials.fedex.productionAccountNumber || accountNumber);
           
-          console.log(`[OrderDetails] Calling FedEx API (Server Side)...`);
-          const fedex = new ServerSideFedExClient(credentials.general.serverUrl);
+          console.log(`[OrderDetails] Calling FedEx API (${isDomestic ? 'Domestic' : 'Global'})...`);
+          const fedex = new FedExClient(
+            credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+            credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
+            accountNumber,
+            credentials.fedex.isSandbox,
+            credentials.general.proxyUrl
+          );
 
           const isInternational = credentials.general.originCountry !== order.shipping_address.country_id;
 
@@ -1107,16 +1060,34 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         width: width,
         height: height
       }];
-      const isDomestic = getCarrierCountryCode(order.shipping_address?.country_id, 'UPS') === getCarrierCountryCode(credentials.general.originCountry, 'UPS');
+      const isDomestic = order.shipping_address?.country_id === credentials.general.originCountry || 
+                        (credentials.general.originCountry === 'GB' && order.shipping_address?.country_id === 'XI') ||
+                        (credentials.general.originCountry === 'XI' && order.shipping_address?.country_id === 'GB');
 
       if (selectedRate.carrier === 'UPS') {
-        const accountNumber = credentials.ups.accountNumber;
-        const ups = new ServerSideUPSClient(credentials.general.serverUrl);
-        
-        // Extract service code from ID (e.g. "ups-11" -> "11")
-        const serviceCode = selectedRate.id.startsWith('ups-') 
-          ? selectedRate.id.replace('ups-', '') 
-          : '03';
+        const accountNumber = credentials.ups.isSandbox
+          ? (isDomestic ? (credentials.ups.domesticAccountNumber || credentials.ups.accountNumber) : (credentials.ups.globalAccountNumber || credentials.ups.accountNumber))
+          : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber);
+
+        const ups = new UPSClient(
+          credentials.ups.isSandbox ? credentials.ups.sandboxClientId : credentials.ups.productionClientId,
+          credentials.ups.isSandbox ? credentials.ups.sandboxClientSecret : credentials.ups.productionClientSecret,
+          accountNumber,
+          credentials.ups.isSandbox,
+          credentials.general.proxyUrl
+        );
+
+        // Map service name to code (simplified mapping)
+        const serviceMap: Record<string, string> = {
+          'Ground': '03',
+          'Next Day Air': '01',
+          '2nd Day Air': '02',
+          'Standard': '11',
+          'Worldwide Express': '07',
+          'Worldwide Expedited': '08',
+          'Worldwide Saver': '65',
+        };
+        const serviceCode = serviceMap[selectedRate.service] || '03';
 
         const upsParams: any = {
           ShipmentRequest: {
@@ -1126,13 +1097,15 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 Name: credentials.general.originContactName,
                 AttentionName: credentials.general.originContactName,
                 Phone: { Number: credentials.general.originPhone },
-                ShipperNumber: credentials.ups.accountNumber,
+                ShipperNumber: credentials.ups.isSandbox 
+                  ? ((isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber)
+                  : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber),
                 Address: {
                   AddressLine: getCarrierStreetLines([credentials.general.originStreet1, credentials.general.originStreet2], credentials.general.originState),
                   City: credentials.general.originCity,
                   StateProvinceCode: getCarrierRegion(credentials.general.originState, credentials.general.originCountry),
                   PostalCode: credentials.general.originPostalCode,
-                  CountryCode: getCarrierCountryCode(credentials.general.originCountry, 'UPS')
+                  CountryCode: getCarrierCountryCode(credentials.general.originCountry)
                 }
               },
               ShipTo: {
@@ -1144,14 +1117,16 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   City: order.shipping_address?.city,
                   StateProvinceCode: getCarrierRegion(order.shipping_address?.region, order.shipping_address?.country_id),
                   PostalCode: order.shipping_address?.postcode,
-                  CountryCode: getCarrierCountryCode(order.shipping_address?.country_id, 'UPS'),
+                  CountryCode: getCarrierCountryCode(order.shipping_address?.country_id),
                   ResidentialAddressIndicator: order.shipping_address?.is_residential ? "" : undefined
                 }
               },
               PaymentInformation: {
                 ShipmentCharge: {
                   Type: "01",
-                  BillShipper: { AccountNumber: credentials.ups.accountNumber }
+                  BillShipper: { AccountNumber: credentials.ups.isSandbox 
+                    ? ((isDomestic ? credentials.ups.domesticAccountNumber : credentials.ups.globalAccountNumber) || credentials.ups.accountNumber)
+                    : (credentials.ups.productionAccountNumber || credentials.ups.accountNumber) }
                 }
               },
               Service: { Code: serviceCode },
@@ -1213,7 +1188,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                     UnitOfMeasurement: { Code: "PCS" }
                   },
                   CommodityCode: getAttr('commodity_code'),
-                  OriginCountryCode: getCarrierCountryCode(getAttr('country_of_manufacture') || credentials.general.originCountry, 'UPS')
+                  OriginCountryCode: getCarrierCountryCode(getAttr('country_of_manufacture') || credentials.general.originCountry)
                 };
               })
             }
@@ -1258,8 +1233,6 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           throw new Error(error.Description || error.message || "UPS Shipment Failed");
         }
       } else if (selectedRate.carrier === 'FedEx') {
-        const destCountry = order.shipping_address.country_id;
-        const isDomestic = getCarrierCountryCode(destCountry) === getCarrierCountryCode(credentials.general.originCountry);
         const accountNumber = credentials.fedex.isSandbox
           ? (isDomestic ? (credentials.fedex.domesticAccountNumber || credentials.fedex.accountNumber) : (credentials.fedex.globalAccountNumber || credentials.fedex.accountNumber))
           : (credentials.fedex.productionAccountNumber || credentials.fedex.accountNumber);
@@ -1268,7 +1241,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           ? (credentials.fedex.paymentAccountNumber || accountNumber)
           : (credentials.fedex.productionAccountNumber || accountNumber);
 
-        const fedex = new ServerSideFedExClient(credentials.general.serverUrl);
+        const fedex = new FedExClient(
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxApiKey : credentials.fedex.productionApiKey,
+          credentials.fedex.isSandbox ? credentials.fedex.sandboxSecretKey : credentials.fedex.productionSecretKey,
+          accountNumber,
+          credentials.fedex.isSandbox,
+          credentials.general.proxyUrl
+        );
 
         const referenceId = order.increment_id?.trim();
         const shouldSendReference = referenceId && referenceId !== 'MANUAL';
@@ -1489,8 +1468,12 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
         if (credentials.general.markAsShipped && id !== 'manual' && !isSandbox) {
           try {
-            console.log(`[OrderDetails] Updating Magento shipment status via server...`);
-            const client = new ServerSideMagentoClient(credentials.general.serverUrl);
+            console.log(`[OrderDetails] Updating Magento shipment status...`);
+            const client = new MagentoClient(
+              credentials.magento.url,
+              credentials.magento.token,
+              credentials.general.proxyUrl
+            );
 
             const carrierTitle = selectedRate.carrier === 'UPS' ? 'United Parcel Service' : 'Federal Express';
             const carrierCode = selectedRate.carrier.toLowerCase();
@@ -1865,26 +1848,16 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">FedEx</span>
-                  <button 
-                    type="button"
-                    onClick={handleValidateAddress}
-                    disabled={isValidatingFedEx}
-                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
-                  >
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                     <ValidationIcon status={isFedExValid} />
-                  </button>
+                  </div>
                 </div>
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">UPS</span>
-                  <button 
-                    type="button"
-                    onClick={handleValidateAddressUPS}
-                    disabled={isValidatingUPS}
-                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
-                  >
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                     <ValidationIcon status={isUPSValid} />
-                  </button>
+                  </div>
                 </div>
               </div>
 
@@ -2240,26 +2213,16 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       <Separator orientation="vertical" className="h-6" />
                       <div className="flex-1 flex items-center justify-between">
                         <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
-                        <button 
-                          type="button"
-                          onClick={handleValidateAddress}
-                          disabled={isValidatingFedEx}
-                          className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
-                        >
+                        <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                           <ValidationIcon status={isFedExValid} />
-                        </button>
+                        </div>
                       </div>
                       <Separator orientation="vertical" className="h-6" />
                       <div className="flex-1 flex items-center justify-between">
                         <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
-                        <button 
-                          type="button"
-                          onClick={handleValidateAddressUPS}
-                          disabled={isValidatingUPS}
-                          className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
-                        >
+                        <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                           <ValidationIcon status={isUPSValid} />
-                        </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2310,26 +2273,16 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">FedEx Validation</span>
-                  <button 
-                    type="button"
-                    onClick={handleValidateAddress}
-                    disabled={isValidatingFedEx}
-                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
-                  >
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                     <ValidationIcon status={isFedExValid} />
-                  </button>
+                  </div>
                 </div>
                 <Separator orientation="vertical" className="h-6" />
                 <div className="flex-1 flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-600">UPS Validation</span>
-                  <button 
-                    type="button"
-                    onClick={handleValidateAddressUPS}
-                    disabled={isValidatingUPS}
-                    className="w-6 h-6 flex items-center justify-center border rounded bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
-                  >
+                  <div className="w-6 h-6 flex items-center justify-center border rounded bg-white">
                     <ValidationIcon status={isUPSValid} />
-                  </button>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -3108,11 +3061,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       >
                         <div className="flex justify-between items-center">
                           <div>
-                            <p className="font-bold text-sm">
-                              {rate.service.toLowerCase().includes(rate.carrier.toLowerCase()) 
-                                ? rate.service 
-                                : `${rate.carrier} ${rate.service}`}
-                            </p>
+                            <p className="font-bold text-sm">{rate.carrier} {rate.service}</p>
                             <p className="text-xs text-zinc-500">{rate.delivery}</p>
                           </div>
                           <p className="font-bold text-zinc-900">

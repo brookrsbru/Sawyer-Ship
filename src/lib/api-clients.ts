@@ -35,42 +35,6 @@ export interface MagentoOrder {
   product_details?: Record<string, any>;
 }
 
-export function normalizeMagentoOrder(order: any): MagentoOrder {
-  if (!order) return {} as MagentoOrder;
-
-  // Magento 2 orders often have shipping address in extension_attributes
-  const shippingAddress = order.extension_attributes?.shipping_assignments?.[0]?.shipping?.address 
-    || order.shipping_address 
-    || order.billing_address 
-    || {};
-
-  // Ensure street is an array (sometimes it comes as a string or is missing)
-  let street = shippingAddress.street || [];
-  if (typeof street === 'string') {
-    street = [street];
-  } else if (!Array.isArray(street)) {
-    street = [];
-  }
-
-  return {
-    ...order,
-    customer_firstname: shippingAddress.firstname || order.customer_firstname || '',
-    customer_lastname: shippingAddress.lastname || order.customer_lastname || '',
-    shipping_address: {
-      firstname: shippingAddress.firstname || order.customer_firstname || '',
-      lastname: shippingAddress.lastname || order.customer_lastname || '',
-      company: shippingAddress.company || '',
-      street: street,
-      city: shippingAddress.city || '',
-      region: shippingAddress.region || shippingAddress.region_id || '',
-      postcode: shippingAddress.postcode || '',
-      country_id: shippingAddress.country_id || '',
-      telephone: shippingAddress.telephone || '',
-    },
-    items: order.items || []
-  };
-}
-
 export class MagentoClient {
   constructor(private baseUrl: string, private token: string, private proxyUrl: string = '') {}
 
@@ -100,7 +64,7 @@ export class MagentoClient {
     const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=increment_id&searchCriteria[filter_groups][0][filters][0][value]=%25${query}%25&searchCriteria[filter_groups][0][filters][0][condition_type]=like`;
     const data = await this.fetch(`orders?${searchCriteria}`);
     const items = data.items || [];
-    const orders = items.map((item: any) => normalizeMagentoOrder(item));
+    const orders = items.map((item: any) => this.normalizeOrder(item));
 
     // Bulk fetch products for all orders to limit API requests
     const allSkus = Array.from(new Set(orders.flatMap(o => o.items.map(i => i.sku)))) as string[];
@@ -149,7 +113,7 @@ export class MagentoClient {
       }
     }
 
-    const order = normalizeMagentoOrder(orderData);
+    const order = this.normalizeOrder(orderData);
 
     // Bulk fetch products for this order to limit API requests
     const skus = order.items.map(i => i.sku) as string[];
@@ -201,7 +165,7 @@ export class MagentoClient {
     return {
       raw_order: rawOrder,
       raw_products: rawProducts,
-      normalized_order: normalizeMagentoOrder(rawOrder)
+      normalized_order: this.normalizeOrder(rawOrder)
     };
   }
 
@@ -213,6 +177,37 @@ export class MagentoClient {
       console.error(`[MagentoClient] Failed to fetch options for ${attributeCode}:`, e);
       return [];
     }
+  }
+
+  private normalizeOrder(order: any): MagentoOrder {
+    // Magento 2 orders often have shipping address in extension_attributes
+    const shippingAddress = order.extension_attributes?.shipping_assignments?.[0]?.shipping?.address 
+      || order.shipping_address 
+      || order.billing_address 
+      || {};
+
+    // Ensure street is an array (sometimes it comes as a string or is missing)
+    let street = shippingAddress.street || [];
+    if (typeof street === 'string') {
+      street = [street];
+    }
+
+    return {
+      ...order,
+      customer_firstname: shippingAddress.firstname || order.customer_firstname || '',
+      customer_lastname: shippingAddress.lastname || order.customer_lastname || '',
+      shipping_address: {
+        firstname: shippingAddress.firstname || order.customer_firstname || '',
+        lastname: shippingAddress.lastname || order.customer_lastname || '',
+        company: shippingAddress.company || '',
+        street: street,
+        city: shippingAddress.city || '',
+        region: shippingAddress.region || '',
+        postcode: shippingAddress.postcode || '',
+        country_id: shippingAddress.country_id || '',
+        telephone: shippingAddress.telephone || '',
+      }
+    };
   }
 
   async getProduct(sku: string): Promise<any> {
@@ -300,177 +295,117 @@ export class MagentoClient {
 }
 
 export class UPSClient {
-  constructor(private apiKey: string, private secretKey: string, private accountNumber: string, private isSandbox: boolean = true, private proxyUrl: string = '') {}
+  constructor(private clientId: string, private clientSecret: string, private accountNumber: string, private isSandbox: boolean = true, private proxyUrl: string = '') {}
 
   private get baseUrl() {
-    return this.isSandbox ? 'https://sandbox.api.ups.com' : 'https://api.ups.com';
+    return this.isSandbox ? 'https://wwwcie.ups.com' : 'https://onlinetools.ups.com';
   }
 
   private getProxyUrl() {
     return this.proxyUrl ? (this.proxyUrl.endsWith('/') ? this.proxyUrl : `${this.proxyUrl}/`) : '';
   }
 
-  private accessToken: string | null = null;
-  private tokenExpiresAt: number = 0;
-
   async getAccessToken(): Promise<string> {
-    // Return cached token if valid (give 5 min buffer)
-    if (this.accessToken && Date.now() < this.tokenExpiresAt - 300000) {
-      return this.accessToken;
-    }
-
     const url = `${this.getProxyUrl()}${this.baseUrl}/security/v1/oauth/token`;
-    const auth = btoa(`${this.apiKey}:${this.secretKey}`);
-    
-    console.log(`[UPSClient] Requesting token from: ${url}`);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for auth
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ grant_type: 'client_credentials' }),
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        if (response.status === 504 || response.status === 502) {
-          throw new Error(`UPS Auth Proxy Timeout (${response.status}): The authentication request timed out. Please check your credentials and proxy.`);
-        }
-        console.error(`[UPSClient] Token request failed (${response.status}):`, errorText);
-        throw new Error(`UPS Auth Error: ${response.status} ${errorText}`);
-      }
-
-      const data = await response.json();
-      if (!data.access_token) {
-        console.error(`[UPSClient] No access_token in UPS response:`, data);
-        throw new Error('UPS Auth Error: No access token returned');
-      }
-
-      this.accessToken = data.access_token;
-      // Set expiry (default 3600 seconds)
-      const expiresIn = parseInt(data.expires_in || '3600');
-      this.tokenExpiresAt = Date.now() + (expiresIn * 1000);
-
-      return this.accessToken;
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        throw new Error('UPS Auth Timeout: The authentication request took longer than 15 seconds and was aborted.');
-      }
-      throw error;
-    }
-  }
-
-  private cleanObject(obj: any): any {
-    if (obj === null || typeof obj !== 'object') return obj;
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.cleanObject(item));
-    }
-    
-    return Object.fromEntries(
-      Object.entries(obj)
-        .filter(([_, v]) => v !== undefined && v !== null)
-        .map(([k, v]) => [k, this.cleanObject(v)])
-    );
-  }
-
-  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = await this.getAccessToken();
-    const url = `${this.getProxyUrl()}${this.baseUrl}${endpoint}`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...(this.accountNumber ? { 'x-merchant-id': this.accountNumber } : {}),
-          'transId': `sawyer-${Date.now()}`,
-          'transactionSrc': 'sawyer-ship',
-          ...options.headers,
-        },
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        let errorData: any = {};
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          // If not JSON, it might be a proxy HTML error
-          const text = await response.text().catch(() => '');
-          if (response.status === 504 || response.status === 502) {
-            throw new Error(`UPS Proxy Timeout (${response.status}): The request timed out at the gateway. Please try again.`);
-          }
-          throw new Error(`UPS API Error (${response.status}): ${text || response.statusText}`);
-        }
-        
-        const msg = errorData?.response?.errors?.[0]?.message 
-                 || errorData?.errors?.[0]?.message 
-                 || `UPS Error (${response.status}): ${response.statusText}`;
-        throw new Error(msg);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        throw new Error('UPS Request Timeout: The request took longer than 30 seconds and was aborted.');
-      }
-      throw error;
-    }
+    const auth = btoa(`${this.clientId}:${this.clientSecret}`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-merchant-id': this.clientId
+      },
+      body: new URLSearchParams({ grant_type: 'client_credentials' }),
+    });
+    const data = await response.json();
+    return data.access_token;
   }
 
   async getRates(params: any): Promise<any> {
     console.log(`[UPSClient] Fetching rates`, params);
-    return this.request('/api/rating/v1/shop', {
+    const token = await this.getAccessToken();
+    console.log(`[UPSClient] OAuth token obtained`);
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/rating/v1/shop`;
+    const response = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify(this.cleanObject(params)),
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
     });
+    const data = await response.json();
+    console.log(`[UPSClient] Rates response:`, data);
+    return data;
   }
 
   async createShipment(params: any): Promise<any> {
     console.log(`[UPSClient] Creating shipment`, params);
-    return this.request('/api/shipments/v1/ship', {
+    const token = await this.getAccessToken();
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/ship`;
+    const response = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify(this.cleanObject(params)),
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'x-merchant-id': this.clientId
+      },
+      body: JSON.stringify(params),
     });
+    const data = await response.json();
+    console.log(`[UPSClient] Shipment response:`, data);
+    return data;
   }
 
   async trackShipment(trackingNumber: string): Promise<any> {
     console.log(`[UPSClient] Tracking shipment: ${trackingNumber}`);
-    return this.request(`/api/track/v1/details/${trackingNumber}?locale=en_US&returnSignature=false&returnMilestones=false`, {
-      method: 'GET'
+    const token = await this.getAccessToken();
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/track/v1/details/${trackingNumber}?locale=en_US&returnSignature=false&returnMilestones=false`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'transId': `sawyer-${Date.now()}`,
+        'transactionSrc': 'sawyer-ship'
+      }
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.response?.errors?.[0]?.message || `UPS Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[UPSClient] Tracking response:`, data);
+
+    if (data?.trackResponse?.shipment?.[0]?.warnings) {
+      console.warn(`[UPSClient] Tracking warnings:`, data.trackResponse.shipment[0].warnings);
+    }
+
+    return data;
   }
 
   async cancelShipment(trackingNumber: string): Promise<any> {
     console.log(`[UPSClient] Voiding shipment: ${trackingNumber}`);
-    return this.request(`/api/shipments/v1/void/cancel/${trackingNumber}`, {
-      method: 'PUT'
+    const token = await this.getAccessToken();
+    // UPS Void (Cancel) endpoint: PUT /shipments/v1/void/cancel/{trackingnumber}
+    const url = `${this.getProxyUrl()}${this.baseUrl}/api/shipments/v1/void/cancel/${trackingNumber}`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'x-merchant-id': this.clientId
+      }
     });
-  }
 
-  async validateAddress(params: any): Promise<any> {
-    console.log(`[UPSClient] Validating address`, params);
-    return this.request('/api/addressvalidation/v1/1', {
-      method: 'POST',
-      body: JSON.stringify(this.cleanObject(params)),
-    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.response?.errors?.[0]?.message || `UPS Void Error: ${response.status}`);
+    }
+    console.log(`[UPSClient] Void response:`, data);
+    return data;
   }
 }
 
