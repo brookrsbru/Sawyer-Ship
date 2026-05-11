@@ -35,18 +35,18 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const PAGE_SIZE = 20;
 
-  // Cleanup effect: Remove label data for shipments older than 5 days to save storage
+  // Cleanup effect: Remove label data for shipments older than __ hours to save storage
   useEffect(() => {
     if (!credentials.shipments || credentials.shipments.length === 0) return;
 
-    const fiveDaysAgo = new Date();
-    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+    const limitDate = new Date();
+    limitDate.setHours(limitDate.getHours() - 48); // __ hours retention
 
     let hasChanges = false;
     const cleanedShipments = credentials.shipments.map(s => {
       if (s.labelBase64 && s.shipDate) {
         const shipDate = new Date(s.shipDate);
-        if (shipDate < fiveDaysAgo) {
+        if (shipDate < limitDate) {
           hasChanges = true;
           const { labelBase64, ...rest } = s;
           return { ...rest };
@@ -57,7 +57,7 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
 
     if (hasChanges) {
       onSave({ ...credentials, shipments: cleanedShipments });
-      console.log('Cleaned up old labels to save storage space.');
+      console.log('Cleaned up old labels to save storage space (72h limit).');
     }
   }, []);
 
