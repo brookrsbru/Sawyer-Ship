@@ -762,6 +762,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           };
 
           if (isInternational) {
+            const totalBaseValue = (order.items || []).reduce((sum, item) => sum + (item.price * item.qty_ordered), 0);
             const commodities = order.items.length > 0 
               ? order.items.map(item => {
                   const product = productDetails[item.sku];
@@ -823,6 +824,10 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                     accountNumber: { value: payorAccountNumber }
                   }
                 }
+              },
+              totalCustomsValue: {
+                amount: totalBaseValue,
+                currency: credentials.general.currency || "GBP"
               },
               commodities
             };
@@ -1051,6 +1056,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
         // Add International Customs if needed
         if (!isDomestic) {
+          const totalBaseValue = (order.items || []).reduce((sum, item) => sum + (item.price * item.qty_ordered), 0);
           fedexParams.requestedShipment.customsClearanceDetail = {
             dutiesPayment: {
               paymentType: billDutiesTo === 'recipient' ? "RECIPIENT" : "SENDER",
@@ -1059,6 +1065,10 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                   accountNumber: { value: payorAccountNumber }
                 }
               }
+            },
+            totalCustomsValue: {
+              amount: totalBaseValue,
+              currency: credentials.general.currency || "GBP"
             },
             commodities: order.items.map(item => {
               const product = productDetails[item.sku];
@@ -2802,7 +2812,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       >
                         <div className="flex justify-between items-center">
                           <div>
-                            <p className="font-bold text-sm">{rate.carrier} {rate.service}</p>
+                            <p className="font-bold text-sm">
+                              {rate.service.toLowerCase().startsWith(rate.carrier.toLowerCase()) 
+                                ? rate.service 
+                                : `${rate.carrier} ${rate.service}`}
+                            </p>
                             <p className="text-xs text-zinc-500">{rate.delivery}</p>
                           </div>
                           <p className="font-bold text-zinc-900">
