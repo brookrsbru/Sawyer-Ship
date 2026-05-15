@@ -1216,45 +1216,67 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
             );
 
             // "Smart Replace": if order is already complete, it means there is an existing shipment.
-            // We should remove existing shipments to allow a clean replace and avoid duplicate logs.
-            // Magento standard behavior when deleting a shipment is to reset the qty_shipped on items.
-            if (order.status === 'complete') {
-              console.log(`[OrderDetails] Order is already COMPLETE. Attempting to remove existing shipments for "Smart Replace"...`);
-              try {
-                const existingShipments = await client.getShipments(order.entity_id);
-                if (existingShipments && existingShipments.length > 0) {
-                  for (const shipment of existingShipments) {
-                    console.log(`[OrderDetails] Removing existing Magento shipment ${shipment.entity_id}`);
-                    try {
-                      await client.deleteShipment(shipment.entity_id);
-                    } catch (delError: any) {
-                      console.warn(`[OrderDetails] Failed to delete shipment entity ${shipment.entity_id}. This is common if the endpoint is not supported. Trying to delete tracks instead.`, delError);
-                      // Fallback: Delete tracks if shipment deletion fails
-                      if (shipment.tracks && shipment.tracks.length > 0) {
-                        for (const track of shipment.tracks) {
-                          try {
-                            await client.deleteTrack(track.entity_id);
-                          } catch (trackErr) {
-                            console.warn(`[OrderDetails] Failed to delete track ${track.entity_id}`, trackErr);
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              } catch (fetchErr) {
-                console.warn(`[OrderDetails] Failed to fetch or clean up existing shipments:`, fetchErr);
-              }
-            }
-
+            // We should ideally just add the new track to an existing shipment if we can't create a new one.
             const carrierTitle = 'Federal Express';
             const carrierCode = selectedRate.carrier.toLowerCase();
-
-            await client.createShipment(order.entity_id, [{
+            const trackObj = {
               track_number: tracking,
               title: carrierTitle,
               carrier_code: carrierCode
-            }]);
+            };
+
+            let shipmentCreated = false;
+
+            if (order.status !== 'complete') {
+              console.log(`[OrderDetails] Order is not yet complete, creating new shipment...`);
+              try {
+                await client.createShipment(order.entity_id, [trackObj]);
+                shipmentCreated = true;
+              } catch (createErr: any) {
+                console.warn(`[OrderDetails] Initial createShipment failed:`, createErr);
+                // Fallthrough to existing shipment check if it failed with "no products"
+              }
+            }
+
+            if (!shipmentCreated) {
+              console.log(`[OrderDetails] Searching for existing shipments to add track...`);
+              try {
+                const existingShipments = await client.getShipments(order.entity_id);
+                if (existingShipments && existingShipments.length > 0) {
+                  // Sort by ID descending to get the most recent one
+                  const sorted = [...existingShipments].sort((a, b) => b.entity_id - a.entity_id);
+                  const lastShipment = sorted[0];
+                  
+                  console.log(`[OrderDetails] Adding track to existing shipment ${lastShipment.entity_id}`);
+                  await client.addTrack(lastShipment.entity_id, trackObj);
+                  shipmentCreated = true;
+
+                  // Clean up OLD tracks from this shipment if they were for the same carrier
+                  // This is optional but helps with the "Smart Replace" feel
+                  try {
+                    const fullShipment = await client.getShipment(lastShipment.entity_id);
+                    if (fullShipment.tracks && fullShipment.tracks.length > 1) {
+                      for (const t of fullShipment.tracks) {
+                        if (t.track_number !== tracking && t.carrier_code === carrierCode) {
+                          console.log(`[OrderDetails] Cleaning up old track ${t.track_number} from shipment ${lastShipment.entity_id}`);
+                          await client.deleteTrack(t.entity_id);
+                        }
+                      }
+                    }
+                  } catch (cleanupErr) {
+                    console.warn(`[OrderDetails] Failed to cleanup old tracks:`, cleanupErr);
+                  }
+                } else if (order.status === 'complete') {
+                   throw new Error("Order is complete but no shipment entities were found in Magento to attach tracking to.");
+                } else {
+                   // If not complete and create failed, throw the original error
+                   throw new Error("Failed to create shipment and no existing shipments found.");
+                }
+              } catch (fallbackErr: any) {
+                console.error(`[OrderDetails] Magento fallback failed:`, fallbackErr);
+                throw fallbackErr;
+              }
+            }
             console.log(`[OrderDetails] Magento updated successfully`);
           } catch (magentoError: any) {
             console.error(`[OrderDetails] Magento update failed:`, magentoError);

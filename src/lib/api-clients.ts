@@ -300,6 +300,26 @@ export class MagentoClient {
     return data.items || [];
   }
 
+  async getShipment(shipmentId: number): Promise<any> {
+    console.log(`[MagentoClient] Fetching shipment ${shipmentId}`);
+    return this.fetch(`shipment/${shipmentId}`);
+  }
+
+  async addTrack(shipmentId: number, track: { track_number: string, title: string, carrier_code: string }): Promise<any> {
+    console.log(`[MagentoClient] Adding track to shipment ${shipmentId}`, track);
+    return this.fetch(`shipment/${shipmentId}/track`, {
+      method: 'POST',
+      body: JSON.stringify({
+        entity: {
+          parent_id: shipmentId,
+          track_number: track.track_number,
+          title: track.title,
+          carrier_code: track.carrier_code
+        }
+      })
+    });
+  }
+
   async deleteShipment(shipmentId: number): Promise<any> {
     console.log(`[MagentoClient] Deleting shipment ${shipmentId}`);
     return this.fetch(`shipment/${shipmentId}`, {

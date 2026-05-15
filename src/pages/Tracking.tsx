@@ -258,32 +258,48 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
           const order = orders.find(o => o.increment_id === shipment.orderIncrementId);
 
           if (order) {
-            const magentoShipments = await magento.getShipments(order.entity_id);
-            // Find the shipment that matches our tracking number
-            const matchingShipment = magentoShipments.find(ms => 
-              ms.tracks?.some((t: any) => t.track_number === shipment.trackingNumber)
-            );
+            const magentoShipmentsList = await magento.getShipments(order.entity_id);
+            console.log(`[Tracking] Found ${magentoShipmentsList.length} shipments in Magento for order ${order.entity_id}`);
+            
+            let matchingShipment = null;
+            for (const sItem of magentoShipmentsList) {
+              // Deep fetch the shipment to get tracks if not present in list
+              try {
+                const fullShipment = await magento.getShipment(sItem.entity_id);
+                if (fullShipment.tracks?.some((t: any) => t.track_number === shipment.trackingNumber)) {
+                  matchingShipment = fullShipment;
+                  break;
+                }
+              } catch (e) {
+                console.warn(`[Tracking] Failed to fetch deep info for shipment ${sItem.entity_id}`, e);
+              }
+            }
 
             if (matchingShipment) {
-              console.log(`[Tracking] Found matching Magento shipment ${matchingShipment.entity_id}. Deleting...`);
-              try {
-                await magento.deleteShipment(matchingShipment.entity_id);
-                toast.info("Shipment removed from Magento log.");
-              } catch (delError: any) {
-                console.warn(`[Tracking] Failed to delete shipment entity ${matchingShipment.entity_id}. Trying to delete tracks instead.`, delError);
-                if (matchingShipment.tracks) {
-                  for (const track of matchingShipment.tracks) {
-                    if (track.track_number === shipment.trackingNumber) {
-                      try {
-                        await magento.deleteTrack(track.entity_id);
-                        toast.info("Tracking number removed from Magento shipment.");
-                      } catch (trackErr) {
-                         console.warn(`[Tracking] Failed to delete track ${track.entity_id}`, trackErr);
-                      }
+              console.log(`[Tracking] Found matching Magento shipment ${matchingShipment.entity_id}. Deleting tracks...`);
+              // Even if we can't delete the shipment entity, we MUST delete the track
+              if (matchingShipment.tracks) {
+                for (const track of matchingShipment.tracks) {
+                  if (track.track_number === shipment.trackingNumber) {
+                    try {
+                      await magento.deleteTrack(track.entity_id);
+                      console.log(`[Tracking] Successfully deleted track ${track.entity_id} from Magento`);
+                    } catch (trackErr) {
+                       console.warn(`[Tracking] Failed to delete track ${track.entity_id}`, trackErr);
                     }
                   }
                 }
               }
+
+              // Try deleting the whole shipment record (often restricted, but we try anyway)
+              try {
+                await magento.deleteShipment(matchingShipment.entity_id);
+                console.log(`[Tracking] Successfully deleted shipment record ${matchingShipment.entity_id}`);
+              } catch (delError: any) {
+                console.info(`[Tracking] Note: Could not delete shipment record ${matchingShipment.entity_id} (REST API often restricts this). Individual tracking was attempted separately.`);
+              }
+            } else {
+              console.log(`[Tracking] No matching Magento shipment found for tracking ${shipment.trackingNumber}`);
             }
           }
         } catch (magentoErr) {
