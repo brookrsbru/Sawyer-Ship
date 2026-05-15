@@ -66,6 +66,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const [isFetchingProducts, setIsFetchingProducts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attributeOptions, setAttributeOptions] = useState<Record<string, any[]>>({});
+  
+  // Refs to track what has been fetched or applied to prevent overwriting local edits
+  const fetchedOrderIdRef = React.useRef<string | null>(null);
+  const fetchedProductsForIdRef = React.useRef<string | null>(null);
+  const defaultsAppliedForRef = React.useRef<{id: string, country: string} | null>(null);
 
   // Package details
   const [weight, setWeight] = useState('1.0');
@@ -160,6 +165,15 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   useEffect(() => {
     if (order && credentials.shippingDefaults) {
       const destCountry = order.shipping_address?.country_id;
+      const orderId = String(order.entity_id || order.increment_id);
+      
+      // Check if we already applied defaults for this order and country
+      if (defaultsAppliedForRef.current?.id === orderId && 
+          defaultsAppliedForRef.current?.country === destCountry) {
+        return;
+      }
+
+      console.log(`[OrderDetails] Applying shipping defaults for ${destCountry}`);
       const countryDefaults = credentials.countryDefaults?.[destCountry || ''];
       const defaults = countryDefaults || credentials.shippingDefaults;
       
@@ -179,8 +193,11 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       if (applyHeight && defaults.height) setHeight(defaults.height);
       if (applyBillShip && defaults.billShippingTo) setBillShippingTo(defaults.billShippingTo);
       if (applyBillDuty && defaults.billDutiesTo) setBillDutiesTo(defaults.billDutiesTo);
+
+      // Mark as applied
+      defaultsAppliedForRef.current = { id: orderId, country: destCountry || '' };
     }
-  }, [order, credentials.shippingDefaults, credentials.countryDefaults]);
+  }, [order?.entity_id, order?.increment_id, order?.shipping_address?.country_id, credentials.shippingDefaults, credentials.countryDefaults]);
 
   // Editing state
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -312,12 +329,15 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         const isResidential = addressResult.classification === 'RESIDENTIAL';
         setRecommendedResidential(isResidential);
         if (order) {
-          setOrder({
-            ...order,
-            shipping_address: {
-              ...order.shipping_address,
-              is_residential: isResidential
-            }
+          setOrder(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              shipping_address: {
+                ...prev.shipping_address,
+                is_residential: isResidential
+              }
+            };
           });
         }
       } else {
@@ -414,22 +434,24 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   };
 
   useEffect(() => {
-    console.log(`[OrderDetails] Loading order ID: ${id}`);
+    // Only fetch if we don't have an order AND we haven't already fetched it for this session/ID
+    if (!id || id === 'manual' || order || fetchedOrderIdRef.current === id) return;
+    if (!credentials.magento.url || !credentials.magento.token) return;
+    
     const fetchOrder = async () => {
-      if (order || !id || id === 'manual') return;
-      if (!credentials.magento.url || !credentials.magento.token) return;
-      
       setIsLoading(true);
       setError(null);
       try {
-        console.log(`[OrderDetails] Fetching order from Magento: ${credentials.magento.url}`);
+        console.log(`[OrderDetails] Fetching order ${id} from Magento...`);
         const client = new MagentoClient(
           credentials.magento.url,
           credentials.magento.token,
           credentials.general.proxyUrl
         );
         const fetchedOrder = await client.getOrder(id);
-        console.log(`[OrderDetails] Order fetched successfully:`, fetchedOrder);
+        console.log(`[OrderDetails] Order fetched successfully`);
+        
+        fetchedOrderIdRef.current = id;
         setOrder(fetchedOrder);
       } catch (e: any) {
         console.error(`[OrderDetails] Error fetching order:`, e);
@@ -444,18 +466,30 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   }, [id, order, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl]);
 
   useEffect(() => {
-    const fetchProductInfo = async () => {
-      if (!order || id === 'manual') return;
-      
-      // If order already has product details (from search or getOrder), use them
-      if (order.product_details && Object.keys(order.product_details).length > 0) {
-        console.log(`[OrderDetails] Using pre-loaded product details`);
-        setProductDetails(order.product_details);
-        return;
-      }
+    // Only fetch product info if we have an order, it's not manual, 
+    // and we haven't already fetched for this order ID
+    if (!order || id === 'manual' || fetchedProductsForIdRef.current === String(order.entity_id)) return;
+    
+    // If order already has product details (from search or getOrder), use them and mark as fetched
+    if (order.product_details && Object.keys(order.product_details).length > 0) {
+      console.log(`[OrderDetails] Using pre-loaded product details`);
+      setProductDetails(order.product_details);
+      fetchedProductsForIdRef.current = String(order.entity_id);
+      return;
+    }
 
-      if (!credentials.magento.url || !credentials.magento.token) return;
-      
+    // If we already have some product details and the SKUs match, don't re-fetch
+    // This handles cases where state might be updated by address edits
+    const currentSkus = order.items.map(i => i.sku).sort().join(',');
+    const existingSkus = Object.keys(productDetails).sort().join(',');
+    if (existingSkus === currentSkus && existingSkus.length > 0) {
+      fetchedProductsForIdRef.current = String(order.entity_id);
+      return;
+    }
+
+    if (!credentials.magento.url || !credentials.magento.token) return;
+    
+    const fetchProductInfo = async () => {
       console.log(`[OrderDetails] Fetching product details for ${order.items.length} items`);
       setIsFetchingProducts(true);
       const client = new MagentoClient(
@@ -474,6 +508,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         });
 
         console.log(`[OrderDetails] Loaded details for ${products.length} products`);
+        fetchedProductsForIdRef.current = String(order.entity_id);
         setProductDetails(details);
       } catch (e) {
         console.error("[OrderDetails] Failed to fetch product details:", e);
@@ -483,7 +518,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     };
 
     fetchProductInfo();
-  }, [order, id, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl]);
+  }, [order, id, credentials.magento.url, credentials.magento.token, credentials.general.proxyUrl, productDetails]);
 
   // Manual Rate Creation Helper
   const handleParcelOptionsOpen = () => {
@@ -1830,15 +1865,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                           const parts = val.trim().split(' ');
                           const first = parts[0] || '';
                           const last = parts.slice(1).join(' ') || '';
-                          setOrder({
-                            ...order, 
-                            customer_firstname: first, 
-                            customer_lastname: last,
-                            shipping_address: {
-                              ...order.shipping_address!,
-                              firstname: first,
-                              lastname: last
-                            }
+                          setOrder(prev => {
+                            if (!prev) return prev;
+                            return {
+                              ...prev,
+                              customer_firstname: first, 
+                              customer_lastname: last,
+                              shipping_address: {
+                                ...prev.shipping_address!,
+                                firstname: first,
+                                lastname: last
+                              }
+                            };
                           });
                         }}
                       />
@@ -1847,10 +1885,19 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       <Label>Company</Label>
                       <Input 
                         value={order.shipping_address?.company || ''} 
-                        onChange={(e) => setOrder({
-                          ...order, 
-                          shipping_address: { ...order.shipping_address!, company: e.target.value }
-                        })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOrder(prev => {
+                            if (!prev) return prev;
+                            return {
+                              ...prev,
+                              shipping_address: {
+                                ...prev.shipping_address!,
+                                company: val
+                              }
+                            };
+                          });
+                        }}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -1858,7 +1905,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                         <Label>Email</Label>
                         <Input 
                           value={order.customer_email} 
-                          onChange={(e) => setOrder({...order, customer_email: e.target.value})}
+                          onChange={(e) => {
+                          const val = e.target.value;
+                          setOrder(prev => {
+                            if (!prev) return prev;
+                            return { ...prev, customer_email: val };
+                          });
+                        }}
                         />
                       </div>
                       <div className="space-y-2">
