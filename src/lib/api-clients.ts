@@ -47,14 +47,31 @@ export class MagentoClient {
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.token.trim()}`,
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
         ...options.headers,
       },
     });
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(`Magento API Error (${response.status}): ${errorData.message || response.statusText}`);
+      let message = errorData.message || response.statusText;
+
+      // Handle Magento error parameter interpolation (e.g. "The %1 field is required")
+      if (errorData.parameters && Array.isArray(errorData.parameters)) {
+        errorData.parameters.forEach((param: any, index: number) => {
+          message = message.replace(`%${index + 1}`, String(param));
+        });
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        message += ` (APSB26-73 Authorization Check Failed: Ensure your Magento Integration Token has explicit ACL permissions enabled for required resources like Magento_Sales::shipment).`;
+      } else if (response.status === 400) {
+        message += ` (APSB26-73 REST Payload Validation Failed: Check that all payload data types and required fields strictly match Magento Swagger schema).`;
+      }
+
+      throw new Error(`Magento API Error (${response.status}): ${message}`);
     }
     return response.json();
   }
@@ -270,66 +287,79 @@ export class MagentoClient {
   }
 
   async createShipment(orderId: number, tracks: Array<{ track_number: string, title: string, carrier_code: string }>): Promise<any> {
-    console.log(`[MagentoClient] Creating shipment for order ${orderId}`, tracks);
-    const result = await this.fetch(`order/${orderId}/ship`, {
+    const numericOrderId = Number(orderId);
+    console.log(`[MagentoClient] Creating shipment for order ${numericOrderId}`, tracks);
+    
+    // Strict schema compliance for Magento REST /V1/order/{orderId}/ship under APSB26-73
+    const payload = {
+      items: [], // Empty array ships all items
+      notify: true,
+      appendComment: true,
+      comment: {
+        comment: "Shipment created via Sawyer-Ship",
+        is_visible_on_front: 1
+      },
+      tracks: tracks.map(t => ({
+        track_number: String(t.track_number || '').trim(),
+        title: String(t.title || '').trim(),
+        carrier_code: String(t.carrier_code || '').trim().toLowerCase()
+      }))
+    };
+
+    const result = await this.fetch(`order/${numericOrderId}/ship`, {
       method: 'POST',
-      body: JSON.stringify({
-        items: [], // Empty array ships all items
-        notify: true,
-        appendComment: true,
-        comment: {
-          extension_attributes: {},
-          comment: "Shipment created via Sawyer-Ship",
-          is_visible_on_front: 1
-        },
-        tracks: tracks.map(t => ({
-          track_number: t.track_number,
-          title: t.title,
-          carrier_code: t.carrier_code
-        }))
-      })
+      body: JSON.stringify(payload)
     });
     console.log(`[MagentoClient] Shipment created successfully:`, result);
     return result;
   }
 
   async getShipments(orderId: number): Promise<any[]> {
-    console.log(`[MagentoClient] Fetching shipments for order ${orderId}`);
-    const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=order_id&searchCriteria[filter_groups][0][filters][0][value]=${orderId}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
+    const numericOrderId = Number(orderId);
+    console.log(`[MagentoClient] Fetching shipments for order ${numericOrderId}`);
+    const searchCriteria = `searchCriteria[filter_groups][0][filters][0][field]=order_id&searchCriteria[filter_groups][0][filters][0][value]=${numericOrderId}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`;
     const data = await this.fetch(`shipments?${searchCriteria}`);
     return data.items || [];
   }
 
   async getShipment(shipmentId: number): Promise<any> {
-    console.log(`[MagentoClient] Fetching shipment ${shipmentId}`);
-    return this.fetch(`shipment/${shipmentId}`);
+    const numericShipmentId = Number(shipmentId);
+    console.log(`[MagentoClient] Fetching shipment ${numericShipmentId}`);
+    return this.fetch(`shipment/${numericShipmentId}`);
   }
 
   async addTrack(shipmentId: number, track: { track_number: string, title: string, carrier_code: string }): Promise<any> {
-    console.log(`[MagentoClient] Adding track to shipment ${shipmentId}`, track);
-    return this.fetch(`shipment/${shipmentId}/track`, {
+    const numericShipmentId = Number(shipmentId);
+    console.log(`[MagentoClient] Adding track to shipment ${numericShipmentId}`, track);
+    
+    // Strict schema compliance for Magento REST /V1/shipment/{shipmentId}/track
+    const payload = {
+      entity: {
+        parent_id: numericShipmentId,
+        track_number: String(track.track_number || '').trim(),
+        title: String(track.title || '').trim(),
+        carrier_code: String(track.carrier_code || '').trim().toLowerCase()
+      }
+    };
+
+    return this.fetch(`shipment/${numericShipmentId}/track`, {
       method: 'POST',
-      body: JSON.stringify({
-        entity: {
-          parent_id: shipmentId,
-          track_number: track.track_number,
-          title: track.title,
-          carrier_code: track.carrier_code
-        }
-      })
+      body: JSON.stringify(payload)
     });
   }
 
   async deleteShipment(shipmentId: number): Promise<any> {
-    console.log(`[MagentoClient] Deleting shipment ${shipmentId}`);
-    return this.fetch(`shipment/${shipmentId}`, {
+    const numericShipmentId = Number(shipmentId);
+    console.log(`[MagentoClient] Deleting shipment ${numericShipmentId}`);
+    return this.fetch(`shipment/${numericShipmentId}`, {
       method: 'DELETE'
     });
   }
 
   async deleteTrack(trackId: number): Promise<any> {
-    console.log(`[MagentoClient] Deleting track ${trackId}`);
-    return this.fetch(`shipment/track/${trackId}`, {
+    const numericTrackId = Number(trackId);
+    console.log(`[MagentoClient] Deleting track ${numericTrackId}`);
+    return this.fetch(`shipment/track/${numericTrackId}`, {
       method: 'DELETE'
     });
   }
