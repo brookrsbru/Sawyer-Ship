@@ -371,6 +371,9 @@ export function useSawyerStorage() {
 
   const resetData = () => {
     localStorage.removeItem('sawyer_ship_data');
+    localStorage.removeItem('sawyer_last_search');
+    localStorage.removeItem('sawyer_last_orders');
+    localStorage.removeItem('sawyer_has_searched');
     setCredentials(DEFAULT_CREDENTIALS);
     setMasterPassword(null);
     setIsLocked(true);

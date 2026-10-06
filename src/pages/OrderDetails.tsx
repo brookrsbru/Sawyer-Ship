@@ -61,6 +61,24 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     if (id === 'manual') return createBlankOrder();
     return location.state?.order || null;
   });
+
+  // Sync changes to order back to sawyer_last_orders so Dashboard shows updated status/data
+  useEffect(() => {
+    if (!order || !order.entity_id) return;
+    try {
+      const saved = localStorage.getItem('sawyer_last_orders');
+      if (saved) {
+        const lastOrders: MagentoOrder[] = JSON.parse(saved);
+        const idx = lastOrders.findIndex(o => String(o.entity_id) === String(order.entity_id) || o.increment_id === order.increment_id);
+        if (idx !== -1) {
+          lastOrders[idx] = order;
+          localStorage.setItem('sawyer_last_orders', JSON.stringify(lastOrders));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [order]);
   const [productDetails, setProductDetails] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingProducts, setIsFetchingProducts] = useState(false);

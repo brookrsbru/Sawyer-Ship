@@ -14,15 +14,45 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function Dashboard({ credentials }: { credentials: SawyerCredentials }) {
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('sawyer_last_search') || '');
-  const [orders, setOrders] = useState<MagentoOrder[]>([]);
+  const [orders, setOrders] = useState<MagentoOrder[]>(() => {
+    try {
+      const saved = localStorage.getItem('sawyer_last_orders');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState<boolean>(() => {
+    return localStorage.getItem('sawyer_has_searched') === 'true';
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
     localStorage.setItem('sawyer_last_search', searchQuery);
   }, [searchQuery]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sawyer_last_orders', JSON.stringify(orders));
+    } catch (e) {
+      console.error("Failed to save last orders to storage:", e);
+    }
+  }, [orders]);
+
+  useEffect(() => {
+    localStorage.setItem('sawyer_has_searched', String(hasSearched));
+  }, [hasSearched]);
+
+  const handleClear = () => {
+    setOrders([]);
+    setHasSearched(false);
+    setSearchQuery('');
+    localStorage.removeItem('sawyer_last_orders');
+    localStorage.removeItem('sawyer_has_searched');
+    localStorage.removeItem('sawyer_last_search');
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,8 +134,19 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
 
       {orders.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>Search Results</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle>Search Results</CardTitle>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleClear} 
+              className="text-zinc-500 hover:text-zinc-900 text-xs gap-1.5"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear Results
+            </Button>
           </CardHeader>
           <CardContent>
             <Table>
