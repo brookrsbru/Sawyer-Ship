@@ -285,10 +285,7 @@ export default function App() {
     save, 
     exportData, 
     importData, 
-    resetData,
-    showHiddenData,
-    revealHiddenData,
-    hideHiddenData
+    resetData 
   } = useSawyerStorage();
 
   // Auto-lock logic
@@ -334,11 +331,11 @@ export default function App() {
         },
         {
           path: "order/:id",
-          element: <OrderDetails credentials={credentials} onSave={save} showHiddenData={showHiddenData} />,
+          element: <OrderDetails credentials={credentials} onSave={save} />,
         },
         {
           path: "tracking",
-          element: <Tracking credentials={credentials} onSave={save} showHiddenData={showHiddenData} />,
+          element: <Tracking credentials={credentials} onSave={save} />,
         },
         {
           path: "settings",
@@ -347,10 +344,7 @@ export default function App() {
               credentials={credentials} 
               onSave={save} 
               onExport={exportData} 
-              onImport={importData}
-              showHiddenData={showHiddenData}
-              onRevealHiddenData={revealHiddenData}
-              onHideHiddenData={hideHiddenData}
+              onImport={importData} 
             />
           ),
         },
@@ -360,7 +354,7 @@ export default function App() {
         },
       ],
     },
-  ]), [credentials, logout, save, exportData, importData, showHiddenData, revealHiddenData, hideHiddenData]);
+  ]), [credentials, logout, save, exportData, importData]);
 
   if (isLocked) {
     return (

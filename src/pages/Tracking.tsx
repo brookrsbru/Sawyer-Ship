@@ -25,7 +25,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export default function Tracking({ credentials, onSave, showHiddenData = false }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void>, showHiddenData?: boolean }) {
+export default function Tracking({ credentials, onSave }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void> }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -766,9 +766,7 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
                       <p className="text-sm font-bold text-zinc-900 capitalize">
                         {selectedShipment?.billing?.shipping || 'Shipper'}
                         {selectedShipment?.billing?.shippingAccountNumber && (
-                          <span className="text-zinc-400 font-mono text-xs ml-2">
-                            ({showHiddenData ? selectedShipment.billing.shippingAccountNumber : '••••••••'})
-                          </span>
+                          <span className="text-zinc-400 font-mono text-xs ml-2">({selectedShipment.billing.shippingAccountNumber})</span>
                         )}
                       </p>
                     </div>
@@ -777,9 +775,7 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
                       <p className="text-sm font-bold text-zinc-900 capitalize">
                         {selectedShipment?.billing?.duties || 'Shipper'}
                         {selectedShipment?.billing?.dutiesAccountNumber && (
-                          <span className="text-zinc-400 font-mono text-xs ml-2">
-                            ({showHiddenData ? selectedShipment.billing.dutiesAccountNumber : '••••••••'})
-                          </span>
+                          <span className="text-zinc-400 font-mono text-xs ml-2">({selectedShipment.billing.dutiesAccountNumber})</span>
                         )}
                       </p>
                     </div>

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -21,14 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { APP_VERSION } from '@/src/constants';
 
@@ -44,55 +36,19 @@ export default function Settings({
   credentials, 
   onSave, 
   onExport, 
-  onImport,
-  showHiddenData = false,
-  onRevealHiddenData,
-  onHideHiddenData
+  onImport 
 }: { 
   credentials: SawyerCredentials, 
   onSave: (data: SawyerCredentials) => Promise<void>,
   onExport: () => string | null,
-  onImport: (data: string) => void,
-  showHiddenData?: boolean,
-  onRevealHiddenData?: (password: string) => Promise<boolean>,
-  onHideHiddenData?: () => void
+  onImport: (data: string) => void
 }) {
   const [formData, setFormData] = useState<SawyerCredentials>(credentials);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<string | null>(null);
-  const [isRevealModalOpen, setIsRevealModalOpen] = useState(false);
-  const [revealPassword, setRevealPassword] = useState('');
-  const [revealError, setRevealError] = useState(false);
-  const [isVerifyingReveal, setIsVerifyingReveal] = useState(false);
   const [devOrderId, setDevOrderId] = useState(() => localStorage.getItem('sawyer_last_search') || '');
   const [devOrderData, setDevOrderData] = useState<any>(null);
   const [isDevLoading, setIsDevLoading] = useState(false);
-
-  const handleRevealSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!revealPassword) return;
-    setIsVerifyingReveal(true);
-    setRevealError(false);
-    try {
-      if (onRevealHiddenData) {
-        const success = await onRevealHiddenData(revealPassword);
-        if (success) {
-          setIsRevealModalOpen(false);
-          setRevealPassword('');
-          setRevealError(false);
-          toast.success("All hidden data has been revealed");
-        } else {
-          setRevealError(true);
-          toast.error("Incorrect master password");
-        }
-      }
-    } catch {
-      setRevealError(true);
-      toast.error("Failed to verify password");
-    } finally {
-      setIsVerifyingReveal(false);
-    }
-  };
 
   // Storage usage calculator
   const storageUsage = useMemo(() => {
@@ -970,7 +926,6 @@ export default function Settings({
                       <Label htmlFor="magento-token">Integration Access Token</Label>
                       <Input 
                         id="magento-token" 
-                        type={showHiddenData ? "text" : "password"}
                         autoComplete="off"
                         placeholder="Bearer Token" 
                         value={formData.magento.token}
@@ -1030,7 +985,6 @@ export default function Settings({
                             <Label htmlFor="fedex-sandbox-key">API Key</Label>
                             <Input 
                               id="fedex-sandbox-key" 
-                              type={showHiddenData ? "text" : "password"}
                               value={formData.fedex.sandboxApiKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxApiKey: e.target.value } })}
                             />
@@ -1039,7 +993,6 @@ export default function Settings({
                             <Label htmlFor="fedex-sandbox-secret">Secret Key</Label>
                             <Input 
                               id="fedex-sandbox-secret" 
-                              type={showHiddenData ? "text" : "password"}
                               autoComplete="off"
                               value={formData.fedex.sandboxSecretKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxSecretKey: e.target.value } })}
@@ -1052,7 +1005,6 @@ export default function Settings({
                             <Label htmlFor="fedex-production-key">API Key</Label>
                             <Input 
                               id="fedex-production-key" 
-                              type={showHiddenData ? "text" : "password"}
                               value={formData.fedex.productionApiKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionApiKey: e.target.value } })}
                             />
@@ -1061,7 +1013,6 @@ export default function Settings({
                             <Label htmlFor="fedex-production-secret">Secret Key</Label>
                             <Input 
                               id="fedex-production-secret" 
-                              type={showHiddenData ? "text" : "password"}
                               autoComplete="off"
                               value={formData.fedex.productionSecretKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionSecretKey: e.target.value } })}
@@ -1076,7 +1027,6 @@ export default function Settings({
                               <Label htmlFor="fedex-domestic-account">Sandbox Domestic Account Number</Label>
                               <Input 
                                 id="fedex-domestic-account" 
-                                type={showHiddenData ? "text" : "password"}
                                 value={formData.fedex.domesticAccountNumber}
                                 onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, domesticAccountNumber: e.target.value } })}
                               />
@@ -1085,7 +1035,6 @@ export default function Settings({
                               <Label htmlFor="fedex-global-account">Sandbox Global Account Number</Label>
                               <Input 
                                 id="fedex-global-account" 
-                                type={showHiddenData ? "text" : "password"}
                                 value={formData.fedex.globalAccountNumber}
                                 onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, globalAccountNumber: e.target.value } })}
                               />
@@ -1095,7 +1044,6 @@ export default function Settings({
                             <Label htmlFor="fedex-payment-account">Sandbox Payment Account Number (Payor)</Label>
                             <Input 
                               id="fedex-payment-account" 
-                              type={showHiddenData ? "text" : "password"}
                               placeholder="Used for shipping charges payment"
                               value={formData.fedex.paymentAccountNumber}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, paymentAccountNumber: e.target.value } })}
@@ -1108,7 +1056,6 @@ export default function Settings({
                           <Label htmlFor="fedex-prod-account">Production Account Number</Label>
                           <Input 
                             id="fedex-prod-account" 
-                            type={showHiddenData ? "text" : "password"}
                             value={formData.fedex.productionAccountNumber}
                             onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionAccountNumber: e.target.value } })}
                           />
@@ -1148,7 +1095,6 @@ export default function Settings({
                             <Label htmlFor="fedex-track-sandbox-key">API Key</Label>
                             <Input 
                               id="fedex-track-sandbox-key" 
-                              type={showHiddenData ? "text" : "password"}
                               value={formData.fedex.sandboxTrackingApiKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxTrackingApiKey: e.target.value } })}
                             />
@@ -1157,7 +1103,6 @@ export default function Settings({
                             <Label htmlFor="fedex-track-sandbox-secret">Secret Key</Label>
                             <Input 
                               id="fedex-track-sandbox-secret" 
-                              type={showHiddenData ? "text" : "password"}
                               autoComplete="off"
                               value={formData.fedex.sandboxTrackingSecretKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxTrackingSecretKey: e.target.value } })}
@@ -1167,7 +1112,6 @@ export default function Settings({
                             <Label htmlFor="fedex-track-sandbox-account">Account Number</Label>
                             <Input 
                               id="fedex-track-sandbox-account" 
-                              type={showHiddenData ? "text" : "password"}
                               value={formData.fedex.sandboxTrackingAccountNumber}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, sandboxTrackingAccountNumber: e.target.value } })}
                             />
@@ -1179,7 +1123,6 @@ export default function Settings({
                             <Label htmlFor="fedex-track-production-key">API Key</Label>
                             <Input 
                               id="fedex-track-production-key" 
-                              type={showHiddenData ? "text" : "password"}
                               value={formData.fedex.productionTrackingApiKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionTrackingApiKey: e.target.value } })}
                             />
@@ -1188,7 +1131,6 @@ export default function Settings({
                             <Label htmlFor="fedex-track-production-secret">Secret Key</Label>
                             <Input 
                               id="fedex-track-production-secret" 
-                              type={showHiddenData ? "text" : "password"}
                               autoComplete="off"
                               value={formData.fedex.productionTrackingSecretKey}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionTrackingSecretKey: e.target.value } })}
@@ -1198,7 +1140,6 @@ export default function Settings({
                             <Label htmlFor="fedex-track-production-account">Account Number</Label>
                             <Input 
                               id="fedex-track-production-account" 
-                              type={showHiddenData ? "text" : "password"}
                               value={formData.fedex.productionTrackingAccountNumber}
                               onChange={(e) => setFormData({ ...formData, fedex: { ...formData.fedex, productionTrackingAccountNumber: e.target.value } })}
                             />
@@ -1303,43 +1244,6 @@ export default function Settings({
                   <Separator />
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Credential Visibility</Label>
-                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${showHiddenData ? 'bg-amber-100 text-amber-800' : 'bg-zinc-100 text-zinc-600'}`}>
-                        {showHiddenData ? 'REVEALED' : 'HIDDEN'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-500">
-                      API tokens, keys, and account numbers are currently {showHiddenData ? <span className="font-semibold text-amber-600">revealed</span> : <span className="font-semibold text-zinc-700">hidden (password style)</span>}.
-                    </p>
-                    {showHiddenData ? (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="w-full gap-2 border-zinc-300 hover:bg-zinc-100"
-                        onClick={onHideHiddenData}
-                      >
-                        <EyeOff size={16} /> Hide all data
-                      </Button>
-                    ) : (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="w-full gap-2 border-zinc-300 hover:bg-zinc-100"
-                        onClick={() => {
-                          setRevealPassword('');
-                          setRevealError(false);
-                          setIsRevealModalOpen(true);
-                        }}
-                      >
-                        <Eye size={16} /> Reveal all hidden data
-                      </Button>
-                    )}
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-2">
                     <Label>Export Settings & Tokens</Label>
                     <Button variant="outline" className="w-full gap-2" onClick={handleExport}>
                       <FileJson size={18} /> Download JSON Backup
@@ -1362,60 +1266,6 @@ export default function Settings({
                       <p className="text-[10px] text-zinc-500">Importing will overwrite your current settings.</p>
                     </div>
                   </div>
-
-                  <Dialog open={isRevealModalOpen} onOpenChange={setIsRevealModalOpen}>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <Lock className="w-5 h-5 text-zinc-900" /> Reveal All Hidden Data
-                        </DialogTitle>
-                        <DialogDescription>
-                          Enter your master password to reveal all API keys, access tokens, and account numbers.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleRevealSubmit} className="space-y-4 py-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="reveal-password-input">Master Password</Label>
-                          <Input 
-                            id="reveal-password-input"
-                            type="password"
-                            placeholder="Enter password..."
-                            value={revealPassword}
-                            onChange={(e) => {
-                              setRevealPassword(e.target.value);
-                              setRevealError(false);
-                            }}
-                            className={revealError ? "border-red-500" : ""}
-                            autoFocus
-                          />
-                          {revealError && (
-                            <p className="text-xs text-red-500">Incorrect password. Please try again.</p>
-                          )}
-                        </div>
-                        <DialogFooter className="gap-2 sm:gap-0">
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            onClick={() => {
-                              setIsRevealModalOpen(false);
-                              setRevealPassword('');
-                              setRevealError(false);
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button 
-                            type="submit" 
-                            className="bg-zinc-900 hover:bg-zinc-800"
-                            disabled={!revealPassword || isVerifyingReveal}
-                          >
-                            {isVerifyingReveal ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
-                            Reveal All
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
 
                   <AlertDialog open={!!pendingImportData} onOpenChange={(open) => !open && setPendingImportData(null)}>
                     <AlertDialogContent>

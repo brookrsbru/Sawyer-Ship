@@ -213,7 +213,6 @@ export function useSawyerStorage() {
   const [isBackdoorVisible, setIsBackdoorVisible] = useState(false);
   const [credentials, setCredentials] = useState<SawyerCredentials>(DEFAULT_CREDENTIALS);
   const [masterPassword, setMasterPassword] = useState<string | null>(null);
-  const [showHiddenData, setShowHiddenData] = useState(false);
 
   const RECOVERY_CIPHER_KEY = "RECOVERY_MASTER_f2e8d1c0a9b876543210fedcba9876543210abcdef0123456789";
   const DEV_SECRET_SEED = "v9P2m8R5k1L7q4N3b0X6s9D2j5H8g4F1e7A3t0Y6u5I4o3P2w1S0z9C8v7B6n5M";
@@ -354,37 +353,8 @@ export function useSawyerStorage() {
     setCredentials(newCredentials);
   };
 
-  const verifyPassword = async (password: string): Promise<boolean> => {
-    if (masterPassword && masterPassword === password) return true;
-    const stored = localStorage.getItem('sawyer_ship_data');
-    if (!stored) {
-      return !masterPassword || password === masterPassword;
-    }
-    try {
-      const decrypted = await decrypt(stored, password);
-      JSON.parse(decrypted);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const revealHiddenData = async (password: string): Promise<boolean> => {
-    const isValid = await verifyPassword(password);
-    if (isValid) {
-      setShowHiddenData(true);
-      return true;
-    }
-    return false;
-  };
-
-  const hideHiddenData = () => {
-    setShowHiddenData(false);
-  };
-
   const logout = () => {
     setMasterPassword(null);
-    setShowHiddenData(false);
     setCredentials(DEFAULT_CREDENTIALS);
     setIsLocked(true);
   };
@@ -404,7 +374,6 @@ export function useSawyerStorage() {
     localStorage.removeItem('sawyer_last_search');
     localStorage.removeItem('sawyer_last_orders');
     localStorage.removeItem('sawyer_has_searched');
-    setShowHiddenData(false);
     setCredentials(DEFAULT_CREDENTIALS);
     setMasterPassword(null);
     setIsLocked(true);
@@ -422,10 +391,6 @@ export function useSawyerStorage() {
     exportData,
     importData,
     resetData,
-    showHiddenData,
-    revealHiddenData,
-    hideHiddenData,
-    verifyPassword,
     hasStoredData: !!localStorage.getItem('sawyer_ship_data'),
     hasRecoveryBlob: !!localStorage.getItem('sawyer_ship_recovery')
   };
