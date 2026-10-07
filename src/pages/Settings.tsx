@@ -524,26 +524,6 @@ export default function Settings({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="origin-email">Email</Label>
-                        <Input 
-                          id="origin-email"
-                          type="email"
-                          value={formData.general.originEmail}
-                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originEmail: e.target.value } })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="origin-phone">Phone</Label>
-                        <Input 
-                          id="origin-phone"
-                          value={formData.general.originPhone}
-                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originPhone: e.target.value } })}
-                        />
-                      </div>
-                    </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="origin-street1">Street Address</Label>
                       <Input 
@@ -583,6 +563,26 @@ export default function Settings({
                           id="origin-postcode"
                           value={formData.general.originPostalCode}
                           onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originPostalCode: e.target.value } })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-email">Email</Label>
+                        <Input 
+                          id="origin-email"
+                          type="email"
+                          value={formData.general.originEmail}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originEmail: e.target.value } })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="origin-phone">Phone</Label>
+                        <Input 
+                          id="origin-phone"
+                          value={formData.general.originPhone}
+                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, originPhone: e.target.value } })}
                         />
                       </div>
                     </div>

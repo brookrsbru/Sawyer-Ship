@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight, ChevronLeft, ChevronRight, Box, Trash2, Copy, Plus } from 'lucide-react';
+import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2, Pencil, X, RotateCcw, Search, Book, ArrowRight, ChevronLeft, ChevronRight, Box, Trash2, Copy, Plus, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -222,6 +222,12 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [isManualReady, setIsManualReady] = useState(false);
+  const [isNoOrderNumberDialogOpen, setIsNoOrderNumberDialogOpen] = useState(false);
+  const orderNumberInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const hasLongAddressLine = !!(order?.shipping_address?.street || []).some(
+    (line: string | undefined) => (line?.length || 0) > 35
+  );
 
   // Sync weight when Kg or G changes
   useEffect(() => {
@@ -435,6 +441,21 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
       }
     }
     setIsManualReady(true);
+  };
+
+  const handleProceedClick = () => {
+    const hasOrderNumber = !!(
+      order?.increment_id &&
+      order.increment_id.trim() !== '' &&
+      order.increment_id.trim().toUpperCase() !== 'MANUAL'
+    );
+
+    if (!hasOrderNumber) {
+      setIsNoOrderNumberDialogOpen(true);
+      return;
+    }
+
+    handleContinueToShipping();
   };
 
   const ValidationIcon = ({ status }: { status: 'none' | 'loading' | 'valid' | 'invalid' }) => {
@@ -1503,6 +1524,7 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
             <div className="flex items-baseline gap-1">
               <h1 className="text-4xl font-bold text-zinc-900 whitespace-nowrap">Shipment #</h1>
               <input 
+                ref={orderNumberInputRef}
                 value={order?.increment_id === 'MANUAL' ? '' : order?.increment_id} 
                 onChange={(e) => setOrder({...order!, increment_id: e.target.value.toUpperCase()})}
                 className="text-4xl font-bold text-zinc-900 bg-transparent border-none p-0 focus:outline-none w-full max-w-[500px] placeholder:text-zinc-200"
@@ -1539,25 +1561,6 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                     });
                   }}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input 
-                    value={order!.customer_email || ''} 
-                    onChange={(e) => setOrder({...order!, customer_email: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telephone</Label>
-                  <Input 
-                    value={order!.shipping_address?.telephone || ''} 
-                    onChange={(e) => setOrder({
-                      ...order!, 
-                      shipping_address: { ...order!.shipping_address!, telephone: e.target.value }
-                    })}
-                  />
-                </div>
               </div>
               <div className="space-y-2">
                 <Label>Company</Label>
@@ -1674,6 +1677,25 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                   </Select>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input 
+                    value={order!.customer_email || ''} 
+                    onChange={(e) => setOrder({...order!, customer_email: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telephone</Label>
+                  <Input 
+                    value={order!.shipping_address?.telephone || ''} 
+                    onChange={(e) => setOrder({
+                      ...order!, 
+                      shipping_address: { ...order!.shipping_address!, telephone: e.target.value }
+                    })}
+                  />
+                </div>
+              </div>
 
               {id === 'manual' && (
                 <div className="space-y-4 pt-2">
@@ -1739,12 +1761,63 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
               <Button 
                 className="w-full bg-zinc-900 hover:bg-zinc-800" 
                 disabled={!isComplete}
-                onClick={handleContinueToShipping}
+                onClick={handleProceedClick}
               >
                 Continue to Shipping
               </Button>
             </CardContent>
           </Card>
+
+          <Dialog open={isNoOrderNumberDialogOpen} onOpenChange={setIsNoOrderNumberDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-zinc-900">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  No Order Number
+                </DialogTitle>
+                <DialogDescription className="text-zinc-600 pt-2 text-sm leading-relaxed">
+                  You haven't entered an order number for this manual shipment. Are you sure you want to proceed without one?
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-2">
+                <Label className="text-xs font-semibold text-zinc-700">Enter Order Number (optional)</Label>
+                <Input 
+                  placeholder="e.g. MANUAL-1001" 
+                  value={order?.increment_id === 'MANUAL' ? '' : (order?.increment_id || '')} 
+                  onChange={(e) => setOrder({...order!, increment_id: e.target.value.toUpperCase()})}
+                  className="mt-1.5"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setIsNoOrderNumberDialogOpen(false);
+                      handleContinueToShipping();
+                    }
+                  }}
+                />
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0 pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsNoOrderNumberDialogOpen(false);
+                    setTimeout(() => {
+                      orderNumberInputRef.current?.focus();
+                    }, 100);
+                  }}
+                >
+                  Add Order Number
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setIsNoOrderNumberDialogOpen(false);
+                    handleContinueToShipping();
+                  }}
+                  className="bg-zinc-900 hover:bg-zinc-800"
+                >
+                  Proceed Without Number
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Right Column: Address Book Autofill */}
           <Card className="flex flex-col shadow-sm border-zinc-200 h-fit">
@@ -1894,6 +1967,14 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2">
                 <User size={20} /> Customer & Shipping
+                {hasLongAddressLine && (
+                  <span 
+                    title="Address line exceeds 35 characters" 
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white font-black text-xs ml-1 shadow-sm"
+                  >
+                    !
+                  </span>
+                )}
               </CardTitle>
               <Dialog open={isEditingCustomer} onOpenChange={setIsEditingCustomer}>
                 <DialogTrigger
@@ -1952,31 +2033,6 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                           });
                         }}
                       />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Email</Label>
-                        <Input 
-                          value={order.customer_email} 
-                          onChange={(e) => {
-                          const val = e.target.value;
-                          setOrder(prev => {
-                            if (!prev) return prev;
-                            return { ...prev, customer_email: val };
-                          });
-                        }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Telephone</Label>
-                        <Input 
-                          value={order.shipping_address?.telephone || ''} 
-                          onChange={(e) => setOrder({
-                            ...order, 
-                            shipping_address: { ...order.shipping_address!, telephone: e.target.value }
-                          })}
-                        />
-                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="flex justify-between">
@@ -2083,6 +2139,31 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                         </Select>
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <Input 
+                          value={order.customer_email} 
+                          onChange={(e) => {
+                          const val = e.target.value;
+                          setOrder(prev => {
+                            if (!prev) return prev;
+                            return { ...prev, customer_email: val };
+                          });
+                        }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Telephone</Label>
+                        <Input 
+                          value={order.shipping_address?.telephone || ''} 
+                          onChange={(e) => setOrder({
+                            ...order, 
+                            shipping_address: { ...order.shipping_address!, telephone: e.target.value }
+                          })}
+                        />
+                      </div>
+                    </div>
 
                     <div className="flex gap-4 p-4 bg-zinc-50 border rounded-lg mt-4 items-center h-[58px]">
                       <div className="flex-1 flex items-center gap-2">
@@ -2127,14 +2208,40 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                 <p className="text-zinc-600">{order.shipping_address?.telephone || 'No phone number'}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Shipping Address</p>
-                <p className="font-bold text-lg">{order.shipping_address?.street?.join(', ') || 'No street address'}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Shipping Address</p>
+                  {hasLongAddressLine && (
+                    <span 
+                      title="Address line exceeds 35 character limit" 
+                      className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white font-black text-[10px] leading-none shrink-0"
+                    >
+                      !
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-start gap-2">
+                  <p className="font-bold text-lg flex-1">{order.shipping_address?.street?.join(', ') || 'No street address'}</p>
+                  {hasLongAddressLine && (
+                    <span 
+                      title="One or more address lines exceed 35 characters" 
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white font-black text-xs shrink-0 shadow-sm cursor-help animate-pulse"
+                    >
+                      !
+                    </span>
+                  )}
+                </div>
                 <p className="text-zinc-600">
                   {order.shipping_address?.city}, {order.shipping_address?.region} {order.shipping_address?.postcode}
                 </p>
                 <p className="text-zinc-600">
                   {COUNTRY_NAMES[order.shipping_address?.country_id || ''] || order.shipping_address?.country_id}
                 </p>
+                {hasLongAddressLine && (
+                  <p className="text-xs text-red-600 font-medium flex items-center gap-1.5 pt-1">
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-100 text-red-700 font-bold text-[10px]">!</span>
+                    Address line exceeds 35 character limit
+                  </p>
+                )}
               </div>
 
               <div className="col-span-2 flex gap-4 p-4 bg-zinc-50 border rounded-lg items-center h-[58px]">

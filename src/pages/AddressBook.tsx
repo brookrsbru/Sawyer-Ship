@@ -323,21 +323,12 @@ export default function AddressBook({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="col-span-2 space-y-2">
                 <Label htmlFor="comp">Company</Label>
                 <Input 
                   id="comp" 
                   value={newCustomer.company}
                   onChange={(e) => setNewCustomer({ ...newCustomer, company: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  type="email"
-                  value={newCustomer.email}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                 />
               </div>
 
@@ -392,15 +383,6 @@ export default function AddressBook({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input 
-                  id="phone" 
-                  value={newCustomer.telephone}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, telephone: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="country">Country</Label>
                 <Select 
                   value={newCustomer.country} 
@@ -417,7 +399,25 @@ export default function AddressBook({
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2 pt-8">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                  id="email" 
+                  type="email"
+                  value={newCustomer.email}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input 
+                  id="phone" 
+                  value={newCustomer.telephone}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, telephone: e.target.value })}
+                />
+              </div>
+
+              <div className="col-span-2 flex items-center gap-2 pt-2">
                 <input 
                   type="checkbox" 
                   id="res"
@@ -757,21 +757,12 @@ export default function AddressBook({
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="col-span-2 space-y-2">
               <Label htmlFor="edit-comp">Company</Label>
               <Input 
                 id="edit-comp" 
                 value={editingCustomer?.company || ''}
                 onChange={(e) => setEditingCustomer(prev => prev ? { ...prev, company: e.target.value } : null)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input 
-                id="edit-email" 
-                type="email"
-                value={editingCustomer?.email || ''}
-                onChange={(e) => setEditingCustomer(prev => prev ? { ...prev, email: e.target.value } : null)}
               />
             </div>
 
@@ -826,15 +817,6 @@ export default function AddressBook({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone</Label>
-              <Input 
-                id="edit-phone" 
-                value={editingCustomer?.telephone || ''}
-                onChange={(e) => setEditingCustomer(prev => prev ? { ...prev, telephone: e.target.value } : null)}
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="edit-country">Country</Label>
               <Select 
                 value={editingCustomer?.country || 'GB'} 
@@ -851,7 +833,25 @@ export default function AddressBook({
               </Select>
             </div>
 
-            <div className="flex items-center gap-2 pt-8">
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input 
+                id="edit-email" 
+                type="email"
+                value={editingCustomer?.email || ''}
+                onChange={(e) => setEditingCustomer(prev => prev ? { ...prev, email: e.target.value } : null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input 
+                id="edit-phone" 
+                value={editingCustomer?.telephone || ''}
+                onChange={(e) => setEditingCustomer(prev => prev ? { ...prev, telephone: e.target.value } : null)}
+              />
+            </div>
+
+            <div className="col-span-2 flex items-center gap-2 pt-2">
               <input 
                 type="checkbox" 
                 id="edit-res"
