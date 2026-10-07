@@ -404,6 +404,7 @@ export function useSawyerStorage() {
     localStorage.removeItem('sawyer_last_search');
     localStorage.removeItem('sawyer_last_orders');
     localStorage.removeItem('sawyer_has_searched');
+    localStorage.removeItem('sawyer_manual_shipment_draft');
     setShowHiddenData(false);
     setCredentials(DEFAULT_CREDENTIALS);
     setMasterPassword(null);

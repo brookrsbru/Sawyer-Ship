@@ -225,6 +225,12 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
   const [isNoOrderNumberDialogOpen, setIsNoOrderNumberDialogOpen] = useState(false);
   const orderNumberInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  // Manual shipment draft state & restoration
+  const [isResumeDraftModalOpen, setIsResumeDraftModalOpen] = useState(false);
+  const [isConfirmClearShipmentOpen, setIsConfirmClearShipmentOpen] = useState(false);
+  const [existingDraft, setExistingDraft] = useState<any | null>(null);
+  const isDraftInitializedRef = React.useRef(false);
+
   const hasLongAddressLine = !!(order?.shipping_address?.street || []).some(
     (line: string | undefined) => (line?.length || 0) > 35
   );
@@ -472,6 +478,248 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
     setWidth('');
     setHeight('');
   };
+
+  // Check for existing manual shipment draft on mount
+  useEffect(() => {
+    if (id !== 'manual') return;
+    try {
+      const raw = localStorage.getItem('sawyer_manual_shipment_draft');
+      if (raw) {
+        const parsedDraft = JSON.parse(raw);
+        const hasContent = !!(
+          parsedDraft.fullNameInput ||
+          parsedDraft.order?.customer_firstname ||
+          parsedDraft.order?.customer_lastname ||
+          parsedDraft.order?.shipping_address?.street?.[0] ||
+          parsedDraft.order?.shipping_address?.city ||
+          parsedDraft.order?.shipping_address?.postcode ||
+          parsedDraft.order?.shipping_address?.company ||
+          parsedDraft.order?.customer_email ||
+          parsedDraft.order?.shipping_address?.telephone ||
+          (parsedDraft.order?.increment_id && parsedDraft.order.increment_id !== 'MANUAL') ||
+          parsedDraft.isManualReady ||
+          (parsedDraft.parcels && parsedDraft.parcels.length > 0)
+        );
+
+        if (hasContent) {
+          setExistingDraft(parsedDraft);
+          setIsResumeDraftModalOpen(true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse manual shipment draft", e);
+    }
+    isDraftInitializedRef.current = true;
+  }, [id]);
+
+  const handleAcceptDraftAndContinue = () => {
+    if (existingDraft) {
+      if (existingDraft.order) setOrder(existingDraft.order);
+      if (existingDraft.fullNameInput !== undefined) setFullNameInput(existingDraft.fullNameInput);
+      if (existingDraft.isManualReady !== undefined) setIsManualReady(existingDraft.isManualReady);
+      if (existingDraft.weight !== undefined) setWeight(existingDraft.weight);
+      if (existingDraft.weightKg !== undefined) setWeightKg(existingDraft.weightKg);
+      if (existingDraft.weightG !== undefined) setWeightG(existingDraft.weightG);
+      if (existingDraft.length !== undefined) setLength(existingDraft.length);
+      if (existingDraft.width !== undefined) setWidth(existingDraft.width);
+      if (existingDraft.height !== undefined) setHeight(existingDraft.height);
+      if (existingDraft.parcels !== undefined) setParcels(existingDraft.parcels);
+      if (existingDraft.addressBookSync !== undefined) setAddressBookSync(existingDraft.addressBookSync);
+      if (existingDraft.addressBookRef !== undefined) setAddressBookRef(existingDraft.addressBookRef);
+      if (existingDraft.billShippingTo !== undefined) setBillShippingTo(existingDraft.billShippingTo);
+      if (existingDraft.billDutiesTo !== undefined) setBillDutiesTo(existingDraft.billDutiesTo);
+      if (existingDraft.shipAccountNumber !== undefined) setShipAccountNumber(existingDraft.shipAccountNumber);
+      if (existingDraft.dutyAccountNumber !== undefined) setDutyAccountNumber(existingDraft.dutyAccountNumber);
+    }
+    setIsResumeDraftModalOpen(false);
+    isDraftInitializedRef.current = true;
+    toast.success("Restored in-progress manual shipment");
+  };
+
+  const handleRejectDraftAndStartNew = () => {
+    localStorage.removeItem('sawyer_manual_shipment_draft');
+    setExistingDraft(null);
+    setIsResumeDraftModalOpen(false);
+    isDraftInitializedRef.current = true;
+    executeClearManualShipment();
+  };
+
+  const executeClearManualShipment = () => {
+    localStorage.removeItem('sawyer_manual_shipment_draft');
+    setOrder(createBlankOrder());
+    setFullNameInput('');
+    setIsManualReady(false);
+    clearPackageDetails();
+    setParcels([]);
+    setRates([]);
+    setSelectedRate(null);
+    setAddressBookSync(false);
+    setAddressBookRef('');
+    setAddressSearch('');
+    toast.info("Manual shipment cleared");
+  };
+
+  // Auto-save manual shipment draft
+  useEffect(() => {
+    if (id !== 'manual') return;
+    if (!isDraftInitializedRef.current) return;
+    if (!order) return;
+
+    const hasContent = !!(
+      fullNameInput ||
+      order.customer_firstname ||
+      order.customer_lastname ||
+      order.shipping_address?.street?.[0] ||
+      order.shipping_address?.city ||
+      order.shipping_address?.postcode ||
+      order.shipping_address?.company ||
+      order.customer_email ||
+      order.shipping_address?.telephone ||
+      (order.increment_id && order.increment_id !== 'MANUAL') ||
+      isManualReady ||
+      (parcels && parcels.length > 0) ||
+      length ||
+      width ||
+      height
+    );
+
+    if (hasContent) {
+      const draft = {
+        order,
+        fullNameInput,
+        isManualReady,
+        weight,
+        weightKg,
+        weightG,
+        length,
+        width,
+        height,
+        parcels,
+        addressBookSync,
+        addressBookRef,
+        billShippingTo,
+        billDutiesTo,
+        shipAccountNumber,
+        dutyAccountNumber,
+        savedAt: Date.now()
+      };
+      localStorage.setItem('sawyer_manual_shipment_draft', JSON.stringify(draft));
+    } else {
+      localStorage.removeItem('sawyer_manual_shipment_draft');
+    }
+  }, [
+    id,
+    order,
+    fullNameInput,
+    isManualReady,
+    weight,
+    weightKg,
+    weightG,
+    length,
+    width,
+    height,
+    parcels,
+    addressBookSync,
+    addressBookRef,
+    billShippingTo,
+    billDutiesTo,
+    shipAccountNumber,
+    dutyAccountNumber
+  ]);
+
+  const renderDraftModal = () => (
+    <Dialog open={isResumeDraftModalOpen} onOpenChange={(open) => {
+      if (!open) handleAcceptDraftAndContinue();
+    }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-zinc-900">
+            <Package className="w-5 h-5 text-zinc-700" />
+            Existing Manual Shipment Found
+          </DialogTitle>
+          <DialogDescription className="text-zinc-600 pt-2 text-sm leading-relaxed">
+            You have an in-progress manual shipment that was not completed. Would you like to continue editing this shipment, or clear it and start fresh?
+          </DialogDescription>
+        </DialogHeader>
+
+        {existingDraft && (
+          <div className="p-3.5 bg-zinc-50 border rounded-xl space-y-2 text-xs">
+            <div className="flex justify-between items-center text-zinc-500 font-medium">
+              <span className="font-mono text-zinc-700 font-bold">
+                Shipment #{existingDraft.order?.increment_id && existingDraft.order.increment_id !== 'MANUAL' ? existingDraft.order.increment_id : 'MANUAL'}
+              </span>
+              <span className="bg-zinc-200/70 text-zinc-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                {existingDraft.isManualReady ? 'Rates & Shipping step' : 'Address details step'}
+              </span>
+            </div>
+            <div className="pt-0.5">
+              <p className="font-bold text-zinc-900 text-sm truncate">
+                {existingDraft.fullNameInput || 
+                 [existingDraft.order?.customer_firstname, existingDraft.order?.customer_lastname].filter(Boolean).join(' ') || 
+                 existingDraft.order?.shipping_address?.company || 
+                 'Unnamed Recipient'}
+              </p>
+              {existingDraft.order?.shipping_address?.company && existingDraft.fullNameInput && (
+                <p className="text-zinc-600 truncate">{existingDraft.order.shipping_address.company}</p>
+              )}
+              {(existingDraft.order?.shipping_address?.street?.[0] || existingDraft.order?.shipping_address?.city || existingDraft.order?.shipping_address?.postcode) && (
+                <p className="text-zinc-500 truncate pt-0.5">
+                  {[existingDraft.order?.shipping_address?.street?.[0], existingDraft.order?.shipping_address?.city, existingDraft.order?.shipping_address?.postcode].filter(Boolean).join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0 pt-3">
+          <Button 
+            variant="outline" 
+            onClick={handleRejectDraftAndStartNew}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
+          >
+            Clear & Create New
+          </Button>
+          <Button 
+            onClick={handleAcceptDraftAndContinue}
+            className="bg-zinc-900 hover:bg-zinc-800 text-white"
+          >
+            Continue Shipment
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const renderConfirmClearModal = () => (
+    <Dialog open={isConfirmClearShipmentOpen} onOpenChange={setIsConfirmClearShipmentOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-zinc-900">
+            <Trash2 className="w-5 h-5 text-red-600" />
+            Clear Manual Shipment?
+          </DialogTitle>
+          <DialogDescription className="text-zinc-600 pt-2 text-sm leading-relaxed">
+            Are you sure you want to clear this manual shipment? All recipient details, parcels, and options entered will be reset.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0 pt-3">
+          <Button variant="outline" onClick={() => setIsConfirmClearShipmentOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="destructive"
+            onClick={() => {
+              setIsConfirmClearShipmentOpen(false);
+              executeClearManualShipment();
+            }}
+          >
+            Clear Shipment
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   useEffect(() => {
     // Only fetch if we don't have an order AND we haven't already fetched it for this session/ID
@@ -1460,6 +1708,11 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
         if (credentials.general.autoOpenLabel) {
           setIsLabelViewerOpen(true);
         }
+
+        // Clear manual shipment draft upon successful label creation
+        if (id === 'manual') {
+          localStorage.removeItem('sawyer_manual_shipment_draft');
+        }
       }
     } catch (error: any) {
       console.error(`[OrderDetails] Error in handleCreateLabel:`, error);
@@ -1516,23 +1769,34 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
 
     return (
       <div className="max-w-7xl mx-auto space-y-8">
-        <header className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} />
-          </Button>
-          <div>
-            <div className="flex items-baseline gap-1">
-              <h1 className="text-4xl font-bold text-zinc-900 whitespace-nowrap">Shipment #</h1>
-              <input 
-                ref={orderNumberInputRef}
-                value={order?.increment_id === 'MANUAL' ? '' : order?.increment_id} 
-                onChange={(e) => setOrder({...order!, increment_id: e.target.value.toUpperCase()})}
-                className="text-4xl font-bold text-zinc-900 bg-transparent border-none p-0 focus:outline-none w-full max-w-[500px] placeholder:text-zinc-200"
-                placeholder="MANUAL"
-              />
+        <header className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft size={20} />
+            </Button>
+            <div>
+              <div className="flex items-baseline gap-1">
+                <h1 className="text-4xl font-bold text-zinc-900 whitespace-nowrap">Shipment #</h1>
+                <input 
+                  ref={orderNumberInputRef}
+                  value={order?.increment_id === 'MANUAL' ? '' : order?.increment_id} 
+                  onChange={(e) => setOrder({...order!, increment_id: e.target.value.toUpperCase()})}
+                  className="text-4xl font-bold text-zinc-900 bg-transparent border-none p-0 focus:outline-none w-full max-w-[500px] placeholder:text-zinc-200"
+                  placeholder="MANUAL"
+                />
+              </div>
+              <p className="text-zinc-500">Please provide the recipient's information to continue.</p>
             </div>
-            <p className="text-zinc-500">Please provide the recipient's information to continue.</p>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setIsConfirmClearShipmentOpen(true)}
+            className="gap-2 text-zinc-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={16} />
+            Clear Shipment
+          </Button>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start">
@@ -1935,6 +2199,8 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
             </CardContent>
           </Card>
         </div>
+        {renderDraftModal()}
+        {renderConfirmClearModal()}
       </div>
     );
   }
@@ -1955,9 +2221,22 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                 </p>
               </div>
             </div>
-            <Badge className="bg-zinc-900 text-white px-3 py-1 text-sm">
-              {id === 'manual' ? 'Draft' : order.status}
-            </Badge>
+            <div className="flex items-center gap-3">
+              {id === 'manual' && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setIsConfirmClearShipmentOpen(true)}
+                  className="gap-2 text-zinc-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={16} />
+                  Clear Shipment
+                </Button>
+              )}
+              <Badge className="bg-zinc-900 text-white px-3 py-1 text-sm">
+                {id === 'manual' ? 'Draft' : order.status}
+              </Badge>
+            </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -3097,6 +3376,8 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
           </Card>
         </div>
       </div>
+      {id === 'manual' && renderDraftModal()}
+      {id === 'manual' && renderConfirmClearModal()}
     </div>
   );
 }
