@@ -28,7 +28,7 @@ interface Parcel {
   height: string;
 }
 
-export default function OrderDetails({ credentials, onSave }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void> }) {
+export default function OrderDetails({ credentials, onSave, showHiddenData = false }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void>, showHiddenData?: boolean }) {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -2822,6 +2822,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                       <div className="space-y-2">
                         <Label>Shipping Account Number</Label>
                         <Input 
+                          type={showHiddenData ? "text" : "password"}
                           value={shipAccountNumber} 
                           onChange={(e) => setShipAccountNumber(e.target.value)} 
                           placeholder="Enter account number"
@@ -2850,6 +2851,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                           <div className="space-y-2">
                             <Label>Duties Account Number</Label>
                             <Input 
+                              type={showHiddenData ? "text" : "password"}
                               value={dutyAccountNumber} 
                               onChange={(e) => setDutyAccountNumber(e.target.value)} 
                               placeholder="Enter account number"
