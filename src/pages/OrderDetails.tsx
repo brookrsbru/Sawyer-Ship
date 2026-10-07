@@ -1967,14 +1967,6 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2">
                 <User size={20} /> Customer & Shipping
-                {hasLongAddressLine && (
-                  <span 
-                    title="Address line exceeds 35 characters" 
-                    className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white font-black text-xs ml-1 shadow-sm"
-                  >
-                    !
-                  </span>
-                )}
               </CardTitle>
               <Dialog open={isEditingCustomer} onOpenChange={setIsEditingCustomer}>
                 <DialogTrigger
@@ -2219,17 +2211,7 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                     </span>
                   )}
                 </div>
-                <div className="flex items-start gap-2">
-                  <p className="font-bold text-lg flex-1">{order.shipping_address?.street?.join(', ') || 'No street address'}</p>
-                  {hasLongAddressLine && (
-                    <span 
-                      title="One or more address lines exceed 35 characters" 
-                      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white font-black text-xs shrink-0 shadow-sm cursor-help animate-pulse"
-                    >
-                      !
-                    </span>
-                  )}
-                </div>
+                <p className="font-bold text-lg">{order.shipping_address?.street?.join(', ') || 'No street address'}</p>
                 <p className="text-zinc-600">
                   {order.shipping_address?.city}, {order.shipping_address?.region} {order.shipping_address?.postcode}
                 </p>
