@@ -434,44 +434,6 @@ export default function Settings({
 
                 <Separator />
 
-                {/* Security */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
-                    <Shield size={16} className="text-zinc-400" />
-                    Security
-                  </h3>
-                  <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
-                    <div className="space-y-2">
-                      <Label htmlFor="autolock">Auto-Lock Timer</Label>
-                      <Select 
-                        value={(formData.general.autoLockMinutes ?? 0).toString()}
-                        onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, autoLockMinutes: parseInt(v) } })}
-                      >
-                        <SelectTrigger id="autolock">
-                          <SelectValue placeholder="Select time">
-                            {formData.general.autoLockMinutes === 0 ? 'Never Lock' : 
-                             formData.general.autoLockMinutes === 1 ? '1 Minute' :
-                             formData.general.autoLockMinutes === 5 ? '5 Minutes' :
-                             formData.general.autoLockMinutes === 15 ? '15 Minutes' :
-                             formData.general.autoLockMinutes === 30 ? '30 Minutes' : '1 Hour'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">Never Lock</SelectItem>
-                          <SelectItem value="1">1 Minute</SelectItem>
-                          <SelectItem value="5">5 Minutes</SelectItem>
-                          <SelectItem value="15">15 Minutes</SelectItem>
-                          <SelectItem value="30">30 Minutes</SelectItem>
-                          <SelectItem value="60">1 Hour</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-zinc-500">Automatically lock the app after a period of inactivity.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
                 {/* Shipping Origin */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
@@ -1249,9 +1211,38 @@ export default function Settings({
                   <CardTitle className="flex items-center gap-2">
                     <Shield size={20} /> Security & Backup
                   </CardTitle>
-                  <CardDescription>Export or import your encrypted credentials.</CardDescription>
+                  <CardDescription>Configure session auto-lock, and export or import your encrypted credentials.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="autolock">Auto-Lock Timer</Label>
+                    <Select 
+                      value={(formData.general.autoLockMinutes ?? 0).toString()}
+                      onValueChange={(v) => setFormData({ ...formData, general: { ...formData.general, autoLockMinutes: parseInt(v) } })}
+                    >
+                      <SelectTrigger id="autolock">
+                        <SelectValue placeholder="Select time">
+                          {formData.general.autoLockMinutes === 0 ? 'Never Lock' : 
+                           formData.general.autoLockMinutes === 1 ? '1 Minute' :
+                           formData.general.autoLockMinutes === 5 ? '5 Minutes' :
+                           formData.general.autoLockMinutes === 15 ? '15 Minutes' :
+                           formData.general.autoLockMinutes === 30 ? '30 Minutes' : '1 Hour'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Never Lock</SelectItem>
+                        <SelectItem value="1">1 Minute</SelectItem>
+                        <SelectItem value="5">5 Minutes</SelectItem>
+                        <SelectItem value="15">15 Minutes</SelectItem>
+                        <SelectItem value="30">30 Minutes</SelectItem>
+                        <SelectItem value="60">1 Hour</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-zinc-500">Automatically lock the app after a period of inactivity.</p>
+                  </div>
+
+                  <Separator />
+
                   <div className="space-y-2">
                     <Label>Export Settings & Tokens</Label>
                     <Button variant="outline" className="w-full gap-2" onClick={handleExport}>

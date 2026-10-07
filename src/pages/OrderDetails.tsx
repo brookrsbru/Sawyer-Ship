@@ -99,6 +99,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   // Multiple parcels state
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [isParcelModalOpen, setIsParcelModalOpen] = useState(false);
+  const initialParcelsRef = React.useRef<Parcel[] | null>(null);
   
   const [rates, setRates] = useState<any[]>([]);
   const [isRating, setIsRating] = useState(false);
@@ -540,18 +541,25 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
   // Manual Rate Creation Helper
   const handleParcelOptionsOpen = () => {
-    // If no parcels yet, initialize with current single-package data
-    if (parcels.length === 0) {
-      setParcels([{
-        id: crypto.randomUUID(),
-        weightKg: weightKg,
-        weightG: weightG,
-        weight: weight,
-        length: length,
-        width: width,
-        height: height
-      }]);
-    }
+    // Synchronize parcel 1 with current single-package data so dimensions are never wiped
+    setParcels(prev => {
+      let nextParcels: Parcel[];
+      if (prev.length <= 1) {
+        nextParcels = [{
+          id: prev[0]?.id || crypto.randomUUID(),
+          weightKg: weightKg,
+          weightG: weightG,
+          weight: weight,
+          length: length,
+          width: width,
+          height: height
+        }];
+      } else {
+        nextParcels = prev;
+      }
+      initialParcelsRef.current = JSON.parse(JSON.stringify(nextParcels));
+      return nextParcels;
+    });
     setIsParcelModalOpen(true);
   };
 
@@ -578,7 +586,21 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   };
 
   const handleDeleteParcel = (id: string) => {
-    setParcels(prev => prev.filter(p => p.id !== id));
+    setParcels(prev => {
+      const filtered = prev.filter(p => p.id !== id);
+      if (filtered.length === 0) {
+        return [{
+          id: crypto.randomUUID(),
+          weightKg: weightKg || '1',
+          weightG: weightG || '0',
+          weight: weight || '1.0',
+          length: length || '',
+          width: width || '',
+          height: height || ''
+        }];
+      }
+      return filtered;
+    });
   };
 
   const updateParcel = (id: string, field: keyof Parcel, value: string) => {
@@ -637,14 +659,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
   const handleParcelModalClose = (open: boolean) => {
     if (!open) {
       // Apply synchronization logic when closing
-      if (parcels.length === 0) {
-        setWeightKg('');
-        setWeightG('');
-        setWeight('0');
-        setLength('');
-        setWidth('');
-        setHeight('');
-      } else if (parcels.length === 1) {
+      if (parcels.length === 1) {
         const p = parcels[0];
         setWeight(p.weight);
         setWeightKg(p.weightKg);
@@ -652,15 +667,35 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         setLength(p.length);
         setWidth(p.width);
         setHeight(p.height);
-      } else {
+      } else if (parcels.length > 1) {
         // Multi-parcel
         const totalWeight = parcels.reduce((sum, p) => sum + (parseFloat(p.weight) || 0), 0);
         setWeight(totalWeight.toFixed(3));
         setWeightKg(Math.floor(totalWeight).toString());
         setWeightG(Math.round((totalWeight % 1) * 1000).toString());
       }
+      // Never wipe dimensions if parcels.length === 0
+      setIsParcelModalOpen(false);
+    } else {
+      handleParcelOptionsOpen();
     }
-    setIsParcelModalOpen(open);
+  };
+
+  const handleDimensionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      fetchRates();
+    }
+  };
+
+  const handleModalDimensionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleParcelModalClose(false);
+      setTimeout(() => {
+        fetchRates();
+      }, 50);
+    }
   };
 
   const fetchRates = async () => {
@@ -674,10 +709,10 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
     if (!order.shipping_address?.postcode) errors.push("Postcode");
     if (!order.shipping_address?.country_id) errors.push("Country");
     
-    // Check if we have parcels defined in "Package Options"
-    const hasParcels = parcels.length > 0;
+    // Check if we have multi-parcels defined in "Package Options"
+    const hasMultiParcels = parcels.length > 1;
     
-    if (hasParcels) {
+    if (hasMultiParcels) {
       // Validate each parcel
       const invalidParcels = parcels.filter(p => 
         !(parseFloat(p.weight) > 0) || 
@@ -690,7 +725,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       }
     } else {
       // Standard single package validation
-      const hasWeight = (weightKg && parseFloat(weightKg) > 0) || (weightG && parseFloat(weightG) > 0);
+      const hasWeight = (weightKg && parseFloat(weightKg) > 0) || (weightG && parseFloat(weightG) > 0) || (parseFloat(weight) > 0);
       if (!hasWeight) errors.push("Weight (KG or Grams)");
       
       if (!length || parseFloat(length) <= 0) errors.push("Length");
@@ -713,8 +748,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       const allRates: any[] = [];
       const weightVal = parseFloat(weight) || 0.1;
       
-      const pacakgeConfigs = parcels.length > 0 ? parcels : [{
-        id: 'default',
+      const pacakgeConfigs = parcels.length > 1 ? parcels : [{
+        id: parcels[0]?.id || 'default',
         weight: weight,
         length: length,
         width: width,
@@ -1009,8 +1044,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
       let labelType = "application/pdf";
 
       const weightVal = parseFloat(weight) || 0.1;
-      const pacakgeConfigs = parcels.length > 0 ? parcels : [{
-        id: 'default',
+      const pacakgeConfigs = parcels.length > 1 ? parcels : [{
+        id: parcels[0]?.id || 'default',
         weight: weight,
         length: length,
         width: width,
@@ -2465,12 +2500,18 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                         <Input 
                           id="weightKg" 
                           type="number" 
-                          step="0.1"
+                          step="0.1" 
                           placeholder="0"
                           value={weightKg} 
                           disabled={parcels.length > 1}
-                          onChange={(e) => handleWeightKgChange(e.target.value)}
+                          onChange={(e) => {
+                            handleWeightKgChange(e.target.value);
+                            if (parcels.length === 1) {
+                              setParcels(prev => [{ ...prev[0], weightKg: e.target.value }]);
+                            }
+                          }}
                           onBlur={handleWeightKgBlur}
+                          onKeyDown={handleDimensionKeyDown}
                           className={parcels.length > 1 ? "bg-zinc-50 font-bold" : ""}
                         />
                       </div>
@@ -2484,8 +2525,14 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                           placeholder="0"
                           value={weightG} 
                           disabled={parcels.length > 1}
-                          onChange={(e) => handleWeightGChange(e.target.value)}
+                          onChange={(e) => {
+                            handleWeightGChange(e.target.value);
+                            if (parcels.length === 1) {
+                              setParcels(prev => [{ ...prev[0], weightG: e.target.value }]);
+                            }
+                          }}
                           onBlur={handleWeightGBlur}
+                          onKeyDown={handleDimensionKeyDown}
                           className={parcels.length > 1 ? "bg-zinc-50 font-bold" : ""}
                         />
                       </div>
@@ -2500,7 +2547,19 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-bold uppercase text-zinc-500">Dimensions (cm) <span className="text-red-500">*</span></Label>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => { setLength(''); setWidth(''); setHeight(''); }}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-[10px] gap-1" 
+                          onClick={() => { 
+                            setLength(''); 
+                            setWidth(''); 
+                            setHeight(''); 
+                            if (parcels.length <= 1) {
+                              setParcels(prev => prev.map(p => ({ ...p, length: '', width: '', height: '' })));
+                            }
+                          }}
+                        >
                           <RotateCcw size={10} /> Clear Dims
                         </Button>
                       </div>
@@ -2513,7 +2572,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                             type="number" 
                             placeholder="0"
                             value={length} 
-                            onChange={(e) => setLength(e.target.value)}
+                            onChange={(e) => {
+                              setLength(e.target.value);
+                              if (parcels.length === 1) {
+                                setParcels(prev => [{ ...prev[0], length: e.target.value }]);
+                              }
+                            }}
+                            onKeyDown={handleDimensionKeyDown}
                           />
                         </div>
                         <div className="space-y-2">
@@ -2523,7 +2588,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                             type="number" 
                             placeholder="0"
                             value={width} 
-                            onChange={(e) => setWidth(e.target.value)}
+                            onChange={(e) => {
+                              setWidth(e.target.value);
+                              if (parcels.length === 1) {
+                                setParcels(prev => [{ ...prev[0], width: e.target.value }]);
+                              }
+                            }}
+                            onKeyDown={handleDimensionKeyDown}
                           />
                         </div>
                         <div className="space-y-2">
@@ -2533,7 +2604,13 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                             type="number" 
                             placeholder="0"
                             value={height} 
-                            onChange={(e) => setHeight(e.target.value)}
+                            onChange={(e) => {
+                              setHeight(e.target.value);
+                              if (parcels.length === 1) {
+                                setParcels(prev => [{ ...prev[0], height: e.target.value }]);
+                              }
+                            }}
+                            onKeyDown={handleDimensionKeyDown}
                           />
                         </div>
                       </div>
@@ -2652,6 +2729,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                                         type="number" 
                                         value={parcel.length} 
                                         onChange={(e) => updateParcel(parcel.id, 'length', e.target.value)}
+                                        onKeyDown={handleModalDimensionKeyDown}
                                         className="h-8 text-xs"
                                       />
                                     </div>
@@ -2661,6 +2739,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                                         type="number" 
                                         value={parcel.width} 
                                         onChange={(e) => updateParcel(parcel.id, 'width', e.target.value)}
+                                        onKeyDown={handleModalDimensionKeyDown}
                                         className="h-8 text-xs"
                                       />
                                     </div>
@@ -2670,6 +2749,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                                         type="number" 
                                         value={parcel.height} 
                                         onChange={(e) => updateParcel(parcel.id, 'height', e.target.value)}
+                                        onKeyDown={handleModalDimensionKeyDown}
                                         className="h-8 text-xs"
                                       />
                                     </div>
@@ -2699,9 +2779,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
                         <Button 
                           variant="ghost" 
                           onClick={() => {
-                            // If they clear everything, we handle it on close logic, 
-                            // but maybe they want to cancel? 
-                            // Actually the user wants it to apply on exit.
+                            if (initialParcelsRef.current) {
+                              setParcels(initialParcelsRef.current);
+                            }
                             setIsParcelModalOpen(false);
                           }}
                         >
