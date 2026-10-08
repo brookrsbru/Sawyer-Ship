@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff, Activity, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff, Activity, CheckCircle2, AlertTriangle, X, Bell, OctagonX } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -1785,6 +1785,85 @@ export default function Settings({
                     
                     <div className="text-[10px] text-zinc-400 italic">
                       Note: This is an approximation of the memory footprint in your browser.
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Bell size={20} /> Test Notification Triggers
+                    </CardTitle>
+                    <CardDescription>
+                      Fire test toasts to verify real-time presentation and logging in the Notification History (capped at 100).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200 justify-start gap-2.5 h-auto py-2.5 px-3"
+                        onClick={() => {
+                          toast.success("Shipment label created successfully!", {
+                            description: "Tracking number #FX-928471049 assigned."
+                          });
+                        }}
+                      >
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <div className="text-left">
+                          <div className="text-xs font-semibold">Success Toast</div>
+                          <div className="text-[10px] text-emerald-600/80">Label created</div>
+                        </div>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200 justify-start gap-2.5 h-auto py-2.5 px-3"
+                        onClick={() => {
+                          toast.error("FedEx API authentication failed", {
+                            description: "Please verify client credentials in Settings."
+                          });
+                        }}
+                      >
+                        <OctagonX size={16} className="text-rose-600 shrink-0" />
+                        <div className="text-left">
+                          <div className="text-xs font-semibold">Error Toast</div>
+                          <div className="text-[10px] text-rose-600/80">Auth failure</div>
+                        </div>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200 justify-start gap-2.5 h-auto py-2.5 px-3"
+                        onClick={() => {
+                          toast.warning("Address line exceeds recommended length", {
+                            description: "Street 1 has 38 characters (limit is 35)."
+                          });
+                        }}
+                      >
+                        <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                        <div className="text-left">
+                          <div className="text-xs font-semibold">Warning Toast</div>
+                          <div className="text-[10px] text-amber-600/80">35+ char warning</div>
+                        </div>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200 justify-start gap-2.5 h-auto py-2.5 px-3"
+                        onClick={() => {
+                          toast.info("Refreshed tracking data for active shipments", {
+                            description: "4 records updated from carrier feed."
+                          });
+                        }}
+                      >
+                        <Info size={16} className="text-blue-600 shrink-0" />
+                        <div className="text-left">
+                          <div className="text-xs font-semibold">Info Toast</div>
+                          <div className="text-[10px] text-blue-600/80">Status refresh</div>
+                        </div>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Lock, Book, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink, Package, Truck, ShieldAlert } from 'lucide-react';
+import { Lock, Book, Settings as SettingsIcon, LayoutDashboard, LogOut, AlertTriangle, ExternalLink, Package, Truck, ShieldAlert, Bell, RefreshCw, X } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +22,9 @@ import Settings from '@/src/pages/Settings';
 import OrderDetails from '@/src/pages/OrderDetails';
 import AddressBook from '@/src/pages/AddressBook';
 import Tracking from '@/src/pages/Tracking';
+import NotificationHistory from '@/src/pages/NotificationHistory';
 import { APP_VERSION } from '@/src/constants';
+import { useVersionChecker } from '@/src/hooks/use-version-checker';
 
 function BackdoorRecovery({ onBackdoorUnlock, onCancel }: { onBackdoorUnlock: (key: string, reset?: { enabled: boolean, newPassword: string }) => Promise<boolean>, onCancel: () => void }) {
   const [backdoorKey, setBackdoorKey] = useState('');
@@ -222,6 +224,14 @@ function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: strin
 }
 
 function Layout({ onLogout }: { onLogout: () => void }) {
+  const { isOutdated, latestVersion, isDismissed, dismissBanner } = useVersionChecker();
+
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
+  const outdatedMessage = `Your Sawyer-Ship version is outdated! Please refresh the page to update to ${latestVersion || 'the latest version'}`;
+
   return (
     <div className="h-screen bg-zinc-50 flex overflow-hidden">
       {/* Sidebar */}
@@ -248,17 +258,71 @@ function Layout({ onLogout }: { onLogout: () => void }) {
             <Truck size={20} />
             <span>Tracking</span>
           </Link>
+          <Link to="/notifications" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
+            <Bell size={20} />
+            <span>Notifications</span>
+          </Link>
           <Link to="/settings" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
             <SettingsIcon size={20} />
             <span>Settings</span>
           </Link>
         </nav>
 
-        <div className="p-4 border-t border-zinc-200">
-          <Button variant="ghost" className="w-full justify-start gap-3 text-zinc-600" onClick={onLogout}>
+        {/* Outdated Version Banner above the bottom bar */}
+        {isOutdated && !isDismissed && (
+          <div className="px-3 pb-2">
+            <div className="relative bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5 text-zinc-900 shadow-sm animate-in fade-in duration-200">
+              <button
+                type="button"
+                onClick={dismissBanner}
+                className="absolute top-2 right-2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded transition-colors"
+                title="Dismiss banner"
+                aria-label="Dismiss banner"
+              >
+                <X size={14} />
+              </button>
+              <div className="flex items-start gap-2 pr-4">
+                <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1.5">
+                  <p className="text-[11px] leading-tight text-amber-950 font-medium">
+                    Your Sawyer-Ship version is outdated! Please refresh the page to update to <span className="font-bold underline text-amber-700">{latestVersion}</span>
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRefresh}
+                    className="h-6 px-2 text-[10px] bg-amber-600 hover:bg-amber-700 text-white hover:text-white border-none gap-1 font-semibold shadow-xs"
+                  >
+                    <RefreshCw size={10} />
+                    Refresh Now
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="p-4 border-t border-zinc-200 flex items-center justify-between gap-2">
+          <Button variant="ghost" className="justify-start gap-3 text-zinc-600 px-3 hover:text-zinc-900" onClick={onLogout}>
             <LogOut size={20} />
             <span>Lock App</span>
           </Button>
+
+          <div className="flex items-center gap-1">
+            {/* If outdated and dismissed, show the orange exclamation mark with tooltip */}
+            {isOutdated && isDismissed && (
+              <span
+                className="inline-flex items-center justify-center text-amber-600 hover:text-amber-700 cursor-help transition-transform hover:scale-110"
+                title={outdatedMessage}
+                aria-label={outdatedMessage}
+              >
+                <AlertTriangle size={14} className="fill-amber-500/20 text-amber-600" />
+              </span>
+            )}
+            <span className="text-xs font-mono font-medium text-zinc-400 select-none pr-1">
+              v{APP_VERSION}
+            </span>
+          </div>
         </div>
       </aside>
 
@@ -339,6 +403,10 @@ export default function App() {
         {
           path: "tracking",
           element: <Tracking credentials={credentials} onSave={save} showHiddenData={showHiddenData} />,
+        },
+        {
+          path: "notifications",
+          element: <NotificationHistory />,
         },
         {
           path: "settings",
