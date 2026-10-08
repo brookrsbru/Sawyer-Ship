@@ -228,6 +228,8 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
   // Manual shipment draft state & restoration
   const [isResumeDraftModalOpen, setIsResumeDraftModalOpen] = useState(false);
   const [isConfirmClearShipmentOpen, setIsConfirmClearShipmentOpen] = useState(false);
+  const [isConfirmOverwriteAddressOpen, setIsConfirmOverwriteAddressOpen] = useState(false);
+  const [pendingAddressToApply, setPendingAddressToApply] = useState<any | null>(null);
   const [existingDraft, setExistingDraft] = useState<any | null>(null);
   const isDraftInitializedRef = React.useRef(false);
 
@@ -264,7 +266,7 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
     setWeightG(val);
   };
 
-  const handleSelectAddress = (customer: any) => {
+  const applyAddress = (customer: any) => {
     if (!order) return;
     const parts = customer.fullname.trim().split(' ');
     const first = parts[0] || '';
@@ -291,7 +293,32 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
         is_residential: !!customer.residential
       }
     });
-    toast.success(`Loaded address`);
+    toast.success(`Loaded address for ${customer.fullname}`);
+  };
+
+  const hasShipmentContent = () => {
+    if (!order) return false;
+    return !!(
+      (fullNameInput && fullNameInput.trim()) ||
+      (order.customer_firstname && order.customer_firstname.trim()) ||
+      (order.customer_lastname && order.customer_lastname.trim()) ||
+      (order.shipping_address?.company && order.shipping_address.company.trim()) ||
+      (order.shipping_address?.street?.some(s => s && s.trim())) ||
+      (order.shipping_address?.city && order.shipping_address.city.trim()) ||
+      (order.shipping_address?.region && order.shipping_address.region.trim()) ||
+      (order.shipping_address?.postcode && order.shipping_address.postcode.trim()) ||
+      (order.customer_email && order.customer_email.trim()) ||
+      (order.shipping_address?.telephone && order.shipping_address.telephone.trim())
+    );
+  };
+
+  const handleSelectAddress = (customer: any) => {
+    if (hasShipmentContent()) {
+      setPendingAddressToApply(customer);
+      setIsConfirmOverwriteAddressOpen(true);
+    } else {
+      applyAddress(customer);
+    }
   };
 
   const handleWeightGBlur = () => {
@@ -2046,7 +2073,7 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
               <div className="py-2">
                 <Label className="text-xs font-semibold text-zinc-700">Enter Order Number (optional)</Label>
                 <Input 
-                  placeholder="e.g. MANUAL-1001" 
+                  placeholder="Order Number" 
                   value={order?.increment_id === 'MANUAL' ? '' : (order?.increment_id || '')} 
                   onChange={(e) => setOrder({...order!, increment_id: e.target.value.toUpperCase()})}
                   className="mt-1.5"
@@ -2063,21 +2090,64 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                   variant="outline" 
                   onClick={() => {
                     setIsNoOrderNumberDialogOpen(false);
-                    setTimeout(() => {
-                      orderNumberInputRef.current?.focus();
-                    }, 100);
+                    handleContinueToShipping();
+                  }}
+                >
+                  Proceed Without Number
+                </Button>
+                <Button 
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white"
+                  onClick={() => {
+                    setIsNoOrderNumberDialogOpen(false);
+                    if (order?.increment_id && order.increment_id.trim() !== '' && order.increment_id !== 'MANUAL') {
+                      handleContinueToShipping();
+                    } else {
+                      setTimeout(() => {
+                        orderNumberInputRef.current?.focus();
+                      }, 100);
+                    }
                   }}
                 >
                   Add Order Number
                 </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isConfirmOverwriteAddressOpen} onOpenChange={setIsConfirmOverwriteAddressOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-zinc-900">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  Overwrite Existing Details?
+                </DialogTitle>
+                <DialogDescription className="text-zinc-600 pt-2 text-sm leading-relaxed">
+                  You already have recipient details entered for this shipment. Selecting{' '}
+                  <strong className="text-zinc-900 font-semibold">{pendingAddressToApply?.fullname}</strong>
+                  {pendingAddressToApply?.company ? ` (${pendingAddressToApply.company})` : ''} will replace your current address and contact details. Are you sure you want to proceed?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:gap-0 pt-3">
                 <Button 
+                  variant="outline" 
                   onClick={() => {
-                    setIsNoOrderNumberDialogOpen(false);
-                    handleContinueToShipping();
+                    setIsConfirmOverwriteAddressOpen(false);
+                    setPendingAddressToApply(null);
                   }}
-                  className="bg-zinc-900 hover:bg-zinc-800"
                 >
-                  Proceed Without Number
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white"
+                  onClick={() => {
+                    if (pendingAddressToApply) {
+                      applyAddress(pendingAddressToApply);
+                    }
+                    setIsConfirmOverwriteAddressOpen(false);
+                    setPendingAddressToApply(null);
+                  }}
+                >
+                  Overwrite Details
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -2102,6 +2172,14 @@ export default function OrderDetails({ credentials, onSave, showHiddenData = fal
                      onChange={(e) => {
                         setAddressSearch(e.target.value);
                         setAddressPage(1);
+                     }}
+                     onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (filteredAddressBook.length > 0) {
+                            handleSelectAddress(filteredAddressBook[0]);
+                          }
+                        }
                      }}
                   />
                </div>
