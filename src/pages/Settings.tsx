@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff, Activity, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -67,6 +67,137 @@ export default function Settings({
   const [devOrderId, setDevOrderId] = useState(() => localStorage.getItem('sawyer_last_search') || '');
   const [devOrderData, setDevOrderData] = useState<any>(null);
   const [isDevLoading, setIsDevLoading] = useState(false);
+  const [isPingingProxy, setIsPingingProxy] = useState(false);
+  const [pingResult, setPingResult] = useState<{
+    success: boolean;
+    status: number;
+    statusText: string;
+    latencyMs?: number;
+    message: string;
+    details?: string;
+    timestamp: string;
+  } | null>(null);
+
+  const handlePingProxy = async () => {
+    let rawUrl = (formData.general.proxyUrl || '').trim();
+    if (!rawUrl) {
+      toast.error("Please enter a proxy URL to ping");
+      return;
+    }
+
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      rawUrl = `http://${rawUrl}`;
+    }
+
+    setIsPingingProxy(true);
+    setPingResult(null);
+
+    const cleanBase = rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`;
+    const startTime = performance.now();
+
+    try {
+      // Step 1: Attempt the dedicated /ping endpoint
+      const pingController = new AbortController();
+      const pingTimeout = setTimeout(() => pingController.abort(), 5000);
+
+      let res: Response | null = null;
+      let data: any = null;
+      let pingSuccess = false;
+
+      try {
+        res = await fetch(`${cleanBase}ping`, {
+          method: 'GET',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          signal: pingController.signal,
+        });
+        clearTimeout(pingTimeout);
+
+        if (res.ok) {
+          pingSuccess = true;
+          try {
+            data = await res.json();
+          } catch {
+            // Not JSON
+          }
+        }
+      } catch {
+        clearTimeout(pingTimeout);
+      }
+
+      // Step 2: Fallback to root URL / if /ping didn't respond 200
+      if (!pingSuccess) {
+        const rootController = new AbortController();
+        const rootTimeout = setTimeout(() => rootController.abort(), 5000);
+        try {
+          res = await fetch(cleanBase, {
+            method: 'GET',
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            signal: rootController.signal,
+          });
+        } finally {
+          clearTimeout(rootTimeout);
+        }
+      }
+
+      const elapsed = Math.round(performance.now() - startTime);
+
+      if (res && res.ok) {
+        setPingResult({
+          success: true,
+          status: res.status,
+          statusText: res.statusText || 'OK',
+          latencyMs: elapsed,
+          message: data?.message || "Proxy is online and responding.",
+          details: data?.proxy ? `${data.proxy} on port ${data.port || 'custom'}` : `Responded with HTTP ${res.status}`,
+          timestamp: new Date().toLocaleTimeString(),
+        });
+        toast.success(`Proxy responded in ${elapsed}ms (${res.status} ${res.statusText || 'OK'})`);
+      } else if (res) {
+        const is403 = res.status === 403;
+        const msg = is403
+          ? "Proxy reached, but origin is blocked (403 Forbidden). Ensure your current URL is in originWhitelist in server.js."
+          : res.status === 400
+          ? "Proxy reached (400 Bad Request). Missing required headers or invalid target URL."
+          : `Proxy responded with HTTP ${res.status} (${res.statusText || 'Error'}).`;
+
+        setPingResult({
+          success: false,
+          status: res.status,
+          statusText: res.statusText || 'Error',
+          latencyMs: elapsed,
+          message: msg,
+          details: `Connected to ${cleanBase}`,
+          timestamp: new Date().toLocaleTimeString(),
+        });
+        toast.warning(`Proxy returned status ${res.status} ${res.statusText || ''}`);
+      } else {
+        throw new Error("No response received from proxy");
+      }
+    } catch (err: any) {
+      const elapsed = Math.round(performance.now() - startTime);
+      const isTimeout = err.name === 'AbortError';
+      const msg = isTimeout
+        ? `Request timed out after 5s. Proxy at ${cleanBase} did not respond.`
+        : `Could not connect to ${cleanBase}. Make sure your proxy server (node References/server.js) is running and reachable.`;
+
+      setPingResult({
+        success: false,
+        status: 0,
+        statusText: isTimeout ? 'Timeout' : 'Connection Failed',
+        latencyMs: elapsed,
+        message: msg,
+        details: err.message || "Network Error / Connection Refused",
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      toast.error(isTimeout ? "Proxy ping timed out" : "Proxy unreachable");
+    } finally {
+      setIsPingingProxy(false);
+    }
+  };
 
   const handleRevealSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,34 +417,139 @@ export default function Settings({
                   </h3>
                   <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
                     <div className="space-y-2">
-                      <Label htmlFor="proxy">CORS Proxy URL</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="proxy">CORS Proxy URL</Label>
+                        {pingResult && (
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                            pingResult.success 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${pingResult.success ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            {pingResult.success ? `Connected (${pingResult.latencyMs}ms)` : 'Unreachable'}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex gap-2">
                         <Input 
                           id="proxy" 
-                          placeholder="https://cors-anywhere.herokuapp.com/" 
+                          placeholder="http://localhost:5072/ or https://cors-anywhere.herokuapp.com/" 
                           value={formData.general.proxyUrl}
-                          onChange={(e) => setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } })}
-                          className="flex-1"
+                          onChange={(e) => {
+                            setFormData({ ...formData, general: { ...formData.general, proxyUrl: e.target.value } });
+                            if (pingResult) setPingResult(null);
+                          }}
+                          className="flex-1 font-mono text-xs"
                         />
+                        <Button 
+                          variant="outline" 
+                          type="button"
+                          onClick={handlePingProxy}
+                          disabled={isPingingProxy || !formData.general.proxyUrl?.trim()}
+                          className="gap-1.5 shrink-0"
+                          title="Ping Proxy server to check reachability and response"
+                        >
+                          {isPingingProxy ? (
+                            <>
+                              <Loader2 size={15} className="animate-spin text-zinc-600" />
+                              <span>Pinging...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Activity size={15} className="text-zinc-600" />
+                              <span>Ping Proxy</span>
+                            </>
+                          )}
+                        </Button>
                         <Button 
                           variant="outline" 
                           size="icon"
                           type="button"
-                          title="Request Access to Proxy"
+                          title="Open Proxy URL in new tab"
                           onClick={() => window.open(formData.general.proxyUrl, '_blank')}
+                          disabled={!formData.general.proxyUrl?.trim()}
                         >
-                          <ExternalLink size={18} />
+                          <ExternalLink size={16} />
                         </Button>
                       </div>
-                      <p className="text-xs text-zinc-500">Required for browser-based API calls. Click the button to request temporary access if using Heroku CORS Anywhere.</p>
-                      <Button 
-                        variant="link" 
-                        size="sm" 
-                        className="h-auto p-0 text-xs text-zinc-500 hover:text-zinc-900"
-                        onClick={() => setFormData({ ...formData, general: { ...formData.general, proxyUrl: 'https://cors-anywhere.herokuapp.com/' } })}
-                      >
-                        Reset to demo server (Heroku)
-                      </Button>
+
+                      {/* Ping Result Box */}
+                      {pingResult && (
+                        <div className={`mt-2 p-3 rounded-lg border text-xs transition-all ${
+                          pingResult.success 
+                            ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950' 
+                            : 'bg-amber-50/90 border-amber-200 text-amber-950'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5">
+                              {pingResult.success ? (
+                                <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                              ) : (
+                                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                              )}
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2 font-semibold">
+                                  <span>{pingResult.success ? 'Proxy Responded Successfully' : 'Proxy Ping Failed'}</span>
+                                  {pingResult.latencyMs !== undefined && (
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5">
+                                      {pingResult.latencyMs}ms
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-mono opacity-70">
+                                    {pingResult.status ? `HTTP ${pingResult.status} ${pingResult.statusText}` : 'Connection Refused'}
+                                  </span>
+                                </div>
+                                <p className="leading-relaxed opacity-90">{pingResult.message}</p>
+                                {pingResult.details && (
+                                  <p className="font-mono text-[11px] opacity-75">{pingResult.details}</p>
+                                )}
+                                {!pingResult.success && (
+                                  <p className="text-[11px] opacity-75 mt-1">
+                                    💡 Tip: To run your proxy, start <code className="bg-black/5 px-1 py-0.5 rounded font-mono">node References/server.js</code> in your terminal and verify port 5072 is reachable.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 text-zinc-400 hover:text-zinc-700 shrink-0 -mt-1 -mr-1"
+                              onClick={() => setPingResult(null)}
+                            >
+                              <X size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
+                        <p className="text-xs text-zinc-500">Required for browser-based API calls to UPS, FedEx, & Magento.</p>
+                        <div className="flex items-center gap-3">
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="h-auto p-0 text-xs text-zinc-600 hover:text-zinc-900 font-medium"
+                            onClick={() => {
+                              setFormData({ ...formData, general: { ...formData.general, proxyUrl: 'http://localhost:5072/' } });
+                              setPingResult(null);
+                            }}
+                          >
+                            Local Proxy (Port 5072)
+                          </Button>
+                          <span className="text-zinc-300">•</span>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="h-auto p-0 text-xs text-zinc-500 hover:text-zinc-900"
+                            onClick={() => {
+                              setFormData({ ...formData, general: { ...formData.general, proxyUrl: 'https://cors-anywhere.herokuapp.com/' } });
+                              setPingResult(null);
+                            }}
+                          >
+                            Reset to Heroku demo
+                          </Button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between">
