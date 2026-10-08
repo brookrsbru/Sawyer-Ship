@@ -505,7 +505,7 @@ export default function Settings({
                                 )}
                                 {!pingResult.success && (
                                   <p className="text-[11px] opacity-75 mt-1">
-                                    💡 Tip: To run your proxy, start <code className="bg-black/5 px-1 py-0.5 rounded font-mono">node References/server.js</code> in your terminal and verify port 5072 is reachable.
+                                    💡 Tip: To run your proxy, start <code className="bg-black/5 px-1 py-0.5 rounded font-mono">node server.js</code> in your terminal and verify port 5072 is reachable.
                                   </p>
                                 )}
                               </div>
