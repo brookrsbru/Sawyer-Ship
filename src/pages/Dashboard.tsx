@@ -63,6 +63,8 @@ export default function Dashboard({ credentials }: { credentials: SawyerCredenti
 
     setIsLoading(true);
     setHasSearched(true);
+    // Clear previously displayed/stored orders while the new search is running to prevent mixups
+    setOrders([]);
     try {
       const client = new MagentoClient(
         credentials.magento.url, 
