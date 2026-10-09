@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { APP_VERSION } from '@/src/constants';
 
 const GITHUB_CONSTANTS_RAW_URL = 'https://raw.githubusercontent.com/brookrsbru/Sawyer-Ship/main/src/constants.ts';
@@ -32,27 +32,57 @@ export function isRemoteNewer(remoteVersion: string, currentVersion: string): bo
   return false;
 }
 
+export interface CheckResult {
+  currentVersion: string;
+  latestVersion: string | null;
+  isOutdated: boolean;
+  error?: string;
+}
+
 export interface VersionCheckerState {
   currentVersion: string;
   latestVersion: string | null;
   isOutdated: boolean;
   isDismissed: boolean;
-  dismissBanner: () => void;
-  checkNow: () => Promise<void>;
+  isChecking: boolean;
   lastChecked: Date | null;
+  error: string | null;
+  dismissBanner: () => void;
+  resetDismissal: () => void;
+  checkNow: () => Promise<CheckResult>;
 }
 
-export function useVersionChecker(): VersionCheckerState {
-  const [latestVersion, setLatestVersion] = useState<string | null>(null);
-  const [isOutdated, setIsOutdated] = useState<boolean>(false);
-  const [isDismissed, setIsDismissed] = useState<boolean>(false);
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+// Module-level singleton store so all hook consumers stay completely synced
+let storeState = {
+  latestVersion: null as string | null,
+  isOutdated: false,
+  isDismissed: false,
+  isChecking: false,
+  lastChecked: null as Date | null,
+  error: null as string | null,
+};
 
-  const isMountedRef = useRef(true);
+const listeners = new Set<() => void>();
 
-  const checkVersion = useCallback(async () => {
+function notifyListeners() {
+  listeners.forEach(fn => fn());
+}
+
+let activeCheckPromise: Promise<CheckResult> | null = null;
+let globalIntervalStarted = false;
+
+export async function checkLatestVersion(): Promise<CheckResult> {
+  if (activeCheckPromise) {
+    return activeCheckPromise;
+  }
+
+  storeState.isChecking = true;
+  storeState.error = null;
+  notifyListeners();
+
+  activeCheckPromise = (async () => {
     try {
-      // Append timestamp query parameter to prevent browser or CDN caching
+      // Append timestamp query parameter to bypass CDN/browser caches
       const response = await fetch(`${GITHUB_CONSTANTS_RAW_URL}?_t=${Date.now()}`, {
         cache: 'no-store',
         headers: {
@@ -61,60 +91,125 @@ export function useVersionChecker(): VersionCheckerState {
       });
 
       if (!response.ok) {
-        console.warn(`[VersionChecker] Failed to fetch constants.ts from GitHub (Status: ${response.status})`);
-        return;
+        const err = `Failed to fetch from GitHub (HTTP ${response.status})`;
+        console.warn(`[VersionChecker] ${err}`);
+        storeState.isChecking = false;
+        storeState.error = err;
+        storeState.lastChecked = new Date();
+        notifyListeners();
+        return {
+          currentVersion: APP_VERSION,
+          latestVersion: storeState.latestVersion,
+          isOutdated: storeState.isOutdated,
+          error: err,
+        };
       }
 
       const text = await response.text();
-      // Match `export const APP_VERSION = '2.10.4';` or similar
+      // Match `export const APP_VERSION = '2.12.2';`
       const match = text.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
 
       if (match && match[1]) {
         const fetchedVersion = match[1].trim();
-        if (isMountedRef.current) {
-          setLatestVersion(fetchedVersion);
-          setLastChecked(new Date());
+        const outdated = isRemoteNewer(fetchedVersion, APP_VERSION);
 
-          if (isRemoteNewer(fetchedVersion, APP_VERSION)) {
-            setIsOutdated(true);
-          } else {
-            setIsOutdated(false);
-          }
+        storeState.latestVersion = fetchedVersion;
+        storeState.isOutdated = outdated;
+        storeState.isChecking = false;
+        storeState.lastChecked = new Date();
+        storeState.error = null;
+        if (outdated) {
+          // Un-dismiss if a new outdated status is verified so user sees alert
+          storeState.isDismissed = false;
         }
+        notifyListeners();
+
+        return {
+          currentVersion: APP_VERSION,
+          latestVersion: fetchedVersion,
+          isOutdated: outdated,
+        };
+      } else {
+        const err = 'Could not parse APP_VERSION in repository constants.ts';
+        storeState.isChecking = false;
+        storeState.error = err;
+        storeState.lastChecked = new Date();
+        notifyListeners();
+        return {
+          currentVersion: APP_VERSION,
+          latestVersion: storeState.latestVersion,
+          isOutdated: storeState.isOutdated,
+          error: err,
+        };
       }
-    } catch (err) {
+    } catch (err: any) {
+      const errMessage = err?.message || 'Network error checking version';
       console.warn('[VersionChecker] Error checking latest version:', err);
+      storeState.isChecking = false;
+      storeState.error = errMessage;
+      storeState.lastChecked = new Date();
+      notifyListeners();
+      return {
+        currentVersion: APP_VERSION,
+        latestVersion: storeState.latestVersion,
+        isOutdated: storeState.isOutdated,
+        error: errMessage,
+      };
+    } finally {
+      activeCheckPromise = null;
     }
-  }, []);
+  })();
+
+  return activeCheckPromise;
+}
+
+export function useVersionChecker(): VersionCheckerState {
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    isMountedRef.current = true;
+    const handleUpdate = () => {
+      setTick(t => t + 1);
+    };
+    listeners.add(handleUpdate);
 
-    // Check immediately on mount
-    checkVersion();
+    // Initial check on mount if not checked yet
+    if (!storeState.lastChecked && !storeState.isChecking) {
+      checkLatestVersion();
+    }
 
-    // Check every 5 minutes
-    const intervalId = setInterval(() => {
-      checkVersion();
-    }, CHECK_INTERVAL_MS);
+    // Start 5-minute interval once globally
+    if (!globalIntervalStarted && typeof window !== 'undefined') {
+      globalIntervalStarted = true;
+      setInterval(() => {
+        checkLatestVersion();
+      }, CHECK_INTERVAL_MS);
+    }
 
     return () => {
-      isMountedRef.current = false;
-      clearInterval(intervalId);
+      listeners.delete(handleUpdate);
     };
-  }, [checkVersion]);
+  }, []);
 
   const dismissBanner = useCallback(() => {
-    setIsDismissed(true);
+    storeState.isDismissed = true;
+    notifyListeners();
+  }, []);
+
+  const resetDismissal = useCallback(() => {
+    storeState.isDismissed = false;
+    notifyListeners();
   }, []);
 
   return {
     currentVersion: APP_VERSION,
-    latestVersion,
-    isOutdated,
-    isDismissed,
+    latestVersion: storeState.latestVersion,
+    isOutdated: storeState.isOutdated,
+    isDismissed: storeState.isDismissed,
+    isChecking: storeState.isChecking,
+    lastChecked: storeState.lastChecked,
+    error: storeState.error,
     dismissBanner,
-    checkNow: checkVersion,
-    lastChecked,
+    resetDismissal,
+    checkNow: checkLatestVersion,
   };
 }

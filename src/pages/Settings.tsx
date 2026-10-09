@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff, Activity, CheckCircle2, AlertTriangle, X, Bell, OctagonX } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff, Activity, CheckCircle2, AlertTriangle, X, Bell, OctagonX, RefreshCw } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { APP_VERSION } from '@/src/constants';
+import { useVersionChecker } from '@/src/hooks/use-version-checker';
 
 const FEDEX_PICKUP_LABELS: Record<string, string> = {
   "CONTACT_FEDEX_TO_SCHEDULE": "Contact FedEx to Schedule",
@@ -77,6 +78,25 @@ export default function Settings({
     details?: string;
     timestamp: string;
   } | null>(null);
+
+  const versionChecker = useVersionChecker();
+
+  const handleManualUpdateCheck = async () => {
+    const result = await versionChecker.checkNow();
+    if (result.error) {
+      toast.error("Version check failed", {
+        description: result.error,
+      });
+    } else if (result.isOutdated) {
+      toast.warning(`New version available: v${result.latestVersion}`, {
+        description: `Current version is v${result.currentVersion}. Please refresh the page to update.`,
+      });
+    } else {
+      toast.success("Sawyer-Ship is up to date", {
+        description: `Running latest version v${result.currentVersion}.`,
+      });
+    }
+  };
 
   const handlePingProxy = async () => {
     let rawUrl = (formData.general.proxyUrl || '').trim();
@@ -1786,6 +1806,107 @@ export default function Settings({
                     <div className="text-[10px] text-zinc-400 italic">
                       Note: This is an approximation of the memory footprint in your browser.
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <RefreshCw size={20} className={versionChecker.isChecking ? "animate-spin text-zinc-600" : ""} />
+                          Update Checker & GitHub Version
+                        </CardTitle>
+                        <CardDescription>
+                          Query the GitHub repository (<code className="text-xs bg-zinc-100 px-1 py-0.5 rounded text-zinc-700">brookrsbru/Sawyer-Ship</code>) to check for newer releases and test update notifications.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={handleManualUpdateCheck}
+                        disabled={versionChecker.isChecking}
+                        className="gap-2 shrink-0 self-start sm:self-auto bg-zinc-900 hover:bg-zinc-800 text-white"
+                      >
+                        <RefreshCw size={16} className={versionChecker.isChecking ? "animate-spin" : ""} />
+                        {versionChecker.isChecking ? "Checking GitHub..." : "Run Update Check"}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                        <div className="text-xs text-zinc-500 font-medium">Installed Version</div>
+                        <div className="text-base font-bold font-mono text-zinc-900 mt-1">v{APP_VERSION}</div>
+                      </div>
+                      <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                        <div className="text-xs text-zinc-500 font-medium">Latest on GitHub</div>
+                        <div className="text-base font-bold font-mono text-zinc-900 mt-1">
+                          {versionChecker.latestVersion ? `v${versionChecker.latestVersion}` : (versionChecker.isChecking ? "Checking..." : "Not checked yet")}
+                        </div>
+                      </div>
+                      <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                        <div className="text-xs text-zinc-500 font-medium">Status</div>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          {versionChecker.isChecking ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600">
+                              <Loader2 size={13} className="animate-spin" /> Querying repository...
+                            </span>
+                          ) : versionChecker.isOutdated ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
+                              <AlertTriangle size={13} className="text-amber-700" /> Outdated
+                            </span>
+                          ) : versionChecker.latestVersion ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded">
+                              <CheckCircle2 size={13} className="text-emerald-700" /> Up to Date
+                            </span>
+                          ) : versionChecker.error ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
+                              <OctagonX size={13} className="text-rose-700" /> Check Failed
+                            </span>
+                          ) : (
+                            <span className="text-xs text-zinc-500">Idle (Auto-checks every 5m)</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-zinc-500 pt-1 border-t border-zinc-100 gap-2">
+                      <div>
+                        Last checked:{' '}
+                        <span className="font-medium text-zinc-700">
+                          {versionChecker.lastChecked 
+                            ? versionChecker.lastChecked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                            : 'Not yet checked'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <a
+                          href="https://github.com/brookrsbru/Sawyer-Ship/blob/main/src/constants.ts"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-zinc-600 hover:text-zinc-900 inline-flex items-center gap-1 underline"
+                        >
+                          View constants.ts on GitHub <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    </div>
+
+                    {versionChecker.isOutdated && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 animate-in fade-in">
+                        <div className="text-xs">
+                          <span className="font-bold">Update available: v{versionChecker.latestVersion}!</span> Your current version is v{APP_VERSION}. Refresh the page to load the update.
+                        </div>
+                        <Button
+                          size="sm"
+                          type="button"
+                          onClick={() => window.location.reload()}
+                          className="bg-amber-600 hover:bg-amber-700 text-white border-transparent text-xs h-8 shrink-0 gap-1.5"
+                        >
+                          <RefreshCw size={13} />
+                          Refresh Page to Update
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
