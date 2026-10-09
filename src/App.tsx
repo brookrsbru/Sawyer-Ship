@@ -1,4 +1,4 @@
-import { createHashRouter, RouterProvider, Routes, Route, Navigate, Link, Outlet } from 'react-router-dom';
+import { createHashRouter, RouterProvider, Routes, Route, Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { useSawyerStorage } from '@/src/hooks/use-sawyer-storage';
 import React, { useState, useMemo } from 'react';
@@ -224,6 +224,7 @@ function LockScreen({ onUnlock, onReset, hasStoredData }: { onUnlock: (pw: strin
 }
 
 function Layout({ onLogout }: { onLogout: () => void }) {
+  const location = useLocation();
   const { isOutdated, latestVersion, isDismissed, dismissBanner } = useVersionChecker();
 
   const handleRefresh = () => {
@@ -231,6 +232,39 @@ function Layout({ onLogout }: { onLogout: () => void }) {
   };
 
   const outdatedMessage = `Your Sawyer-Ship version is outdated! Please refresh the page to update to ${latestVersion || 'the latest version'}`;
+
+  const navItems = [
+    {
+      to: '/',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      isActive: location.pathname === '/' || location.pathname.startsWith('/order'),
+    },
+    {
+      to: '/address-book',
+      label: 'Address Book',
+      icon: Book,
+      isActive: location.pathname.startsWith('/address-book'),
+    },
+    {
+      to: '/tracking',
+      label: 'Tracking',
+      icon: Truck,
+      isActive: location.pathname.startsWith('/tracking'),
+    },
+    {
+      to: '/notifications',
+      label: 'Notifications',
+      icon: Bell,
+      isActive: location.pathname.startsWith('/notifications'),
+    },
+    {
+      to: '/settings',
+      label: 'Settings',
+      icon: SettingsIcon,
+      isActive: location.pathname.startsWith('/settings'),
+    },
+  ];
 
   return (
     <div className="h-screen bg-zinc-50 flex overflow-hidden">
@@ -246,26 +280,23 @@ function Layout({ onLogout }: { onLogout: () => void }) {
         </div>
         
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-          <Link to="/" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
-            <LayoutDashboard size={20} />
-            <span>Dashboard</span>
-          </Link>
-          <Link to="/address-book" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
-            <Book size={20} />
-            <span>Address Book</span>
-          </Link>
-          <Link to="/tracking" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
-            <Truck size={20} />
-            <span>Tracking</span>
-          </Link>
-          <Link to="/notifications" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
-            <Bell size={20} />
-            <span>Notifications</span>
-          </Link>
-          <Link to="/settings" className="flex items-center gap-3 px-3 py-2 text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors">
-            <SettingsIcon size={20} />
-            <span>Settings</span>
-          </Link>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  item.isActive
+                    ? 'bg-zinc-100 text-zinc-900 font-medium border border-zinc-200/60'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/50'
+                }`}
+              >
+                <Icon size={20} className={item.isActive ? 'text-zinc-900' : 'text-zinc-500'} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Outdated Version Banner above the bottom bar */}
@@ -352,7 +383,8 @@ export default function App() {
     resetData,
     showHiddenData,
     revealHiddenData,
-    hideHiddenData
+    hideHiddenData,
+    sessionPassword
   } = useSawyerStorage();
 
   // Auto-lock logic
@@ -402,7 +434,7 @@ export default function App() {
         },
         {
           path: "tracking",
-          element: <Tracking credentials={credentials} onSave={save} showHiddenData={showHiddenData} />,
+          element: <Tracking credentials={credentials} onSave={save} showHiddenData={showHiddenData} sessionPassword={sessionPassword} />,
         },
         {
           path: "notifications",
@@ -419,6 +451,7 @@ export default function App() {
               showHiddenData={showHiddenData}
               onRevealHiddenData={revealHiddenData}
               onHideHiddenData={hideHiddenData}
+              sessionPassword={sessionPassword}
             />
           ),
         },
@@ -428,7 +461,7 @@ export default function App() {
         },
       ],
     },
-  ]), [credentials, logout, save, exportData, importData, showHiddenData, revealHiddenData, hideHiddenData]);
+  ]), [credentials, logout, save, exportData, importData, showHiddenData, revealHiddenData, hideHiddenData, sessionPassword]);
 
   if (isLocked) {
     return (

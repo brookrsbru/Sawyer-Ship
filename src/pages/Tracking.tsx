@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban, FileText, MapPin, User, Package, CreditCard, Printer, Eye } from 'lucide-react';
+import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban, FileText, MapPin, User, Package, CreditCard, Printer, Eye, FolderArchive, Download, Copy, FileUp, X } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { FedExClient, MagentoClient } from '@/src/lib/api-clients';
 import { toast } from 'sonner';
@@ -24,8 +24,22 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useBackupArchive } from '@/src/hooks/use-backup-archive';
+import { BackupInspectorDialog } from '@/src/components/BackupInspectorDialog';
 
-export default function Tracking({ credentials, onSave, showHiddenData = false }: { credentials: SawyerCredentials, onSave: (creds: SawyerCredentials) => Promise<void>, showHiddenData?: boolean }) {
+export default function Tracking({ 
+  credentials, 
+  onSave, 
+  showHiddenData = false,
+  sessionPassword
+}: { 
+  credentials: SawyerCredentials, 
+  onSave: (creds: SawyerCredentials) => Promise<void>, 
+  showHiddenData?: boolean,
+  sessionPassword?: string | null
+}) {
+  const { isArchiveMode, archiveShipments, archiveFilename, setArchive, clearArchive } = useBackupArchive();
+  const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -88,7 +102,7 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
   };
 
   const filteredShipments = useMemo(() => {
-    const shipments = credentials.shipments || [];
+    const shipments = isArchiveMode ? (archiveShipments || []) : (credentials.shipments || []);
     if (!searchQuery) return shipments;
     
     const query = searchQuery.toLowerCase();
@@ -100,7 +114,7 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
       s.carrier.toLowerCase().includes(query) ||
       s.service.toLowerCase().includes(query)
     );
-  }, [credentials.shipments, searchQuery]);
+  }, [credentials.shipments, isArchiveMode, archiveShipments, searchQuery]);
 
   const totalPages = Math.ceil(filteredShipments.length / PAGE_SIZE);
   const paginatedShipments = filteredShipments.slice(
@@ -165,17 +179,27 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
     
     try {
       const result = await fetchStatus(shipment);
-      
-      const updatedShipments = credentials.shipments.map(s => 
-        s.id === shipment.id 
-          ? { ...s, status: result.status, hasError: result.hasError, lastUpdated: new Date().toISOString() } 
-          : s
-      );
+      const now = new Date().toISOString();
 
-      await onSave({
-        ...credentials,
-        shipments: updatedShipments
-      });
+      if (isArchiveMode && archiveShipments) {
+        const updated = archiveShipments.map(s => 
+          s.id === shipment.id 
+            ? { ...s, status: result.status, hasError: result.hasError, lastUpdated: now } 
+            : s
+        );
+        setArchive(updated, archiveFilename || 'Backup File');
+      } else {
+        const updatedShipments = credentials.shipments.map(s => 
+          s.id === shipment.id 
+            ? { ...s, status: result.status, hasError: result.hasError, lastUpdated: now } 
+            : s
+        );
+
+        await onSave({
+          ...credentials,
+          shipments: updatedShipments
+        });
+      }
 
       if (result.hasError) {
         toast.error(`Could not refresh tracking for ${shipment.trackingNumber}`);
@@ -193,6 +217,13 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
   };
 
   const deleteShipmentRecord = async (id: string) => {
+    if (isArchiveMode && archiveShipments) {
+      if (!confirm('Remove this record from the in-memory archive view? (Does not affect any files or local storage).')) return;
+      setArchive(archiveShipments.filter(s => s.id !== id), archiveFilename || 'Backup File');
+      toast.success("Record removed from in-memory archive view.");
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this tracking record? This will not cancel the actual shipment.')) return;
     
     try {
@@ -208,6 +239,11 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
   };
 
   const voidShipment = async (shipment: SawyerShipment) => {
+    if (isArchiveMode) {
+      toast.error("Voiding is disabled while inspecting a historical backup archive.");
+      return;
+    }
+
     if (!confirm(`Are you sure you want to VOID/CANCEL shipment ${shipment.trackingNumber}? This action is permanent.`)) return;
     
     setIsProcessing(true);
@@ -364,25 +400,42 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
 
       // One big update at the end to prevent clobbering
       const now = new Date().toISOString();
-      const updatedShipments = credentials.shipments.map(s => {
-        const result = results[s.id];
-        if (result) {
-          return { 
-            ...s, 
-            status: result.status, 
-            hasError: result.hasError, 
-            lastUpdated: now 
-          };
-        }
-        return s;
-      });
+      if (isArchiveMode && archiveShipments) {
+        const updatedShipments = archiveShipments.map(s => {
+          const result = results[s.id];
+          if (result) {
+            return {
+              ...s,
+              status: result.status,
+              hasError: result.hasError,
+              lastUpdated: now,
+            };
+          }
+          return s;
+        });
+        setArchive(updatedShipments, archiveFilename || 'Backup File');
+        toast.success("Archive tracking statuses refreshed in memory.");
+      } else {
+        const updatedShipments = credentials.shipments.map(s => {
+          const result = results[s.id];
+          if (result) {
+            return { 
+              ...s, 
+              status: result.status, 
+              hasError: result.hasError, 
+              lastUpdated: now 
+            };
+          }
+          return s;
+        });
 
-      await onSave({
-        ...credentials,
-        shipments: updatedShipments
-      });
-      
-      toast.success("Tracking statuses updated.");
+        await onSave({
+          ...credentials,
+          shipments: updatedShipments
+        });
+        
+        toast.success("Tracking statuses updated.");
+      }
     } catch (error) {
       console.error("[Tracking] Bulk refresh failed:", error);
       toast.error("An error occurred during bulk refresh.");
@@ -390,6 +443,29 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
       setIsRefreshing(false);
       setRefreshingIds(new Set());
     }
+  };
+
+  const handleCopyTrackingNumbers = () => {
+    const list = (isArchiveMode ? archiveShipments : credentials.shipments) || [];
+    const trackingNumbers = list.map(s => s.trackingNumber).filter(Boolean);
+    if (trackingNumbers.length === 0) {
+      toast.info("No tracking numbers available to copy.");
+      return;
+    }
+    navigator.clipboard.writeText(trackingNumbers.join('\n'));
+    toast.success(`Copied ${trackingNumbers.length} tracking numbers to clipboard.`);
+  };
+
+  const handleDownloadArchiveJson = () => {
+    const list = archiveShipments || [];
+    const blob = new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `archived-shipments-${(archiveFilename || 'export').replace(/\.json$/i, '')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Downloaded archived shipments JSON.");
   };
 
   // Initial refresh of current page on mount? Maybe not auto-refresh all to avoid rate limits
@@ -416,24 +492,131 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
       {/* Auto-maintenance tasks are handled in the main maintenance effect */}
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Tracking</h1>
-          <p className="text-zinc-500">Monitor shipments and pull live status updates.</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Tracking</h1>
+            {isArchiveMode && (
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs font-semibold uppercase">
+                Archive Mode
+              </Badge>
+            )}
+          </div>
+          <p className="text-zinc-500 text-sm mt-0.5">
+            {isArchiveMode 
+              ? `Inspecting ${archiveShipments?.length || 0} historical shipments from ${archiveFilename || 'backup'} in temporary memory.` 
+              : 'Monitor shipments and pull live status updates.'}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            className="gap-2" 
-            onClick={refreshPageStatuses}
-            disabled={isRefreshing || paginatedShipments.length === 0}
-          >
-            {isRefreshing ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-            Refresh Page Statuses
-          </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {isArchiveMode ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs h-9 bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700"
+                onClick={handleCopyTrackingNumbers}
+              >
+                <Copy size={14} />
+                Copy Tracking #s
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs h-9 bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700"
+                onClick={handleDownloadArchiveJson}
+              >
+                <Download size={14} />
+                Export JSON
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="gap-1.5 text-xs h-9" 
+                onClick={refreshPageStatuses}
+                disabled={isRefreshing || paginatedShipments.length === 0}
+              >
+                {isRefreshing ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                Check Statuses
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5 text-xs h-9 bg-zinc-900 hover:bg-zinc-800 text-white"
+                onClick={clearArchive}
+              >
+                <X size={14} />
+                Exit Archive
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                variant="outline" 
+                className="gap-2" 
+                onClick={refreshPageStatuses}
+                disabled={isRefreshing || paginatedShipments.length === 0}
+              >
+                {isRefreshing ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                Refresh Page Statuses
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700 shadow-sm"
+                onClick={() => setIsBackupDialogOpen(true)}
+              >
+                <FolderArchive size={16} className="text-amber-600" />
+                Inspect Backup File
+              </Button>
+            </>
+          )}
         </div>
       </header>
+
+      {/* Archive Mode Banner */}
+      {isArchiveMode && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 text-zinc-900 animate-in fade-in">
+          <div className="flex items-start md:items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0 text-amber-800">
+              <FolderArchive size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-sm text-zinc-900">
+                  Viewing Backup Archive: {archiveFilename || 'Backup File'}
+                </span>
+                <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] uppercase font-semibold">
+                  In-Memory (Read-Only)
+                </Badge>
+              </div>
+              <p className="text-xs text-zinc-600 mt-0.5">
+                {archiveShipments?.length || 0} historical shipments loaded into temporary memory. No changes are saved to browser storage, and the 30-day purge is bypassed.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsBackupDialogOpen(true)}
+              className="text-xs h-8 gap-1.5 bg-white"
+            >
+              <FileUp size={13} />
+              Open Another Backup
+            </Button>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={clearArchive}
+              className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs h-8 gap-1.5"
+            >
+              <X size={13} />
+              Exit Archive View
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Card className="border-zinc-200">
         <CardHeader className="pb-0">
@@ -573,20 +756,22 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
                                 Refresh Status
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="gap-2 text-red-600 focus:text-red-600 cursor-pointer"
-                                onClick={() => voidShipment(shipment)}
-                                disabled={isProcessing || shipment.status === 'VOIDED'}
-                              >
-                                <Ban size={14} />
-                                Void Shipment
-                              </DropdownMenuItem>
+                              {!isArchiveMode && (
+                                <DropdownMenuItem 
+                                  className="gap-2 text-red-600 focus:text-red-600 cursor-pointer"
+                                  onClick={() => voidShipment(shipment)}
+                                  disabled={isProcessing || shipment.status === 'VOIDED'}
+                                >
+                                  <Ban size={14} />
+                                  Void Shipment
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem 
                                 className="gap-2 text-red-600 focus:text-red-600 cursor-pointer"
                                 onClick={() => deleteShipmentRecord(shipment.id)}
                               >
                                 <Trash2 size={14} />
-                                Delete Record
+                                {isArchiveMode ? 'Remove from View' : 'Delete Record'}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -872,6 +1057,17 @@ export default function Tracking({ credentials, onSave, showHiddenData = false }
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Backup Inspector Dialog */}
+      <BackupInspectorDialog
+        open={isBackupDialogOpen}
+        onOpenChange={setIsBackupDialogOpen}
+        sessionPassword={sessionPassword}
+        onLoaded={(shipments, filename) => {
+          setArchive(shipments, filename);
+          setCurrentPage(1);
+        }}
+      />
     </div>
   );
 }

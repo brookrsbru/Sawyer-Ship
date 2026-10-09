@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useBlocker } from 'react-router-dom';
+import { useBlocker, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { SawyerCredentials } from '@/src/hooks/use-sawyer-storage';
 import { COUNTRY_NAMES } from '@/src/lib/countries';
-import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff, Activity, CheckCircle2, AlertTriangle, X, Bell, OctagonX, RefreshCw } from 'lucide-react';
+import { Save, Download, Upload, Shield, Globe, Truck, Info, FileJson, ExternalLink, Plus, Trash2, ChevronRight, LayoutDashboard, Package, Lock, Loader2, Settings as SettingsIcon, HardDrive, Search, Eye, EyeOff, Activity, CheckCircle2, AlertTriangle, X, Bell, OctagonX, RefreshCw, FolderArchive } from 'lucide-react';
+import { useBackupArchive } from '@/src/hooks/use-backup-archive';
+import { BackupInspectorDialog } from '@/src/components/BackupInspectorDialog';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -48,7 +50,8 @@ export default function Settings({
   onImport,
   showHiddenData = false,
   onRevealHiddenData,
-  onHideHiddenData
+  onHideHiddenData,
+  sessionPassword
 }: { 
   credentials: SawyerCredentials, 
   onSave: (data: SawyerCredentials) => Promise<void>,
@@ -56,8 +59,12 @@ export default function Settings({
   onImport: (data: string) => void,
   showHiddenData?: boolean,
   onRevealHiddenData?: (password: string) => Promise<boolean>,
-  onHideHiddenData?: () => void
+  onHideHiddenData?: () => void,
+  sessionPassword?: string | null
 }) {
+  const navigate = useNavigate();
+  const { setArchive } = useBackupArchive();
+  const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [formData, setFormData] = useState<SawyerCredentials>(credentials);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<string | null>(null);
@@ -1619,6 +1626,31 @@ export default function Settings({
                     </div>
                   </div>
 
+                  <Separator />
+
+                  <div className="space-y-2 p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <Label className="font-semibold text-zinc-900 flex items-center gap-1.5">
+                        <FolderArchive size={16} className="text-amber-600" />
+                        Inspect Historical Backup (Read-Only)
+                      </Label>
+                      <span className="text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
+                        Zero Storage Impact
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 leading-relaxed">
+                      Need to check tracking info from a backup older than 30 days? Inspect the backup in temporary memory without committing it to local storage or triggering the 30-day auto-purge.
+                    </p>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full gap-2 bg-white hover:bg-zinc-100 border-zinc-300 text-zinc-800 mt-1"
+                      onClick={() => setIsBackupDialogOpen(true)}
+                    >
+                      <FolderArchive size={16} /> Open Backup Tracking Inspector
+                    </Button>
+                  </div>
+
                   <Dialog open={isRevealModalOpen} onOpenChange={setIsRevealModalOpen}>
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
@@ -1693,6 +1725,16 @@ export default function Settings({
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+
+                  <BackupInspectorDialog
+                    open={isBackupDialogOpen}
+                    onOpenChange={setIsBackupDialogOpen}
+                    sessionPassword={sessionPassword}
+                    onLoaded={(shipments, filename) => {
+                      setArchive(shipments, filename);
+                      navigate('/tracking');
+                    }}
+                  />
                 </CardContent>
               </Card>
             </section>

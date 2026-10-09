@@ -428,6 +428,7 @@ export function useSawyerStorage() {
     hideHiddenData,
     verifyPassword,
     hasStoredData: !!localStorage.getItem('sawyer_ship_data'),
-    hasRecoveryBlob: !!localStorage.getItem('sawyer_ship_recovery')
+    hasRecoveryBlob: !!localStorage.getItem('sawyer_ship_recovery'),
+    sessionPassword: masterPassword
   };
 }
